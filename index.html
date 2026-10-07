@@ -52,6 +52,7 @@
 
       <button id="dt-sound-btn" class="icon-btn" title="Silenciar / Activar sonido" aria-label="Sonido">🔊</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
+      <button id="dt-stats-btn" class="icon-btn" title="Estadísticas" aria-label="Estadísticas">📊</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
       <button id="dt-pause-btn" class="btn btn-secondary">⏸ Pausa</button>
     </div>
@@ -154,6 +155,7 @@
         <div class="drawer-actions">
           <button id="drawer-resume-btn" class="btn btn-primary">▶ Continuar Jugando</button>
           <button id="drawer-restart-btn" class="btn btn-secondary">🔄 Reiniciar Partida</button>
+          <button id="drawer-stats-btn" class="btn btn-outline">📊 Estadísticas</button>
           <button id="drawer-tutorial-btn" class="btn btn-outline">❓ Ver Tutorial Paso a Paso</button>
         </div>
       </div>
@@ -223,6 +225,60 @@
       </div>
       <button id="restart-overlay-btn" class="btn btn-primary">🔄 Jugar de nuevo</button>
     </div>
+  </div>
+
+  <div id="statistics-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="statistics-title">
+    <section class="statistics-card">
+      <header class="statistics-header">
+        <h2 id="statistics-title">📊 Crónicas de Kukulcán</h2>
+        <button id="close-statistics-btn" class="close-btn" aria-label="Cerrar estadísticas">✕</button>
+      </header>
+      <p class="statistics-description">Tus mejores registros guardados en este navegador, separados por dificultad.</p>
+      <div class="statistics-table-wrap">
+        <table class="statistics-table">
+          <thead>
+            <tr>
+              <th scope="col">Dificultad</th>
+              <th scope="col">Partidas</th>
+              <th scope="col">Mejor puntuación</th>
+              <th scope="col">Supervivencia</th>
+              <th scope="col">Guardianes vencidos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Fácil</th>
+              <td data-stat="easy" data-field="gamesPlayed">0</td>
+              <td data-stat="easy" data-field="bestScore">0</td>
+              <td data-stat="easy" data-field="bestSurvivalMs">0 s</td>
+              <td data-stat="easy" data-field="guardiansDefeated">0</td>
+            </tr>
+            <tr>
+              <th scope="row">Medio</th>
+              <td data-stat="medium" data-field="gamesPlayed">0</td>
+              <td data-stat="medium" data-field="bestScore">0</td>
+              <td data-stat="medium" data-field="bestSurvivalMs">0 s</td>
+              <td data-stat="medium" data-field="guardiansDefeated">0</td>
+            </tr>
+            <tr>
+              <th scope="row">Difícil</th>
+              <td data-stat="hard" data-field="gamesPlayed">0</td>
+              <td data-stat="hard" data-field="bestScore">0</td>
+              <td data-stat="hard" data-field="bestSurvivalMs">0 s</td>
+              <td data-stat="hard" data-field="guardiansDefeated">0</td>
+            </tr>
+            <tr>
+              <th scope="row">Pesadilla</th>
+              <td data-stat="extreme" data-field="gamesPlayed">0</td>
+              <td data-stat="extreme" data-field="bestScore">0</td>
+              <td data-stat="extreme" data-field="bestSurvivalMs">0 s</td>
+              <td data-stat="extreme" data-field="guardiansDefeated">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="statistics-storage-status" class="statistics-storage-status" role="status"></p>
+    </section>
   </div>
 
   <script src="script.js"></script>

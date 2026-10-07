@@ -13,6 +13,7 @@ const dtTutorialBtn = document.getElementById('dt-tutorial-btn');
 const dtStartBtn = document.getElementById('dt-start-btn');
 const dtPauseBtn = document.getElementById('dt-pause-btn');
 const difficultySelect = document.getElementById('difficulty-select');
+const dtStatsBtn = document.getElementById('dt-stats-btn');
 
 // HUD Móvil
 const menuToggleBtn = document.getElementById('menu-toggle-btn');
@@ -31,6 +32,7 @@ const drawerSoundToggle = document.getElementById('drawer-sound-toggle');
 const drawerResumeBtn = document.getElementById('drawer-resume-btn');
 const drawerRestartBtn = document.getElementById('drawer-restart-btn');
 const drawerTutorialBtn = document.getElementById('drawer-tutorial-btn');
+const drawerStatsBtn = document.getElementById('drawer-stats-btn');
 
 // Insignias y Alertas
 const immunityBadge = document.getElementById('immunity-badge');
@@ -62,6 +64,9 @@ const overlayReason = document.getElementById('overlay-reason');
 const finalScoreElement = document.getElementById('final-score');
 const finalLengthElement = document.getElementById('final-length');
 const restartOverlayBtn = document.getElementById('restart-overlay-btn');
+const statisticsModal = document.getElementById('statistics-modal');
+const closeStatisticsBtn = document.getElementById('close-statistics-btn');
+const statisticsStorageStatus = document.getElementById('statistics-storage-status');
 
 // ========================================================
 // CONFIGURACIÓN DE CUADRÍCULA Y VELOCIDADES
@@ -75,6 +80,13 @@ const SPEEDS = {
   medium: 145,
   hard: 105,
   extreme: 75
+};
+const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
+const DIFFICULTY_NAMES = {
+  easy: 'Fácil',
+  medium: 'Medio',
+  hard: 'Difícil',
+  extreme: 'Pesadilla'
 };
 
 // ========================================================
@@ -92,6 +104,46 @@ let isGameRunning = false;
 let isPaused = false;
 let gameInterval = null;
 let isMuted = localStorage.getItem('snakeIoMuted') === 'true';
+let runStartedAt = null;
+let runPausedAt = null;
+let runPausedMs = 0;
+let runDifficulty = null;
+let runGuardiansDefeated = 0;
+let resumeAfterStatistics = false;
+
+function createEmptyGameStatistics() {
+  return Object.fromEntries(Object.keys(DIFFICULTY_NAMES).map(difficulty => [
+    difficulty,
+    { gamesPlayed: 0, bestScore: 0, bestSurvivalMs: 0, guardiansDefeated: 0 }
+  ]));
+}
+
+function isValidGameStatistics(value) {
+  return value && typeof value === 'object' &&
+    Object.keys(DIFFICULTY_NAMES).every(difficulty => {
+      const record = value[difficulty];
+      return record && ['gamesPlayed', 'bestScore', 'bestSurvivalMs', 'guardiansDefeated']
+        .every(field => Number.isFinite(record[field]) && record[field] >= 0);
+    });
+}
+
+function loadGameStatistics() {
+  try {
+    const saved = localStorage.getItem(STATISTICS_STORAGE_KEY);
+    if (!saved) return createEmptyGameStatistics();
+    const parsed = JSON.parse(saved);
+    if (!isValidGameStatistics(parsed)) {
+      throw new Error('El formato guardado no coincide con el esquema de estadísticas.');
+    }
+    return parsed;
+  } catch (error) {
+    console.error('No se pudieron cargar las estadísticas guardadas.', error);
+    statisticsStorageStatus.textContent = 'No se pudieron leer las estadísticas guardadas en este navegador.';
+    return createEmptyGameStatistics();
+  }
+}
+
+let gameStatistics = loadGameStatistics();
 
 // Mecánica de Turbo con Recarga Obligatoria
 let isTurbo = false;
@@ -688,6 +740,7 @@ function updateEnemySnakeAI() {
       if (isImmune) {
         screenShake = 10;
         playEnemyDefeatedSound();
+        runGuardiansDefeated++;
         score += 100;
         spawnFloatingText('+100 🛡️ ¡GUARDIÁN VENCIDO!', playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, '#facc15');
         updateScoresUI();
@@ -706,6 +759,67 @@ function updateEnemySnakeAI() {
 // ========================================================
 // LÓGICA DE PARTIDA Y ALIMENTOS
 // ========================================================
+function getRunDurationMs(now = Date.now()) {
+  if (runStartedAt === null) return 0;
+  const currentPauseMs = runPausedAt === null ? 0 : Math.max(0, now - runPausedAt);
+  return Math.max(0, now - runStartedAt - runPausedMs - currentPauseMs);
+}
+
+function formatDuration(milliseconds) {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes} min ${seconds} s` : `${seconds} s`;
+}
+
+function updateStatisticsUI() {
+  document.querySelectorAll('[data-stat][data-field]').forEach(cell => {
+    const { stat, field } = cell.dataset;
+    const value = gameStatistics[stat][field];
+    cell.textContent = field === 'bestSurvivalMs' ? formatDuration(value) : value;
+  });
+}
+
+function saveGameStatistics() {
+  updateStatisticsUI();
+  try {
+    localStorage.setItem(STATISTICS_STORAGE_KEY, JSON.stringify(gameStatistics));
+    statisticsStorageStatus.textContent = '';
+  } catch (error) {
+    console.error('No se pudieron guardar las estadísticas.', error);
+    statisticsStorageStatus.textContent = 'No se pudieron guardar las estadísticas en este navegador.';
+  }
+}
+
+function finishRunStatistics() {
+  if (runStartedAt === null || runDifficulty === null) return;
+  const record = gameStatistics[runDifficulty];
+  record.gamesPlayed++;
+  record.bestScore = Math.max(record.bestScore, score);
+  record.bestSurvivalMs = Math.max(record.bestSurvivalMs, getRunDurationMs());
+  record.guardiansDefeated += runGuardiansDefeated;
+  saveGameStatistics();
+  runStartedAt = null;
+  runPausedAt = null;
+  runPausedMs = 0;
+  runDifficulty = null;
+  runGuardiansDefeated = 0;
+}
+
+function openStatistics() {
+  resumeAfterStatistics = isGameRunning && !isPaused;
+  if (resumeAfterStatistics) togglePause();
+  drawerMenu.classList.add('hidden');
+  updateStatisticsUI();
+  statisticsModal.classList.remove('hidden');
+}
+
+function closeStatistics() {
+  statisticsModal.classList.add('hidden');
+  if (resumeAfterStatistics && isGameRunning && isPaused) togglePause();
+  resumeAfterStatistics = false;
+}
+
 function resetGame() {
   const startX = Math.floor(gridCols / 2);
   const startY = Math.floor(gridRows / 2);
@@ -782,6 +896,7 @@ function gameUpdate() {
       if (isImmune) {
         screenShake = 10;
         playEnemyDefeatedSound();
+        runGuardiansDefeated++;
         score += 100;
         spawnFloatingText('+100 🛡️ ¡GUARDIÁN VENCIDO!', head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#facc15');
         updateScoresUI();
@@ -1327,9 +1442,15 @@ function restartInterval() {
 // Iniciar o reiniciar juego
 function startGame() {
   getAudioContext();
+  if (isGameRunning) finishRunStatistics();
   resetGame();
   isGameRunning = true;
   isPaused = false;
+  runStartedAt = Date.now();
+  runPausedAt = null;
+  runPausedMs = 0;
+  runDifficulty = difficultySelect.value;
+  runGuardiansDefeated = 0;
   updateTurboUI();
 
   dtStartBtn.textContent = '🔄 Reiniciar';
@@ -1353,9 +1474,14 @@ function togglePause() {
 
   if (isPaused) {
     enemyPauseStartedAt = Date.now();
+    runPausedAt = Date.now();
     stopSuspenseMusic();
     drawerMenu.classList.remove('hidden');
   } else {
+    if (runPausedAt !== null) {
+      runPausedMs += Date.now() - runPausedAt;
+      runPausedAt = null;
+    }
     if (enemyPauseStartedAt !== null) {
       const pauseDuration = Date.now() - enemyPauseStartedAt;
       enemyGuardians.forEach(guardian => {
@@ -1370,6 +1496,7 @@ function togglePause() {
 }
 
 function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
+  finishRunStatistics();
   isGameRunning = false;
   clearInterval(gameInterval);
   clearInterval(turboTimerInterval);
@@ -1498,6 +1625,11 @@ btnTurbo.addEventListener('pointerdown', (e) => {
 
 // Teclado
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) {
+    closeStatistics();
+    return;
+  }
+
   if (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused)) {
     triggerTurboBurst();
   }
@@ -1536,6 +1668,12 @@ dtStartBtn.addEventListener('click', startGame);
 dtPauseBtn.addEventListener('click', togglePause);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
+dtStatsBtn.addEventListener('click', openStatistics);
+drawerStatsBtn.addEventListener('click', openStatistics);
+closeStatisticsBtn.addEventListener('click', closeStatistics);
+statisticsModal.addEventListener('click', (event) => {
+  if (event.target === statisticsModal) closeStatistics();
+});
 
 menuToggleBtn.addEventListener('click', () => {
   if (isGameRunning && !isPaused) {
@@ -1595,4 +1733,5 @@ bindDpad(btnRight, { x: 1, y: 0 });
 // Inicializar estado visual inicial
 resetGame();
 draw();
+updateStatisticsUI();
 showTutorialStep(1); // Inicia mostrando el tutorial interactivo
