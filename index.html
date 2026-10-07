@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#11131b">
+  <meta name="description" content="Kukulcán - Game: una aventura de serpientes, jade y maíz inspirada en la mitología maya.">
+  <title>Kukulcán - Game</title>
+  <!-- Favicon e iconos con snk.png -->
+  <link rel="icon" type="image/png" href="snk.png">
+  <link rel="apple-touch-icon" href="snk.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Canvas de juego a pantalla completa -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- ========================================== -->
+  <!-- TOOLBAR COMPLETO PARA PANTALLAS GRANDES (PC/TABLET) -->
+  <!-- ========================================== -->
+  <header id="desktop-toolbar" class="desktop-toolbar">
+    <div class="toolbar-left">
+      <img src="snk.png" alt="Serpiente emplumada" class="brand-logo">
+      <h1 class="brand-title">Kukulcán - Game <span class="brand-subtitle">Aventura de serpientes</span></h1>
+    </div>
+
+    <div class="toolbar-center">
+      <div class="stat-pill">
+        <span class="stat-label">Puntos:</span>
+        <span id="dt-score" class="stat-value">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Récord:</span>
+        <span id="dt-high-score" class="stat-value">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Longitud:</span>
+        <span id="dt-length" class="stat-value">3</span>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <div class="select-box">
+        <label for="difficulty-select">Dificultad:</label>
+        <select id="difficulty-select" class="styled-select">
+          <option value="easy">Fácil</option>
+          <option value="medium" selected>Medio</option>
+          <option value="hard">Difícil</option>
+          <option value="extreme">Pesadilla</option>
+        </select>
+      </div>
+
+      <button id="dt-sound-btn" class="icon-btn" title="Silenciar / Activar sonido" aria-label="Sonido">🔊</button>
+      <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
+      <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
+      <button id="dt-pause-btn" class="btn btn-secondary">⏸ Pausa</button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- HUD MINIMALISTA PARA MÓVILES (PANTALLA LIMPIA) -->
+  <!-- ========================================== -->
+  <header id="mobile-hud" class="mobile-hud">
+    <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir Menú">☰</button>
+
+    <div class="hud-center-pill">
+      <img src="snk.png" alt="Serpiente emplumada" class="hud-mini-logo">
+      <span class="hud-game-title">Kukulcán - Game</span>
+      <span class="hud-stat">Puntos: <strong id="mb-score">0</strong></span>
+      <span class="hud-divider">|</span>
+      <span class="hud-stat">Récord: <strong id="mb-high-score">0</strong></span>
+    </div>
+
+    <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
+  </header>
+
+  <!-- Insignias de Estado en Partida -->
+  <div class="status-badges-container">
+    <div id="immunity-badge" class="hud-badge immunity-badge hidden">
+      🛡️ ¡INMUNE! <span id="immunity-timer">10</span>s
+    </div>
+    <div id="threat-badge" class="hud-badge threat-badge hidden">
+      ◆ Guardián al acecho
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- FURIA DE KUKULCÁN -->
+  <!-- ========================================== -->
+  <div class="turbo-container">
+    <button id="btn-turbo" class="turbo-btn" aria-label="Activar Furia de Kukulcán">
+      <span id="turbo-icon" class="turbo-icon">🔥</span>
+      <span id="turbo-label" class="turbo-label">FURIA</span>
+      <div id="turbo-cooldown-bar" class="turbo-progress"></div>
+    </button>
+  </div>
+
+  <!-- Cruceta táctil opcional para móviles -->
+  <div id="touch-controls" class="touch-controls hidden">
+    <button id="btn-up" class="pad-btn" aria-label="Arriba">▲</button>
+    <div class="pad-row">
+      <button id="btn-left" class="pad-btn" aria-label="Izquierda">◀</button>
+      <div class="pad-center"></div>
+      <button id="btn-right" class="pad-btn" aria-label="Derecha">▶</button>
+    </div>
+    <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MENÚ HAMBURGUESA DESPLEGABLE EN MÓVILES -->
+  <!-- ========================================== -->
+  <div id="drawer-menu" class="modal-backdrop hidden">
+    <div class="drawer-card">
+      <div class="drawer-header">
+        <div class="drawer-brand">
+          <img src="snk.png" alt="Serpiente emplumada" class="drawer-logo">
+              <h2>Templo de Kukulcán</h2>
+        </div>
+        <button id="close-drawer-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="stat-summary-box">
+          <div class="summary-col">
+            <span class="sum-lbl">Puntos</span>
+            <span id="drawer-score" class="sum-val">0</span>
+          </div>
+          <div class="summary-col">
+            <span class="sum-lbl">Récord</span>
+            <span id="drawer-high-score" class="sum-val">0</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="drawer-difficulty">⚡ Dificultad / Velocidad:</label>
+          <select id="drawer-difficulty" class="styled-select">
+            <option value="easy">Fácil (Tranquilo)</option>
+            <option value="medium" selected>Medio (Normal)</option>
+            <option value="hard">Difícil (Rápido)</option>
+            <option value="extreme">Pesadilla (Extremo)</option>
+          </select>
+        </div>
+
+        <div class="toggle-row">
+          <label for="drawer-dpad-toggle">Cruceta táctil en pantalla:</label>
+          <input type="checkbox" id="drawer-dpad-toggle" class="styled-checkbox">
+        </div>
+
+        <div class="toggle-row">
+          <label for="drawer-sound-toggle">Sonido y música de suspenso:</label>
+          <input type="checkbox" id="drawer-sound-toggle" class="styled-checkbox" checked>
+        </div>
+
+        <div class="drawer-actions">
+          <button id="drawer-resume-btn" class="btn btn-primary">▶ Continuar Jugando</button>
+          <button id="drawer-restart-btn" class="btn btn-secondary">🔄 Reiniciar Partida</button>
+          <button id="drawer-tutorial-btn" class="btn btn-outline">❓ Ver Tutorial Paso a Paso</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TUTORIAL INTERACTIVO PASO A PASO (ONBOARDING) -->
+  <!-- ========================================== -->
+  <div id="tutorial-modal" class="modal-backdrop">
+    <div class="tutorial-card">
+      <div class="tutorial-header">
+        <img src="snk.png" alt="Serpiente emplumada" class="tutorial-logo">
+        <h2 id="tutorial-step-title">🎮 Cómo Moverte</h2>
+      </div>
+
+      <div class="tutorial-content">
+        <!-- Paso 1 -->
+        <div id="step-1" class="tutorial-step active">
+          <div class="tutorial-icon-banner">🪶 🐍</div>
+          <p class="tutorial-lead"><strong>Guía a la serpiente emplumada:</strong> Desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
+          <p class="tutorial-tip">◆ <strong>Caminos del inframundo:</strong> Cruza los bordes de la pantalla y aparecerás por el lado opuesto.</p>
+        </div>
+
+        <!-- Paso 2 -->
+        <div id="step-2" class="tutorial-step">
+          <div class="tutorial-icon-banner">🌽 🍫 🪶</div>
+          <p class="tutorial-lead"><strong>Ofrendas sagradas:</strong> Reúne maíz, cacao, jade y reliquias geométricas para crecer y sumar puntos.</p>
+          <p class="tutorial-tip">🔥 <strong>Furia de Kukulcán:</strong> Invoca su poder durante <strong>3 segundos</strong> con el botón o con <strong>Espacio/Shift</strong>. El aro azul muestra cuándo vuelve a estar listo.</p>
+        </div>
+
+        <!-- Paso 3 -->
+        <div id="step-3" class="tutorial-step">
+          <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
+          <p class="tutorial-lead"><strong>Los guardianes acechan:</strong> Serpientes rojas, naranjas, amarillas y violetas aparecerán para perseguirte. El primero llega pronto; los siguientes dependen de la dificultad.</p>
+          <p class="tutorial-tip">🛡️ <strong>Amuleto de jade:</strong> Recógelo para obtener <strong>10 segundos de protección</strong> y ver a Kukulcán exhalar fuego. Hay más jades y se reponen antes en las dificultades altas. Para vencer a un guardián, embístelo mientras estás protegido; entonces se tambalea y deja ofrendas de oro.</p>
+        </div>
+      </div>
+
+      <!-- Indicadores de puntos -->
+      <div class="step-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+
+      <!-- Botones de Navegación del Tutorial -->
+      <div class="tutorial-footer">
+        <button id="tut-prev-btn" class="btn btn-outline hidden">Anterior</button>
+        <button id="tut-next-btn" class="btn btn-primary">Siguiente ➔</button>
+        <button id="tut-start-btn" class="btn btn-primary hidden">🚀 ¡A Jugar!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL DE GAME OVER -->
+  <!-- ========================================== -->
+  <div id="game-overlay" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <img src="snk.png" alt="Serpiente emplumada" class="modal-gameover-logo">
+      <h2 id="overlay-title">El viaje termina</h2>
+      <p id="overlay-reason" class="death-reason">Has chocado con tu propio cuerpo</p>
+      <div class="final-stats">
+        <p>Puntuación: <strong id="final-score">0</strong></p>
+        <p>Longitud final: <strong id="final-length">3</strong></p>
+      </div>
+      <button id="restart-overlay-btn" class="btn btn-primary">🔄 Jugar de nuevo</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
