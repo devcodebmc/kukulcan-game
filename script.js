@@ -620,18 +620,19 @@ function updateTurboUI() {
 // Rastro sutil en la cola durante Turbo
 function spawnTurboTrail(x, y) {
   const warmColors = ['#ef4c24', '#ff7a24', '#ffc04d', '#fff0a3'];
-  for (let i = 0; i < 2; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 0.6 + 0.2;
+  const backward = Math.atan2(-direction.y, -direction.x);
+  for (let i = 0; i < 3; i++) {
+    const angle = backward + (Math.random() - 0.5) * Math.PI;
+    const speed = Math.random() * 0.8 + 0.5;
     particles.push({
-      x: x + (Math.random() - 0.5) * 5,
-      y: y + (Math.random() - 0.5) * 5,
-      vx: Math.cos(angle) * speed * 0.4,
-      vy: Math.sin(angle) * speed * 0.4,
-      size: Math.random() * 2 + 1.2,
+      x: x + (Math.random() - 0.5) * 7,
+      y: y + (Math.random() - 0.5) * 7,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: Math.random() * 1.8 + 2,
       color: warmColors[Math.floor(Math.random() * warmColors.length)],
-      alpha: 0.6,
-      decay: 0.08
+      alpha: 0.9,
+      decay: 0.045
     });
   }
 }
