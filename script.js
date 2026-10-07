@@ -67,6 +67,7 @@ const restartOverlayBtn = document.getElementById('restart-overlay-btn');
 const statisticsModal = document.getElementById('statistics-modal');
 const closeStatisticsBtn = document.getElementById('close-statistics-btn');
 const statisticsStorageStatus = document.getElementById('statistics-storage-status');
+const countdownOverlay = document.getElementById('countdown-overlay');
 
 // ========================================================
 // CONFIGURACIÓN DE CUADRÍCULA Y VELOCIDADES
@@ -89,6 +90,29 @@ const DIFFICULTY_NAMES = {
   extreme: 'Pesadilla'
 };
 
+let storageUnavailable = false;
+
+function safeGetItem(key, fallback) {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch (error) {
+    storageUnavailable = true;
+    console.warn(`No se pudo leer "${key}" del almacenamiento local.`, error);
+    return fallback;
+  }
+}
+
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, String(value));
+    return true;
+  } catch (error) {
+    storageUnavailable = true;
+    console.warn(`No se pudo guardar "${key}" en el almacenamiento local.`, error);
+    return false;
+  }
+}
+
 // ========================================================
 // ESTADO DEL JUEGO
 // ========================================================
@@ -97,19 +121,27 @@ let foods = [];
 let bonusFoods = [];
 let shieldFoods = [];
 let direction = { x: 1, y: 0 };
-let nextDirection = { x: 1, y: 0 };
+let directionQueue = [];
 let score = 0;
-let highScore = parseInt(localStorage.getItem('snakeIoHighScore') || '0', 10);
+let highScore = Math.max(0, Number.parseInt(safeGetItem('snakeIoHighScore', '0'), 10) || 0);
 let isGameRunning = false;
 let isPaused = false;
-let gameInterval = null;
-let isMuted = localStorage.getItem('snakeIoMuted') === 'true';
+let isMuted = safeGetItem('snakeIoMuted', 'false') === 'true';
 let runStartedAt = null;
-let runPausedAt = null;
-let runPausedMs = 0;
 let runDifficulty = null;
 let runGuardiansDefeated = 0;
 let resumeAfterStatistics = false;
+let gameTime = 0;
+let simulationAccumulator = 0;
+let lastFrameTimestamp = null;
+let animationFrameId = null;
+let countdownEndsAt = null;
+let countdownValue = 0;
+let renderInterpolation = 1;
+let previousSnakePositions = [];
+let previousGuardianPositions = new Map();
+let boardCanvas = null;
+let boardContext = null;
 
 function createEmptyGameStatistics() {
   return Object.fromEntries(Object.keys(DIFFICULTY_NAMES).map(difficulty => [
@@ -128,14 +160,17 @@ function isValidGameStatistics(value) {
 }
 
 function loadGameStatistics() {
+  const saved = safeGetItem(STATISTICS_STORAGE_KEY, null);
+  if (storageUnavailable) {
+    statisticsStorageStatus.textContent = 'Este navegador no permite guardar estadísticas; podrás jugar sin que se conserve el historial.';
+    return createEmptyGameStatistics();
+  }
+  if (!saved) return createEmptyGameStatistics();
+
   try {
-    const saved = localStorage.getItem(STATISTICS_STORAGE_KEY);
-    if (!saved) return createEmptyGameStatistics();
     const parsed = JSON.parse(saved);
-    if (!isValidGameStatistics(parsed)) {
-      throw new Error('El formato guardado no coincide con el esquema de estadísticas.');
-    }
-    return parsed;
+    if (isValidGameStatistics(parsed)) return parsed;
+    throw new Error('El formato guardado no coincide con el esquema de estadísticas.');
   } catch (error) {
     console.error('No se pudieron cargar las estadísticas guardadas.', error);
     statisticsStorageStatus.textContent = 'No se pudieron leer las estadísticas guardadas en este navegador.';
@@ -149,23 +184,22 @@ let gameStatistics = loadGameStatistics();
 let isTurbo = false;
 let turboRemaining = 0;
 let turboCooldown = 0;
-let turboTimerInterval = null;
+let turboCooldownUntil = 0;
+let turboReadyAt = 0;
 const TURBO_DURATION_MS = 3000;
 const TURBO_COOLDOWN_MS = 5000;
-const TURBO_UPDATE_INTERVAL_MS = 50;
 
 // Inmunidad
 let isImmune = false;
 let immunitySeconds = 0;
-let immunityCountdownInterval = null;
+let immunityExpiresAt = 0;
 
 // Guardianes rojos
 let enemyGuardians = [];
 let nextEnemyId = 1;
 let hasSpawnedGuardian = false;
-let enemyPauseStartedAt = null;
-let enemySpawnTimer = null;
-let jadeSpawnTimer = null;
+let enemySpawnAt = null;
+let jadeSpawnAt = null;
 const GUARDIAN_TARGETS = { easy: 1, medium: 2, hard: 3, extreme: 4 };
 const GUARDIAN_PALETTES = [
   { head: '#e2574c', body: '#9b2929', crest: '#ff9b83' },
@@ -190,12 +224,11 @@ let floatingTexts = [];
 let screenShake = 0;
 let blinkCounter = 0;
 let fireBreath = null;
-let fireBreathFrame = null;
 const FIRE_BREATH_CYCLE_MS = 900;
 const FIRE_BREATH_ACTIVE_MS = 540;
 
 // Preferencia de cruceta
-let showDpad = localStorage.getItem('snakeIoShowDpad') === 'true';
+let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
 drawerDpadToggle.checked = showDpad;
 touchControls.classList.toggle('hidden', !showDpad);
 
@@ -226,7 +259,49 @@ function resizeCanvas() {
   gridCols = Math.max(14, Math.floor(width / TILE_SIZE));
   gridRows = Math.max(14, Math.floor(height / TILE_SIZE));
 
+  rebuildBoardCanvas(width, height, dpr);
   if (!isGameRunning) draw();
+}
+
+function rebuildBoardCanvas(width = window.innerWidth, height = window.innerHeight, dpr = window.devicePixelRatio || 1) {
+  boardCanvas = document.createElement('canvas');
+  boardCanvas.width = Math.max(1, Math.floor(width * dpr));
+  boardCanvas.height = Math.max(1, Math.floor(height * dpr));
+  boardContext = boardCanvas.getContext('2d');
+  boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  boardContext.fillStyle = '#141720';
+  boardContext.fillRect(0, 0, width, height);
+  boardContext.strokeStyle = 'rgba(144, 153, 177, 0.16)';
+  boardContext.lineWidth = 1;
+  const offsetX = (width % TILE_SIZE) / 2;
+  const offsetY = (height % TILE_SIZE) / 2;
+
+  for (let x = offsetX; x <= width; x += TILE_SIZE) {
+    boardContext.beginPath();
+    boardContext.moveTo(x, 0);
+    boardContext.lineTo(x, height);
+    boardContext.stroke();
+  }
+  for (let y = offsetY; y <= height; y += TILE_SIZE) {
+    boardContext.beginPath();
+    boardContext.moveTo(0, y);
+    boardContext.lineTo(width, y);
+    boardContext.stroke();
+  }
+
+  boardContext.fillStyle = 'rgba(198, 164, 85, 0.1)';
+  for (let x = offsetX + TILE_SIZE; x <= width; x += TILE_SIZE * 4) {
+    for (let y = offsetY + TILE_SIZE; y <= height; y += TILE_SIZE * 4) {
+      boardContext.beginPath();
+      boardContext.moveTo(x, y - 2);
+      boardContext.lineTo(x + 2, y);
+      boardContext.lineTo(x, y + 2);
+      boardContext.lineTo(x - 2, y);
+      boardContext.closePath();
+      boardContext.fill();
+    }
+  }
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
@@ -383,7 +458,7 @@ function updateSoundUI() {
 
 function toggleSound(forceState = null) {
   isMuted = forceState !== null ? !forceState : !isMuted;
-  localStorage.setItem('snakeIoMuted', isMuted);
+  safeSetItem('snakeIoMuted', isMuted);
   updateSoundUI();
 
   if (!isMuted && isGameRunning && !isPaused) {
@@ -399,38 +474,130 @@ function toggleSound(forceState = null) {
 // ========================================================
 function triggerTurboBurst() {
   // Solo se puede usar si el juego corre, no está pausado y no está en recarga
-  if (isTurbo || turboCooldown > 0 || !isGameRunning || isPaused) return;
+  if (isTurbo || turboCooldown > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
 
   isTurbo = true;
   turboRemaining = TURBO_DURATION_MS;
+  turboReadyAt = gameTime + TURBO_DURATION_MS;
+  turboCooldownUntil = turboReadyAt + TURBO_COOLDOWN_MS;
   updateTurboUI();
 
   playTurboStartSound();
-  restartInterval();
+}
 
-  clearInterval(turboTimerInterval);
-  turboTimerInterval = setInterval(() => {
-    if (isPaused || !isGameRunning) return;
+function updateGameTimers(elapsedMs) {
+  gameTime += elapsedMs;
 
-    if (isTurbo) {
-      turboRemaining = Math.max(0, turboRemaining - TURBO_UPDATE_INTERVAL_MS);
-      if (turboRemaining === 0) {
-        // Se terminó el impulso: ENTRA EN RECARGA OBLIGATORIA
-        isTurbo = false;
-        turboCooldown = TURBO_COOLDOWN_MS;
-        restartInterval();
+  if (isImmune) {
+    immunitySeconds = Math.max(0, Math.ceil((immunityExpiresAt - gameTime) / 1000));
+    immunityTimerSpan.textContent = immunitySeconds;
+    if (gameTime >= immunityExpiresAt) deactivateImmunity();
+  }
+
+  if (isTurbo && gameTime >= turboReadyAt) {
+    isTurbo = false;
+    turboRemaining = 0;
+    turboCooldown = Math.max(0, turboCooldownUntil - gameTime);
+  }
+  if (!isTurbo && turboCooldown > 0) {
+    turboCooldown = Math.max(0, turboCooldownUntil - gameTime);
+    if (turboCooldown === 0) playTurboReadySound();
+  } else if (isTurbo) {
+    turboRemaining = Math.max(0, turboReadyAt - gameTime);
+  }
+  updateTurboUI();
+
+  if (enemySpawnAt !== null && gameTime >= enemySpawnAt) {
+    enemySpawnAt = null;
+    const spawned = spawnEnemySnake();
+    scheduleEnemySpawn(spawned ? null : GUARDIAN_SPAWN_RETRY_MS);
+  }
+
+  if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) {
+    jadeSpawnAt = null;
+    maybeSpawnShieldFood();
+  }
+}
+
+function startCountdown() {
+  countdownEndsAt = performance.now() + 3000;
+  countdownValue = 3;
+  countdownOverlay.textContent = String(countdownValue);
+  countdownOverlay.classList.remove('hidden');
+}
+
+function cancelCountdown() {
+  countdownEndsAt = null;
+  countdownValue = 0;
+  countdownOverlay.textContent = '';
+  countdownOverlay.classList.add('hidden');
+}
+
+function gameLoopFrame(timestamp) {
+  animationFrameId = null;
+  if (!isGameRunning) {
+    draw(1, false);
+    lastFrameTimestamp = null;
+    return;
+  }
+
+  const elapsedMs = lastFrameTimestamp === null
+    ? 0
+    : Math.max(0, timestamp - lastFrameTimestamp);
+  lastFrameTimestamp = timestamp;
+  let updateEffects = false;
+
+  if (!isPaused) {
+    if (countdownEndsAt !== null) {
+      const remainingMs = Math.max(0, countdownEndsAt - timestamp);
+      const nextValue = Math.ceil(remainingMs / 1000);
+      if (nextValue > 0 && nextValue !== countdownValue) {
+        countdownValue = nextValue;
+        countdownOverlay.textContent = String(countdownValue);
       }
-    } else if (turboCooldown > 0) {
-      turboCooldown = Math.max(0, turboCooldown - TURBO_UPDATE_INTERVAL_MS);
-      if (turboCooldown === 0) {
-        // ¡Recarga completa! Listo para volver a usarse
-        clearInterval(turboTimerInterval);
-        playTurboReadySound();
+      if (remainingMs === 0) {
+        cancelCountdown();
+        simulationAccumulator = 0;
+        snapshotRenderPositions();
+        renderInterpolation = 1;
+        scheduleEnemySpawn();
       }
+    } else {
+      updateEffects = true;
+      updateGameTimers(elapsedMs);
+      simulationAccumulator = Math.min(
+        simulationAccumulator + elapsedMs,
+        getCurrentSpeed() * 5
+      );
+
+      let ticks = 0;
+      while (
+        isGameRunning &&
+        !isPaused &&
+        countdownEndsAt === null &&
+        ticks < 5 &&
+        simulationAccumulator >= getCurrentSpeed()
+      ) {
+        const tickDuration = getCurrentSpeed();
+        snapshotRenderPositions();
+        gameUpdate();
+        simulationAccumulator -= tickDuration;
+        ticks++;
+      }
+      renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
     }
+  }
 
-    updateTurboUI();
-  }, TURBO_UPDATE_INTERVAL_MS);
+  draw(renderInterpolation, updateEffects);
+  if (isGameRunning) animationFrameId = requestAnimationFrame(gameLoopFrame);
+  else lastFrameTimestamp = null;
+}
+
+function startGameLoop() {
+  if (animationFrameId === null) {
+    lastFrameTimestamp = null;
+    animationFrameId = requestAnimationFrame(gameLoopFrame);
+  }
 }
 
 function updateTurboUI() {
@@ -440,13 +607,13 @@ function updateTurboUI() {
 
   btnTurbo.classList.toggle('active', isTurbo);
   btnTurbo.classList.toggle('cooldown', turboCooldown > 0);
-  btnTurbo.disabled = turboCooldown > 0 || !isGameRunning || isPaused;
+  btnTurbo.disabled = turboCooldown > 0 || !isGameRunning || isPaused || countdownEndsAt !== null;
   btnTurbo.setAttribute(
     'aria-label',
     isTurbo ? 'Furia de Kukulcán activa' : turboCooldown > 0 ? 'Furia de Kukulcán recargándose' : 'Activar Furia de Kukulcán'
   );
   turboIcon.textContent = '🔥';
-    turboLabel.textContent = turboCooldown > 0 ? 'RECARGA' : 'FURIA';
+  turboLabel.textContent = turboCooldown > 0 ? 'RECARGA' : 'FURIA';
   turboProgress.style.setProperty('--turbo-charge', `${charge * 100}%`);
 }
 
@@ -555,25 +722,15 @@ function updateAndDrawParticles(updateState = true) {
 // ========================================================
 function activateImmunity(seconds = 10) {
   isImmune = true;
+  immunityExpiresAt = gameTime + seconds * 1000;
   immunitySeconds = seconds;
   immunityTimerSpan.textContent = immunitySeconds;
   immunityBadge.classList.remove('hidden');
-
-  clearInterval(immunityCountdownInterval);
-  immunityCountdownInterval = setInterval(() => {
-    if (isPaused) return;
-    immunitySeconds--;
-    immunityTimerSpan.textContent = immunitySeconds;
-
-    if (immunitySeconds <= 0) {
-      deactivateImmunity();
-    }
-  }, 1000);
 }
 
 function deactivateImmunity() {
   isImmune = false;
-  clearInterval(immunityCountdownInterval);
+  immunityExpiresAt = 0;
   immunityBadge.classList.add('hidden');
   clearFireBreath();
 }
@@ -594,19 +751,20 @@ function maybeSpawnShieldFood() {
 // ========================================================
 // SISTEMA DE GUARDIANES ROJOS (ENEMIGOS IA)
 // ========================================================
-function scheduleEnemySpawn(retryDelay = 0) {
-  clearTimeout(enemySpawnTimer);
+function scheduleEnemySpawn(retryDelay = null) {
   const difficulty = difficultySelect.value;
   const targetCount = GUARDIAN_TARGETS[difficulty] || GUARDIAN_TARGETS.medium;
   updateGuardianBadge();
-  if (!isGameRunning || isPaused || enemyGuardians.length >= targetCount) return;
+  if (!isGameRunning || enemyGuardians.length >= targetCount) {
+    enemySpawnAt = null;
+    return;
+  }
+  if (isPaused || countdownEndsAt !== null) return;
 
-  enemySpawnTimer = setTimeout(() => {
-    const spawned = isGameRunning && !isPaused && spawnEnemySnake();
-    scheduleEnemySpawn(spawned ? 0 : GUARDIAN_SPAWN_RETRY_MS);
-  }, retryDelay || (hasSpawnedGuardian
+  const delay = retryDelay ?? (hasSpawnedGuardian
     ? (GUARDIAN_NEXT_SPAWN_MS[difficulty] || GUARDIAN_NEXT_SPAWN_MS.medium)
-    : (GUARDIAN_FIRST_SPAWN_MS[difficulty] || GUARDIAN_FIRST_SPAWN_MS.medium)));
+    : (GUARDIAN_FIRST_SPAWN_MS[difficulty] || GUARDIAN_FIRST_SPAWN_MS.medium));
+  enemySpawnAt = gameTime + delay;
 }
 
 function spawnEnemySnake() {
@@ -642,7 +800,7 @@ function spawnEnemySnake() {
     segments,
     direction: { x: 1, y: 0 },
     tickCounter: 0,
-    expiresAt: Date.now() + (GUARDIAN_LIFETIME_MS[difficulty] || GUARDIAN_LIFETIME_MS.medium),
+    expiresAt: gameTime + (GUARDIAN_LIFETIME_MS[difficulty] || GUARDIAN_LIFETIME_MS.medium),
     palette: GUARDIAN_PALETTES[(id - 1) % GUARDIAN_PALETTES.length],
     behavior: GUARDIAN_BEHAVIORS[(id - 1) % GUARDIAN_BEHAVIORS.length]
   };
@@ -731,7 +889,7 @@ function updateEnemySnakeAI() {
   const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
 
   for (const guardian of [...enemyGuardians]) {
-    if (Date.now() >= guardian.expiresAt) {
+    if (gameTime >= guardian.expiresAt) {
       destroyEnemySnake(guardian.id);
       continue;
     }
@@ -760,11 +918,11 @@ function updateEnemySnakeAI() {
     candidates.push({ x: -candidates[0].x, y: -candidates[0].y });
     candidates.push({ x: -candidates[1].x, y: -candidates[1].y });
 
-    const nextDirection = candidates.find(candidate =>
+    const guardianDirection = candidates.find(candidate =>
       !((candidate.x !== 0 && candidate.x === -guardian.direction.x) ||
         (candidate.y !== 0 && candidate.y === -guardian.direction.y))
     ) || guardian.direction;
-    guardian.direction = nextDirection;
+    guardian.direction = guardianDirection;
 
     const newEnemyHead = {
       x: (enemyHead.x + guardian.direction.x + gridCols) % gridCols,
@@ -797,12 +955,6 @@ function updateEnemySnakeAI() {
 // ========================================================
 // LÓGICA DE PARTIDA Y ALIMENTOS
 // ========================================================
-function getRunDurationMs(now = Date.now()) {
-  if (runStartedAt === null) return 0;
-  const currentPauseMs = runPausedAt === null ? 0 : Math.max(0, now - runPausedAt);
-  return Math.max(0, now - runStartedAt - runPausedMs - currentPauseMs);
-}
-
 function formatDuration(milliseconds) {
   const totalSeconds = Math.floor(milliseconds / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -820,11 +972,9 @@ function updateStatisticsUI() {
 
 function saveGameStatistics() {
   updateStatisticsUI();
-  try {
-    localStorage.setItem(STATISTICS_STORAGE_KEY, JSON.stringify(gameStatistics));
+  if (safeSetItem(STATISTICS_STORAGE_KEY, JSON.stringify(gameStatistics))) {
     statisticsStorageStatus.textContent = '';
-  } catch (error) {
-    console.error('No se pudieron guardar las estadísticas.', error);
+  } else {
     statisticsStorageStatus.textContent = 'No se pudieron guardar las estadísticas en este navegador.';
   }
 }
@@ -834,12 +984,10 @@ function finishRunStatistics() {
   const record = gameStatistics[runDifficulty];
   record.gamesPlayed++;
   record.bestScore = Math.max(record.bestScore, score);
-  record.bestSurvivalMs = Math.max(record.bestSurvivalMs, getRunDurationMs());
+  record.bestSurvivalMs = Math.max(record.bestSurvivalMs, gameTime - runStartedAt);
   record.guardiansDefeated += runGuardiansDefeated;
   saveGameStatistics();
   runStartedAt = null;
-  runPausedAt = null;
-  runPausedMs = 0;
   runDifficulty = null;
   runGuardiansDefeated = 0;
 }
@@ -871,7 +1019,9 @@ function resetGame() {
     { x: (startX - 2 + gridCols) % gridCols, y: startY }
   ];
   direction = { x: 1, y: 0 };
-  nextDirection = { x: 1, y: 0 };
+  directionQueue = [];
+  previousSnakePositions = snake.map(segment => ({ ...segment }));
+  previousGuardianPositions.clear();
   score = 0;
   foods = [];
   bonusFoods = [];
@@ -880,18 +1030,17 @@ function resetGame() {
   floatingTexts = [];
   screenShake = 0;
   clearFireBreath();
-  clearTimeout(enemySpawnTimer);
-  clearTimeout(jadeSpawnTimer);
-  jadeSpawnTimer = null;
+  enemySpawnAt = null;
+  jadeSpawnAt = null;
   enemyGuardians = [];
   hasSpawnedGuardian = false;
-  enemyPauseStartedAt = null;
   updateGuardianBadge();
 
   isTurbo = false;
   turboRemaining = 0;
   turboCooldown = 0;
-  clearInterval(turboTimerInterval);
+  turboReadyAt = 0;
+  turboCooldownUntil = 0;
   updateTurboUI();
 
   updateScoresUI();
@@ -903,12 +1052,18 @@ function resetGame() {
 }
 
 function ensureFoodCount(count = 6) {
-  while (foods.length < count) {
+  let attempts = 0;
+  while (foods.length < count && attempts < gridCols * gridRows) {
+    attempts++;
     const rx = Math.floor(Math.random() * gridCols);
     const ry = Math.floor(Math.random() * gridRows);
     const occupied = snake.some(s => s.x === rx && s.y === ry) ||
                      foods.some(f => f.x === rx && f.y === ry) ||
-                     shieldFoods.some(food => food.x === rx && food.y === ry);
+                     shieldFoods.some(food => food.x === rx && food.y === ry) ||
+                     bonusFoods.some(food => food.x === rx && food.y === ry) ||
+                     enemyGuardians.some(guardian =>
+                       guardian.segments.some(segment => segment.x === rx && segment.y === ry)
+                     );
     if (!occupied) {
       foods.push({ x: rx, y: ry, shape: Math.floor(Math.random() * 6) });
     }
@@ -916,9 +1071,11 @@ function ensureFoodCount(count = 6) {
 }
 
 function gameUpdate() {
-  if (isPaused || !isGameRunning) return;
+  if (isPaused || !isGameRunning || countdownEndsAt !== null) return;
 
-  direction = { ...nextDirection };
+  if (directionQueue.length > 0) {
+    direction = directionQueue.shift();
+  }
 
   let newX = (snake[0].x + direction.x + gridCols) % gridCols;
   let newY = (snake[0].y + direction.y + gridRows) % gridRows;
@@ -962,11 +1119,7 @@ function gameUpdate() {
     activateImmunity(10);
     startFireBreath();
     updateScoresUI();
-    clearTimeout(jadeSpawnTimer);
-    jadeSpawnTimer = setTimeout(() => {
-      jadeSpawnTimer = null;
-      if (isGameRunning) maybeSpawnShieldFood();
-    }, JADE_RESPAWN_DELAY_MS[difficultySelect.value] || JADE_RESPAWN_DELAY_MS.medium);
+    jadeSpawnAt = gameTime + (JADE_RESPAWN_DELAY_MS[difficultySelect.value] || JADE_RESPAWN_DELAY_MS.medium);
   } else {
     const bonusIdx = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
     const foodIdx = foods.findIndex(f => f.x === head.x && f.y === head.y);
@@ -999,7 +1152,6 @@ function gameUpdate() {
   }
 
   updateEnemySnakeAI();
-  draw();
 }
 
 function updateScoresUI() {
@@ -1018,14 +1170,37 @@ function updateScoresUI() {
     dtHighScore.textContent = highScore;
     mbHighScore.textContent = highScore;
     drawerHighScore.textContent = highScore;
-    localStorage.setItem('snakeIoHighScore', highScore);
+    safeSetItem('snakeIoHighScore', highScore);
   }
 }
 
 // ========================================================
 // RENDERIZADO EN EL CANVAS
 // ========================================================
-function draw(updateEffects = true) {
+function interpolateGridPosition(current, previous, progress) {
+  if (!previous || progress >= 1) return current;
+  let dx = current.x - previous.x;
+  let dy = current.y - previous.y;
+  if (dx > gridCols / 2) dx -= gridCols;
+  else if (dx < -gridCols / 2) dx += gridCols;
+  if (dy > gridRows / 2) dy -= gridRows;
+  else if (dy < -gridRows / 2) dy += gridRows;
+
+  return {
+    x: (previous.x + dx * progress + gridCols) % gridCols,
+    y: (previous.y + dy * progress + gridRows) % gridRows
+  };
+}
+
+function snapshotRenderPositions() {
+  previousSnakePositions = snake.map(segment => ({ ...segment }));
+  previousGuardianPositions = new Map(enemyGuardians.map(guardian => [
+    guardian.id,
+    guardian.segments.map(segment => ({ ...segment }))
+  ]));
+}
+
+function draw(interpolation = 1, updateEffects = false) {
   ctx.save();
 
   if (screenShake > 0) {
@@ -1038,41 +1213,13 @@ function draw(updateEffects = true) {
     }
   }
 
-  ctx.fillStyle = '#141720';
-  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-
-  ctx.strokeStyle = 'rgba(144, 153, 177, 0.16)';
-  ctx.lineWidth = 1;
-  const offsetX = (window.innerWidth % TILE_SIZE) / 2;
-  const offsetY = (window.innerHeight % TILE_SIZE) / 2;
-
-  for (let x = offsetX; x <= window.innerWidth; x += TILE_SIZE) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, window.innerHeight);
-    ctx.stroke();
-  }
-  for (let y = offsetY; y <= window.innerHeight; y += TILE_SIZE) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(window.innerWidth, y);
-    ctx.stroke();
+  if (boardCanvas) ctx.drawImage(boardCanvas, 0, 0, window.innerWidth, window.innerHeight);
+  else {
+    ctx.fillStyle = '#141720';
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
   }
 
-  ctx.fillStyle = 'rgba(198, 164, 85, 0.1)';
-  for (let x = offsetX + TILE_SIZE; x <= window.innerWidth; x += TILE_SIZE * 4) {
-    for (let y = offsetY + TILE_SIZE; y <= window.innerHeight; y += TILE_SIZE * 4) {
-      ctx.beginPath();
-      ctx.moveTo(x, y - 2);
-      ctx.lineTo(x + 2, y);
-      ctx.lineTo(x, y + 2);
-      ctx.lineTo(x - 2, y);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  const pulse = Math.sin(Date.now() * 0.006) * 1.5;
+  const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
   foods.forEach((food, i) => {
     const cx = food.x * TILE_SIZE + TILE_SIZE / 2;
@@ -1138,13 +1285,19 @@ function draw(updateEffects = true) {
     guardian.segments.forEach((seg, idx) => {
       const isHead = idx === 0;
       ctx.fillStyle = isHead ? guardian.palette.head : guardian.palette.body;
-      ctx.shadowColor = guardian.palette.head;
-      ctx.shadowBlur = isHead ? 12 : 5;
+      ctx.shadowColor = isHead ? guardian.palette.head : 'transparent';
+      ctx.shadowBlur = isHead ? 12 : 0;
+      const previousSegments = previousGuardianPositions.get(guardian.id);
+      const renderSegment = interpolateGridPosition(
+        seg,
+        previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1],
+        interpolation
+      );
 
       roundRect(
         ctx,
-        seg.x * TILE_SIZE + 1,
-        seg.y * TILE_SIZE + 1,
+        renderSegment.x * TILE_SIZE + 1,
+        renderSegment.y * TILE_SIZE + 1,
         TILE_SIZE - 2,
         TILE_SIZE - 2,
         isHead ? 8 : 4
@@ -1153,33 +1306,33 @@ function draw(updateEffects = true) {
       ctx.shadowBlur = 0;
 
       if (!isHead) {
-        drawFeatherScale(seg, idx, guardian.palette.crest);
+        drawFeatherScale(renderSegment, idx, guardian.palette.crest);
         return;
       }
 
-      drawFeatherCrest(seg, guardian.direction, guardian.palette.crest);
+      drawFeatherCrest(renderSegment, guardian.direction, guardian.palette.crest);
       ctx.fillStyle = '#f7db92';
       const eyeOffset = 5;
       const eyeSize = 4;
-      let e1x = seg.x * TILE_SIZE + eyeOffset;
-      let e1y = seg.y * TILE_SIZE + eyeOffset;
-      let e2x = seg.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
+      let e1x = renderSegment.x * TILE_SIZE + eyeOffset;
+      let e1y = renderSegment.y * TILE_SIZE + eyeOffset;
+      let e2x = renderSegment.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       let e2y = e1y;
 
       if (guardian.direction.y !== 0) {
-        e1y = seg.y * TILE_SIZE + (guardian.direction.y > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
+        e1y = renderSegment.y * TILE_SIZE + (guardian.direction.y > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
         e2y = e1y;
       } else if (guardian.direction.x !== 0) {
-        e1x = seg.x * TILE_SIZE + (guardian.direction.x > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
+        e1x = renderSegment.x * TILE_SIZE + (guardian.direction.x > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
         e2x = e1x;
-        e2y = seg.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
+        e2y = renderSegment.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       }
 
       ctx.fillRect(e1x, e1y, eyeSize, eyeSize);
       ctx.fillRect(e2x, e2y, eyeSize, eyeSize);
 
-      const markX = seg.x * TILE_SIZE + TILE_SIZE / 2;
-      const markY = seg.y * TILE_SIZE + TILE_SIZE / 2 + TILE_SIZE * 0.22;
+      const markX = renderSegment.x * TILE_SIZE + TILE_SIZE / 2;
+      const markY = renderSegment.y * TILE_SIZE + TILE_SIZE / 2 + TILE_SIZE * 0.22;
       const markSize = Math.max(2.5, TILE_SIZE * 0.16);
       ctx.fillStyle = guardian.palette.crest;
       ctx.strokeStyle = 'rgba(34, 24, 20, 0.9)';
@@ -1209,11 +1362,16 @@ function draw(updateEffects = true) {
 
   snake.forEach((segment, index) => {
     const isHead = index === 0;
+    const renderSegment = interpolateGridPosition(
+      segment,
+      previousSnakePositions[index] || previousSnakePositions[previousSnakePositions.length - 1],
+      interpolation
+    );
 
     if (isImmune) {
       ctx.fillStyle = isHead ? '#62d8bd' : '#168c75';
       ctx.shadowColor = '#62d8bd';
-      ctx.shadowBlur = isHead ? 18 : 10;
+      ctx.shadowBlur = isHead ? 18 : 0;
     } else {
       ctx.fillStyle = isHead ? '#54c98f' : '#187a5c';
       if (isHead) {
@@ -1224,8 +1382,8 @@ function draw(updateEffects = true) {
 
     roundRect(
       ctx,
-      segment.x * TILE_SIZE + 1,
-      segment.y * TILE_SIZE + 1,
+      renderSegment.x * TILE_SIZE + 1,
+      renderSegment.y * TILE_SIZE + 1,
       TILE_SIZE - 2,
       TILE_SIZE - 2,
       isHead ? 8 : 5
@@ -1234,27 +1392,27 @@ function draw(updateEffects = true) {
     ctx.shadowBlur = 0;
 
     if (!isHead) {
-      drawFeatherScale(segment, index, isImmune ? '#b6f2d1' : '#d5bd70');
+      drawFeatherScale(renderSegment, index, isImmune ? '#b6f2d1' : '#d5bd70');
     } else {
-      drawFeatherCrest(segment, direction, isImmune ? '#e0fff2' : '#d5bd70');
+      drawFeatherCrest(renderSegment, direction, isImmune ? '#e0fff2' : '#d5bd70');
     }
 
     if (isHead && !isBlinking) {
       ctx.fillStyle = '#141720';
       const eyeOffset = 5;
       const eyeSize = 3.5;
-      let eye1X = segment.x * TILE_SIZE + eyeOffset;
-      let eye1Y = segment.y * TILE_SIZE + eyeOffset;
-      let eye2X = segment.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
+      let eye1X = renderSegment.x * TILE_SIZE + eyeOffset;
+      let eye1Y = renderSegment.y * TILE_SIZE + eyeOffset;
+      let eye2X = renderSegment.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       let eye2Y = eye1Y;
 
       if (direction.y !== 0) {
-        eye1Y = segment.y * TILE_SIZE + (direction.y > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
+        eye1Y = renderSegment.y * TILE_SIZE + (direction.y > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
         eye2Y = eye1Y;
       } else if (direction.x !== 0) {
-        eye1X = segment.x * TILE_SIZE + (direction.x > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
+        eye1X = renderSegment.x * TILE_SIZE + (direction.x > 0 ? TILE_SIZE - eyeOffset - eyeSize : eyeOffset);
         eye2X = eye1X;
-        eye2Y = segment.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
+        eye2Y = renderSegment.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       }
 
       ctx.fillRect(eye1X, eye1Y, eyeSize, eyeSize);
@@ -1270,12 +1428,12 @@ function draw(updateEffects = true) {
 function drawFoodOffering(food, cx, cy, pulse) {
   const shape = food.shape ?? 0;
   const colors = [
-    { fill: '#4fcea2', highlight: '#b0f4d8', shadow: '#36a881' },
-    { fill: '#ee8054', highlight: '#ffd0a0', shadow: '#c7523a' },
-    { fill: '#e8c768', highlight: '#fff0b0', shadow: '#bd8c39' },
-    { fill: '#bc7351', highlight: '#f5c18e', shadow: '#81452f' },
-    { fill: '#9b86d4', highlight: '#ddd0ff', shadow: '#6754a6' },
-    { fill: '#e788a6', highlight: '#ffd6e3', shadow: '#ac5075' }
+    { fill: '#4fcea2', highlight: '#b0f4d8' },
+    { fill: '#ee8054', highlight: '#ffd0a0' },
+    { fill: '#e8c768', highlight: '#fff0b0' },
+    { fill: '#bc7351', highlight: '#f5c18e' },
+    { fill: '#9b86d4', highlight: '#ddd0ff' },
+    { fill: '#e788a6', highlight: '#ffd6e3' }
   ];
   const color = colors[shape % colors.length];
   const radius = Math.max(4, TILE_SIZE / 2 - 3 + pulse * 0.3);
@@ -1284,8 +1442,8 @@ function drawFoodOffering(food, cx, cy, pulse) {
   ctx.fillStyle = color.fill;
   ctx.strokeStyle = color.highlight;
   ctx.lineWidth = 1.5;
-  ctx.shadowColor = color.shadow;
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
   ctx.beginPath();
 
   if (shape === 0) {
@@ -1355,30 +1513,13 @@ function drawFoodOffering(food, cx, cy, pulse) {
 }
 
 function startFireBreath() {
-  fireBreath = { startedAt: performance.now() };
-
-  if (fireBreathFrame !== null) {
-    cancelAnimationFrame(fireBreathFrame);
-  }
-
-  const animate = () => {
-    if (!fireBreath || !isImmune || !isGameRunning) {
-      clearFireBreath();
-      draw(false);
-      return;
-    }
-
-    if (!isPaused) draw(false);
-    fireBreathFrame = requestAnimationFrame(animate);
-  };
-
-  fireBreathFrame = requestAnimationFrame(animate);
+  fireBreath = { startedAt: gameTime };
 }
 
 function drawFireBreath() {
   if (!fireBreath || !isImmune || snake.length === 0) return;
 
-  const cycleProgress = (performance.now() - fireBreath.startedAt) % FIRE_BREATH_CYCLE_MS;
+  const cycleProgress = (gameTime - fireBreath.startedAt) % FIRE_BREATH_CYCLE_MS;
   if (cycleProgress >= FIRE_BREATH_ACTIVE_MS) return;
 
   const progress = cycleProgress / FIRE_BREATH_ACTIVE_MS;
@@ -1387,7 +1528,7 @@ function drawFireBreath() {
   const flameX = head.x * TILE_SIZE + TILE_SIZE / 2 + direction.x * TILE_SIZE * 0.4;
   const flameY = head.y * TILE_SIZE + TILE_SIZE / 2 + direction.y * TILE_SIZE * 0.4;
   const angle = Math.atan2(direction.y, direction.x);
-  const flicker = Math.sin(performance.now() * 0.045);
+  const flicker = Math.sin(gameTime * 0.045);
 
   ctx.save();
   ctx.globalAlpha = fade;
@@ -1422,10 +1563,6 @@ function drawFireBreath() {
 
 function clearFireBreath() {
   fireBreath = null;
-  if (fireBreathFrame !== null) {
-    cancelAnimationFrame(fireBreathFrame);
-    fireBreathFrame = null;
-  }
 }
 
 function roundRect(c, x, y, w, h, r) {
@@ -1497,25 +1634,21 @@ function getCurrentSpeed() {
   return spd;
 }
 
-function restartInterval() {
-  if (isGameRunning && !isPaused) {
-    clearInterval(gameInterval);
-    gameInterval = setInterval(gameUpdate, getCurrentSpeed());
-  }
-}
-
 // Iniciar o reiniciar juego
 function startGame() {
   getAudioContext();
   if (isGameRunning) finishRunStatistics();
   resetGame();
+  gameTime = 0;
+  simulationAccumulator = 0;
+  renderInterpolation = 1;
   isGameRunning = true;
   isPaused = false;
-  runStartedAt = Date.now();
-  runPausedAt = null;
-  runPausedMs = 0;
+  runStartedAt = gameTime;
   runDifficulty = difficultySelect.value;
   runGuardiansDefeated = 0;
+  cancelCountdown();
+  startCountdown();
   updateTurboUI();
 
   dtStartBtn.textContent = '🔄 Reiniciar';
@@ -1525,56 +1658,47 @@ function startGame() {
   drawerMenu.classList.add('hidden');
   gameOverlay.classList.add('hidden');
 
-  restartInterval();
   startSuspenseMusic();
-  scheduleEnemySpawn();
+  startGameLoop();
 }
 
 // Alternar pausa
 function togglePause() {
   if (!isGameRunning) return;
-  isPaused = !isPaused;
+  if (!isPaused) {
+    cancelCountdown();
+    isPaused = true;
+  } else {
+    isPaused = false;
+    startCountdown();
+  }
   dtPauseBtn.textContent = isPaused ? '▶ Reanudar' : '⏸ Pausa';
   updateTurboUI();
 
   if (isPaused) {
-    enemyPauseStartedAt = Date.now();
-    runPausedAt = Date.now();
     stopSuspenseMusic();
     drawerMenu.classList.remove('hidden');
   } else {
-    if (runPausedAt !== null) {
-      runPausedMs += Date.now() - runPausedAt;
-      runPausedAt = null;
-    }
-    if (enemyPauseStartedAt !== null) {
-      const pauseDuration = Date.now() - enemyPauseStartedAt;
-      enemyGuardians.forEach(guardian => {
-        guardian.expiresAt += pauseDuration;
-      });
-      enemyPauseStartedAt = null;
-    }
     drawerMenu.classList.add('hidden');
     startSuspenseMusic();
-    scheduleEnemySpawn();
+    startGameLoop();
   }
 }
 
 function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   finishRunStatistics();
   isGameRunning = false;
-  clearInterval(gameInterval);
-  clearInterval(turboTimerInterval);
+  cancelCountdown();
   clearFireBreath();
   isTurbo = false;
   turboRemaining = 0;
   turboCooldown = 0;
+  turboReadyAt = 0;
+  turboCooldownUntil = 0;
   updateTurboUI();
-  clearTimeout(enemySpawnTimer);
-  clearTimeout(jadeSpawnTimer);
-  jadeSpawnTimer = null;
+  enemySpawnAt = null;
+  jadeSpawnAt = null;
   enemyGuardians = [];
-  enemyPauseStartedAt = null;
   updateGuardianBadge();
   deactivateImmunity();
   stopSuspenseMusic();
@@ -1589,11 +1713,17 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
 
 function changeDirection(newDir) {
   if (!isGameRunning || isPaused) return;
-  const isOpposite = (newDir.x !== 0 && newDir.x === -direction.x) ||
-                     (newDir.y !== 0 && newDir.y === -direction.y);
-  if (!isOpposite) {
-    nextDirection = newDir;
-  }
+  if (directionQueue.length >= 2) return;
+
+  const lastDirection = directionQueue.length > 0
+    ? directionQueue[directionQueue.length - 1]
+    : direction;
+  const isOpposite = (newDir.x !== 0 && newDir.x === -lastDirection.x) ||
+                     (newDir.y !== 0 && newDir.y === -lastDirection.y);
+  if (isOpposite) return;
+
+  const isDuplicate = newDir.x === lastDirection.x && newDir.y === lastDirection.y;
+  if (!isDuplicate) directionQueue.push({ ...newDir });
 }
 
 // ========================================================
@@ -1604,7 +1734,7 @@ const totalTutorialSteps = 3;
 const tutorialTitles = [
   '🪶 Guía a Kukulcán',
   '🌽 Ofrendas y 🔥 Furia de Kukulcán',
-  '🛡️ El guardián rojo'
+  '🛡️ Los guardianes'
 ];
 
 function showTutorialStep(step) {
@@ -1612,7 +1742,7 @@ function showTutorialStep(step) {
   tutorialStepTitle.textContent = tutorialTitles[step - 1];
 
   for (let i = 1; i <= totalTutorialSteps; i++) {
-    const el = document.getElementById(`step-1`) && document.getElementById(`step-${i}`);
+    const el = document.getElementById(`step-${i}`);
     if (el) el.classList.toggle('active', i === step);
   }
 
@@ -1669,6 +1799,8 @@ window.addEventListener('touchmove', (e) => {
 }, { passive: false });
 
 window.addEventListener('touchend', (e) => {
+  const target = e.target;
+  if (target instanceof Element && target.closest('button, select, .modal-backdrop, .drawer-card')) return;
   if (e.changedTouches.length > 0) {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
@@ -1695,7 +1827,12 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused)) {
+  if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
+  const isTextControl = e.target instanceof Element && e.target.matches('select, input');
+  const isMovementKey = e.key.startsWith('Arrow') || ['w', 'W', 'a', 'A', 's', 'S', 'd', 'D'].includes(e.key);
+  if (isTextControl && isMovementKey) return;
+
+  if (!isTextControl && (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused))) {
     triggerTurboBurst();
   }
 
@@ -1767,20 +1904,25 @@ restartOverlayBtn.addEventListener('click', startGame);
 drawerSoundToggle.addEventListener('change', (e) => toggleSound(e.target.checked));
 drawerDpadToggle.addEventListener('change', (e) => {
   showDpad = e.target.checked;
-  localStorage.setItem('snakeIoShowDpad', showDpad);
+  safeSetItem('snakeIoShowDpad', showDpad);
   touchControls.classList.toggle('hidden', !showDpad);
 });
 
 // Sincronizar selectores de dificultad
 difficultySelect.addEventListener('change', () => {
   drawerDifficulty.value = difficultySelect.value;
-  restartInterval();
   reconcileGuardianCount();
 });
 drawerDifficulty.addEventListener('change', () => {
   difficultySelect.value = drawerDifficulty.value;
-  restartInterval();
   reconcileGuardianCount();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && isGameRunning && !isPaused) togglePause();
+});
+window.addEventListener('blur', () => {
+  if (isGameRunning && !isPaused) togglePause();
 });
 
 // Controles virtuales D-Pad

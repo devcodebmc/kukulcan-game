@@ -30,6 +30,26 @@ html, body {
   background-color: #141720;
 }
 
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  color: #ffe27a;
+  font-size: clamp(5rem, 20vw, 11rem);
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 0 24px rgba(242, 194, 48, 0.8), 0 8px 28px rgba(0, 0, 0, 0.8);
+  animation: countdown-pop 0.65s ease-out both;
+}
+
+@keyframes countdown-pop {
+  from { opacity: 0.35; transform: scale(1.35); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 /* ========================================================
    TOOLBAR COMPLETO PARA ESCRITORIO (PANTALLAS > 768px)
 ======================================================== */
@@ -511,6 +531,7 @@ html, body {
 
 /* Menú Drawer en Móviles */
 .drawer-card {
+  touch-action: pan-y;
   background: rgba(30, 29, 32, 0.98);
   border: 1px solid rgba(198, 164, 85, 0.34);
   border-radius: 20px;
@@ -625,6 +646,7 @@ html, body {
    TUTORIAL INTERACTIVO PASO A PASO (ONBOARDING)
 ======================================================== */
 .tutorial-card {
+  touch-action: pan-y;
   background: rgba(30, 29, 32, 0.99);
   border: 1px solid rgba(198, 164, 85, 0.36);
   border-radius: 22px;
@@ -639,6 +661,7 @@ html, body {
 }
 
 .statistics-card {
+  touch-action: pan-y;
   width: min(760px, 100%);
   max-height: 90vh;
   overflow-y: auto;
