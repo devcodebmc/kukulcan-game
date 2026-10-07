@@ -173,6 +173,11 @@ const GUARDIAN_PALETTES = [
   { head: '#f2c230', body: '#a87916', crest: '#ffe27a' },
   { head: '#a65bd4', body: '#64328e', crest: '#d4a0f0' }
 ];
+const GUARDIAN_BEHAVIORS = [
+  { id: 'hunter', name: 'Cazador' },
+  { id: 'interceptor', name: 'Vidente' },
+  { id: 'flanker', name: 'Flanqueador' }
+];
 const GUARDIAN_FIRST_SPAWN_MS = { easy: 16000, medium: 14000, hard: 12000, extreme: 10000 };
 const GUARDIAN_NEXT_SPAWN_MS = { easy: 20000, medium: 15000, hard: 11000, extreme: 8000 };
 const GUARDIAN_LIFETIME_MS = { easy: 24000, medium: 30000, hard: 36000, extreme: 40000 };
@@ -638,7 +643,8 @@ function spawnEnemySnake() {
     direction: { x: 1, y: 0 },
     tickCounter: 0,
     expiresAt: Date.now() + (GUARDIAN_LIFETIME_MS[difficulty] || GUARDIAN_LIFETIME_MS.medium),
-    palette: GUARDIAN_PALETTES[(id - 1) % GUARDIAN_PALETTES.length]
+    palette: GUARDIAN_PALETTES[(id - 1) % GUARDIAN_PALETTES.length],
+    behavior: GUARDIAN_BEHAVIORS[(id - 1) % GUARDIAN_BEHAVIORS.length]
   };
   enemyGuardians.push(guardian);
   hasSpawnedGuardian = true;
@@ -659,9 +665,38 @@ function isGuardianCellOccupied(x, y) {
 function updateGuardianBadge() {
   const count = enemyGuardians.length;
   threatBadge.classList.toggle('hidden', count === 0);
+  const behaviors = [...new Set(enemyGuardians.map(guardian => guardian.behavior.name))];
   threatBadge.textContent = count === 1
-    ? '◆ Guardián al acecho'
-    : `◆ ${count} guardianes al acecho`;
+    ? `◆ ${behaviors[0]} al acecho`
+    : `◆ ${count} guardianes: ${behaviors.join(' · ')}`;
+}
+
+function getGuardianTarget(guardian, playerHead, difficulty) {
+  if (guardian.behavior.id === 'interceptor') {
+    const lead = difficulty === 'easy' ? 2 : difficulty === 'medium' ? 3 : 4;
+    return {
+      x: (playerHead.x + direction.x * lead + gridCols) % gridCols,
+      y: (playerHead.y + direction.y * lead + gridRows) % gridRows
+    };
+  }
+
+  if (guardian.behavior.id === 'flanker') {
+    const moveInterval = difficulty === 'easy' || difficulty === 'medium' ? 4 : 3;
+    const orbit = Math.floor(guardian.tickCounter / (moveInterval * 3) + guardian.id) % 4;
+    const offsets = [
+      { x: 0, y: -5 },
+      { x: 5, y: 0 },
+      { x: 0, y: 5 },
+      { x: -5, y: 0 }
+    ];
+    const offset = offsets[orbit];
+    return {
+      x: (playerHead.x + offset.x + gridCols) % gridCols,
+      y: (playerHead.y + offset.y + gridRows) % gridRows
+    };
+  }
+
+  return playerHead;
 }
 
 function reconcileGuardianCount() {
@@ -702,12 +737,15 @@ function updateEnemySnakeAI() {
     }
 
     guardian.tickCounter++;
-    if ((guardian.tickCounter + guardian.id) % moveInterval !== 0) continue;
+    const behaviorMoveInterval = moveInterval + (guardian.behavior.id === 'interceptor' ? 1 : 0);
+    if ((guardian.tickCounter + guardian.id) % behaviorMoveInterval !== 0) continue;
 
     const enemyHead = guardian.segments[0];
     const playerHead = snake[0];
-    let dx = playerHead.x - enemyHead.x;
-    let dy = playerHead.y - enemyHead.y;
+    const target = getGuardianTarget(guardian, playerHead, difficulty);
+
+    let dx = target.x - enemyHead.x;
+    let dy = target.y - enemyHead.y;
 
     if (Math.abs(dx) > gridCols / 2) dx = -Math.sign(dx) * (gridCols - Math.abs(dx));
     if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
@@ -816,7 +854,10 @@ function openStatistics() {
 
 function closeStatistics() {
   statisticsModal.classList.add('hidden');
-  if (resumeAfterStatistics && isGameRunning && isPaused) togglePause();
+  if (resumeAfterStatistics && isGameRunning && isPaused) {
+    togglePause();
+    drawerMenu.classList.add('hidden');
+  }
   resumeAfterStatistics = false;
 }
 
@@ -1136,6 +1177,30 @@ function draw(updateEffects = true) {
 
       ctx.fillRect(e1x, e1y, eyeSize, eyeSize);
       ctx.fillRect(e2x, e2y, eyeSize, eyeSize);
+
+      const markX = seg.x * TILE_SIZE + TILE_SIZE / 2;
+      const markY = seg.y * TILE_SIZE + TILE_SIZE / 2 + TILE_SIZE * 0.22;
+      const markSize = Math.max(2.5, TILE_SIZE * 0.16);
+      ctx.fillStyle = guardian.palette.crest;
+      ctx.strokeStyle = 'rgba(34, 24, 20, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (guardian.behavior.id === 'hunter') {
+        ctx.rect(markX - markSize / 2, markY - markSize / 2, markSize, markSize);
+      } else if (guardian.behavior.id === 'interceptor') {
+        ctx.moveTo(markX, markY - markSize * 0.65);
+        ctx.lineTo(markX + markSize * 0.65, markY + markSize * 0.5);
+        ctx.lineTo(markX - markSize * 0.65, markY + markSize * 0.5);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(markX, markY - markSize * 0.7);
+        ctx.lineTo(markX + markSize * 0.55, markY);
+        ctx.lineTo(markX, markY + markSize * 0.7);
+        ctx.lineTo(markX - markSize * 0.55, markY);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.stroke();
     });
   });
 
