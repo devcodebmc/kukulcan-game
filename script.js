@@ -51,6 +51,8 @@ const respawnBadge = document.getElementById('respawn-badge');
 const respawnTimerSpan = document.getElementById('respawn-timer');
 const freezeBadge = document.getElementById('freeze-badge');
 const freezeTimerSpan = document.getElementById('freeze-timer');
+const rainBadge = document.getElementById('rain-badge');
+const rainTimerSpan = document.getElementById('rain-timer');
 const threatBadge = document.getElementById('threat-badge');
 
 // Turbo y Cruceta
@@ -169,6 +171,13 @@ let boardCanvas = null;
 let boardContext = null;
 let headPulse = 0;
 let headPulseColor = '#d5bd70';
+let sacredRainUntil = 0;
+let nextSacredRainAt = null;
+let maizeSpawnRetryAt = null;
+const SACRED_RAIN_FIRST_MS = 22000;
+const SACRED_RAIN_INTERVAL_MS = 42000;
+const SACRED_RAIN_DURATION_MS = 8000;
+const MAIZE_RAIN_BONUS = 10;
 const WELCOME_DEMO_COLS = 22;
 const WELCOME_DEMO_ROWS = 8;
 const WELCOME_DEMO_TICK_MS = 260;
@@ -620,6 +629,28 @@ function updateGameTimers(elapsedMs) {
     freezeSpawnAt = null;
     if (enemyGuardians.length === 0 || !maybeSpawnFreezeFood()) {
       freezeSpawnAt = gameTime + 1500;
+    }
+  }
+
+  if (nextSacredRainAt !== null && gameTime >= nextSacredRainAt) {
+    sacredRainUntil = gameTime + SACRED_RAIN_DURATION_MS;
+    nextSacredRainAt = gameTime + SACRED_RAIN_INTERVAL_MS;
+    if (!ensureMaizeOffering()) maizeSpawnRetryAt = gameTime + 500;
+    rainTimerSpan.textContent = String(Math.ceil(SACRED_RAIN_DURATION_MS / 1000));
+    rainBadge.classList.remove('hidden');
+  }
+
+  if (sacredRainUntil > gameTime && maizeSpawnRetryAt !== null && gameTime >= maizeSpawnRetryAt) {
+    if (!ensureMaizeOffering()) maizeSpawnRetryAt = gameTime + 500;
+  }
+
+  if (sacredRainUntil > 0) {
+    if (gameTime >= sacredRainUntil) {
+      sacredRainUntil = 0;
+      maizeSpawnRetryAt = null;
+      rainBadge.classList.add('hidden');
+    } else {
+      rainTimerSpan.textContent = String(Math.ceil((sacredRainUntil - gameTime) / 1000));
     }
   }
 }
@@ -1202,6 +1233,10 @@ function resetGame() {
   bonusFoods = [];
   shieldFoods = [];
   freezeFoods = [];
+  sacredRainUntil = 0;
+  nextSacredRainAt = SACRED_RAIN_FIRST_MS;
+  maizeSpawnRetryAt = null;
+  rainBadge.classList.add('hidden');
   particles = [];
   floatingTexts = [];
   screenShake = 0;
@@ -1317,8 +1352,54 @@ function ensureFoodCount(count = 6) {
                        guardian.segments.some(segment => segment.x === rx && segment.y === ry)
                      );
     if (!occupied) {
-      foods.push({ x: rx, y: ry, shape: Math.floor(Math.random() * 6) });
+      foods.push({
+        x: rx,
+        y: ry,
+        shape: Math.floor(Math.random() * 6),
+        offering: 'common'
+      });
     }
+  }
+
+  if (sacredRainUntil > gameTime) ensureMaizeOffering();
+}
+
+function ensureMaizeOffering() {
+  if (foods.some(food => food.offering === 'maize')) {
+    maizeSpawnRetryAt = null;
+    return true;
+  }
+
+  const start = Math.floor(Math.random() * gridCols * gridRows);
+  const totalCells = gridCols * gridRows;
+  for (let offset = 0; offset < totalCells; offset++) {
+    const cell = (start + offset) % totalCells;
+    const x = cell % gridCols;
+    const y = Math.floor(cell / gridCols);
+    if (isGuardianCellOccupied(x, y)) continue;
+    foods.push({ x, y, shape: 2, offering: 'maize' });
+    maizeSpawnRetryAt = null;
+    return true;
+  }
+  return false;
+}
+
+function spawnWorldCrossingEffect(x, y) {
+  triggerHeadPulse('#8be7ff');
+  const colors = ['#8be7ff', '#69d3b4', '#d5bd70'];
+  for (let i = 0; i < 5; i++) {
+    const angle = (Math.PI * 2 * i) / 5;
+    const speed = 0.7 + (i % 2) * 0.35;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2.2,
+      color: colors[i % colors.length],
+      alpha: 0.8,
+      decay: 0.09
+    });
   }
 }
 
@@ -1329,6 +1410,11 @@ function gameUpdate() {
     direction = directionQueue.shift();
   }
 
+  const crossedWorld =
+    (direction.x > 0 && snake[0].x === gridCols - 1) ||
+    (direction.x < 0 && snake[0].x === 0) ||
+    (direction.y > 0 && snake[0].y === gridRows - 1) ||
+    (direction.y < 0 && snake[0].y === 0);
   let newX = (snake[0].x + direction.x + gridCols) % gridCols;
   let newY = (snake[0].y + direction.y + gridRows) % gridRows;
   const head = { x: newX, y: newY };
@@ -1417,10 +1503,14 @@ function gameUpdate() {
       } else if (foodIdx !== -1) {
         const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
         const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-        foods.splice(foodIdx, 1);
-        score += 10;
-        triggerHeadPulse('#d5bd70');
-        spawnFloatingText('+10', hx, hy, '#d5bd70');
+        const [food] = foods.splice(foodIdx, 1);
+        const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime
+          ? MAIZE_RAIN_BONUS
+          : 0;
+        const foodScore = 10 + maizeBonus;
+        score += foodScore;
+        triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
+        spawnFloatingText(maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`, hx, hy, maizeBonus ? '#facc15' : '#d5bd70');
         playEatSound('normal');
         ensureFoodCount(6);
         updateScoresUI();
@@ -1428,6 +1518,12 @@ function gameUpdate() {
         snake.pop();
       }
     }
+  }
+
+  if (crossedWorld) {
+    const headX = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const headY = head.y * TILE_SIZE + TILE_SIZE / 2;
+    spawnWorldCrossingEffect(headX, headY);
   }
 
   if (isTurbo && snake.length > 0) {
@@ -1509,6 +1605,8 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fillStyle = '#141720';
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
   }
+
+  if (sacredRainUntil > gameTime) drawSacredRain();
 
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
@@ -1813,7 +1911,10 @@ function drawFoodOffering(food, cx, cy, pulse) {
     { fill: '#9b86d4', highlight: '#ddd0ff' },
     { fill: '#e788a6', highlight: '#ffd6e3' }
   ];
-  const color = colors[shape % colors.length];
+  const isMaize = food.offering === 'maize';
+  const color = isMaize
+    ? { fill: '#e8c768', highlight: '#fff0b0' }
+    : colors[shape % colors.length];
   const radius = Math.max(4, TILE_SIZE / 2 - 3 + pulse * 0.3);
 
   ctx.save();
@@ -1886,6 +1987,57 @@ function drawFoodOffering(food, cx, cy, pulse) {
     ctx.lineTo(cx + radius * 0.22, cy - radius * 0.2);
   }
 
+  ctx.stroke();
+  if (isMaize) {
+    ctx.translate(cx, cy);
+    ctx.rotate(-0.22);
+    ctx.fillStyle = '#4fcea2';
+    ctx.strokeStyle = '#b0f4d8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.12, radius * 0.34);
+    ctx.quadraticCurveTo(-radius * 0.72, -radius * 0.1, -radius * 0.38, -radius * 0.72);
+    ctx.quadraticCurveTo(-radius * 0.18, -radius * 0.14, -radius * 0.12, radius * 0.34);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.12, radius * 0.34);
+    ctx.quadraticCurveTo(radius * 0.72, -radius * 0.1, radius * 0.38, -radius * 0.72);
+    ctx.quadraticCurveTo(radius * 0.18, -radius * 0.14, radius * 0.12, radius * 0.34);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f2c230';
+    ctx.strokeStyle = '#fff0b0';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius * 0.34, radius * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#a87916';
+    for (let row = -2; row <= 2; row++) {
+      ctx.beginPath();
+      ctx.arc(-radius * 0.12, row * radius * 0.24, 0.8, 0, Math.PI * 2);
+      ctx.arc(radius * 0.12, row * radius * 0.24, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawSacredRain() {
+  const frame = Math.floor(gameTime / 80);
+  const dropCount = Math.min(42, Math.ceil(window.innerWidth / 28));
+  ctx.save();
+  ctx.strokeStyle = 'rgba(139, 231, 255, 0.24)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < dropCount; i++) {
+    const x = (i * 97 + frame * 2) % window.innerWidth;
+    const y = (i * 137 + frame * 5) % window.innerHeight;
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 3, y + 8);
+  }
   ctx.stroke();
   ctx.restore();
 }
@@ -2083,6 +2235,9 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   guardiansFrozenUntil = 0;
   freezeFoods = [];
   freezeBadge.classList.add('hidden');
+  sacredRainUntil = 0;
+  nextSacredRainAt = null;
+  rainBadge.classList.add('hidden');
   respawnProtectedUntil = 0;
   respawnBadge.classList.add('hidden');
   enemyGuardians = [];
