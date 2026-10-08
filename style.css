@@ -379,7 +379,7 @@ h1, h2, h3 {
   border-radius: 18px;
   font-size: 0.78rem;
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .hud-badge.hidden {
@@ -430,11 +430,44 @@ h1, h2, h3 {
   box-shadow: 0 2px 12px rgba(35, 160, 210, 0.32);
 }
 
+.sacrifice-offering-badge {
+  background: rgba(94, 49, 55, 0.92);
+  border: 1px solid rgba(243, 215, 189, 0.72);
+  color: #fff0e4;
+  box-shadow: 0 2px 12px rgba(190, 102, 112, 0.3);
+}
+
+.skull-food-badge {
+  background: rgba(64, 25, 34, 0.94);
+  border: 1px solid rgba(239, 82, 97, 0.82);
+  color: #ffe3e5;
+  box-shadow: 0 2px 12px rgba(239, 51, 64, 0.34);
+}
+
 .rain-badge {
   background: rgba(37, 77, 83, 0.9);
   border: 1px solid rgba(139, 231, 255, 0.55);
   color: #effbff;
   box-shadow: 0 2px 10px rgba(35, 160, 210, 0.2);
+}
+
+.cosmic-order-badge {
+  background: rgba(105, 91, 48, 0.9);
+  border: 1px solid rgba(213, 189, 112, 0.7);
+  color: #fff6d5;
+  box-shadow: 0 2px 10px rgba(213, 189, 112, 0.2);
+}
+
+#cosmic-order-food-badge:not(.hidden) {
+  border-color: rgba(255, 240, 176, 0.95);
+  box-shadow: 0 0 14px rgba(213, 189, 112, 0.5);
+  animation: cosmic-seal-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cosmic-seal-pulse {
+  50% {
+    box-shadow: 0 0 20px rgba(213, 189, 112, 0.78);
+  }
 }
 
 .threat-badge {
@@ -717,11 +750,12 @@ h1, h2, h3 {
 
 .preview-legend {
   display: flex;
+  flex-wrap: wrap;
   min-height: 26px;
   align-items: center;
   justify-content: center;
-  gap: clamp(12px, 4vw, 24px);
-  padding: 3px 8px;
+  gap: 3px clamp(8px, 2vw, 16px);
+  padding: 5px 8px;
   border-top: 1px solid rgba(105, 211, 180, 0.12);
   background: rgba(9, 16, 20, 0.66);
   color: #d7dfd5;
@@ -774,6 +808,41 @@ h1, h2, h3 {
   line-height: 1.35;
 }
 
+.preview-guardian-guide {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 7px;
+  border-top: 1px solid rgba(105, 211, 180, 0.12);
+  background: rgba(9, 16, 20, 0.7);
+  color: #b7c5ad;
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.preview-guardian-guide h3 {
+  color: #d2b264;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.preview-guardian-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.preview-guardian-list p {
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.preview-guardian-list strong {
+  color: #69d3b4;
+}
+
 .welcome-card > #tutorial-modal {
   position: static;
   flex: 1 1 0;
@@ -797,7 +866,7 @@ h1, h2, h3 {
   min-height: 0;
   gap: 10px;
   padding: 0 0 12px;
-  overflow: visible;
+  overflow: hidden;
   border: 0;
   border-bottom: 1px solid rgba(211, 190, 147, 0.16);
   border-radius: 0;
@@ -807,11 +876,14 @@ h1, h2, h3 {
 
 .welcome-card > #tutorial-modal .tutorial-content {
   display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
+  justify-content: flex-start;
   min-height: 0;
   min-width: 0;
   width: 100%;
-  overflow: visible;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .welcome-card > #tutorial-modal .tutorial-header h2 {
@@ -819,13 +891,14 @@ h1, h2, h3 {
 }
 
 .welcome-card > #tutorial-modal .tutorial-step {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  margin-block: auto;
   align-items: center;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  gap: 7px;
-  justify-content: center;
+  gap: 10px;
+  justify-content: flex-start;
   text-align: center;
 }
 
@@ -833,15 +906,9 @@ h1, h2, h3 {
   display: none;
 }
 
-.welcome-card > #tutorial-modal .tutorial-lead {
-  width: 100%;
-  font-size: 0.9rem;
-}
-
 .welcome-card > #tutorial-modal .tutorial-tip {
   width: 100%;
-  padding: 7px 10px;
-  font-size: 0.8rem;
+  padding: 9px 12px;
   text-align: center;
 }
 
@@ -861,7 +928,7 @@ h1, h2, h3 {
   border-radius: 8px;
   background: rgba(47, 45, 46, 0.62);
   color: #d8dfd3;
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   line-height: 1.3;
 }
 
@@ -879,7 +946,8 @@ h1, h2, h3 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .welcome-card {
+  .welcome-card,
+  #cosmic-order-food-badge:not(.hidden) {
     animation: none;
   }
 }
@@ -951,22 +1019,14 @@ h1, h2, h3 {
     align-items: center;
   }
   .welcome-card > #tutorial-modal .tutorial-step {
-    gap: 14px;
+    gap: 18px;
     justify-content: space-evenly;
-  }
-  .welcome-card > #tutorial-modal .tutorial-lead {
-    font-size: 1rem;
-  }
-  .welcome-card > #tutorial-modal .tutorial-tip {
-    padding: 12px 14px;
-    font-size: 0.92rem;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list {
     gap: 8px;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
     padding: 10px 7px;
-    font-size: 0.87rem;
   }
   .welcome-card > #tutorial-modal .tutorial-footer .btn {
     min-height: 48px;
@@ -1097,7 +1157,9 @@ h1, h2, h3 {
   border-radius: 22px;
   padding: 24px;
   max-width: 420px;
+  max-height: min(90vh, calc(100dvh - 32px));
   width: 100%;
+  overflow-y: auto;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
@@ -1209,7 +1271,7 @@ h1, h2, h3 {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  min-height: 140px;
+  min-height: 0;
   justify-content: center;
 }
 
@@ -1247,7 +1309,7 @@ h1, h2, h3 {
 .lives-tutorial-tip {
   padding-top: 6px;
   padding-bottom: 6px;
-  font-size: 0.8rem;
+  font-size: 0.84rem;
 }
 
 .step-dots {
@@ -1364,15 +1426,8 @@ h1, h2, h3 {
   .welcome-card > #tutorial-modal > .tutorial-card {
     gap: 8px;
   }
-  .welcome-card > #tutorial-modal .tutorial-lead {
-    font-size: 0.9rem;
-  }
-  .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.82rem;
-  }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
     padding: 6px 3px;
-    font-size: 0.78rem;
   }
   .hud-game-title {
     font-size: 0.62rem;
@@ -1387,7 +1442,7 @@ h1, h2, h3 {
 
 @media (max-height: 650px) and (max-width: 767px) {
   .welcome-demo {
-    height: clamp(118px, 25dvh, 170px);
+    height: clamp(76px, 15dvh, 110px);
   }
 }
 
@@ -1412,9 +1467,20 @@ h1, h2, h3 {
   }
   .preview-legend {
     min-height: 23px;
-    gap: 12px;
+    gap: 4px 8px;
     padding: 2px 6px;
     font-size: 0.66rem;
+  }
+  .preview-guardian-guide {
+    gap: 5px;
+    padding: 4px 6px 5px;
+    font-size: 0.58rem;
+  }
+  .preview-guardian-guide h3 {
+    font-size: 0.6rem;
+  }
+  .preview-guardian-list {
+    gap: 2px;
   }
   .preview-callout {
     min-height: 26px;
@@ -1424,6 +1490,12 @@ h1, h2, h3 {
   .preview-callout {
     min-height: 28px;
     padding: 4px 8px;
+  }
+  .preview-guardian-guide {
+    font-size: 0.56rem;
+  }
+  .preview-guardian-guide h3 {
+    font-size: 0.58rem;
   }
   .welcome-card > #tutorial-modal > .tutorial-card {
     gap: 4px;
@@ -1436,19 +1508,25 @@ h1, h2, h3 {
     display: none;
   }
   .welcome-card > #tutorial-modal .tutorial-step {
-    gap: 4px;
-  }
-  .welcome-card > #tutorial-modal .tutorial-lead,
-  .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.82rem;
-    line-height: 1.25;
+    gap: 8px;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
     padding: 5px 3px;
-    font-size: 0.74rem;
   }
   .welcome-card > #tutorial-modal .tutorial-footer .btn {
     min-height: 34px;
     padding: 6px 10px;
+  }
+}
+
+@media (max-width: 767px) {
+  .status-badges-container {
+    left: max(12px, calc(env(safe-area-inset-left) + 12px));
+    right: max(12px, calc(env(safe-area-inset-right) + 12px));
+  }
+
+  .hud-badge {
+    max-width: min(70vw, 320px);
+    text-align: right;
   }
 }

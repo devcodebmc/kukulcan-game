@@ -20,19 +20,21 @@
     <div class="welcome-card">
       <div class="welcome-preview">
         <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego: Kukulcán recoge ofrendas, crece y evita a un guardián"></canvas>
-        <div class="preview-legend" aria-label="Jade verde; guardianes en rojo, naranja, dorado y violeta">
-          <span class="preview-legend-item"><span class="jade-swatch" aria-hidden="true">◆</span> Jade</span>
-          <span class="preview-legend-item">
-            <span class="guardian-swatches" aria-hidden="true">
-              <i class="guardian-swatch guardian-swatch-red"></i>
-              <i class="guardian-swatch guardian-swatch-orange"></i>
-              <i class="guardian-swatch guardian-swatch-gold"></i>
-              <i class="guardian-swatch guardian-swatch-violet"></i>
-            </span>
-            Guardianes
-          </span>
+        <div class="preview-legend" aria-label="El corazón indica tus vidas; la ofrenda recupera una; la calavera quita una; el sello elimina guardianes">
+          <span class="preview-legend-item">🫀 Vidas</span>
+          <span class="preview-legend-item">🗡️🩸 Recupera 1</span>
+          <span class="preview-legend-item">☠️ Pierdes 1</span>
+          <span class="preview-legend-item">🌀 Elimina guardianes</span>
         </div>
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
+        <section class="preview-guardian-guide" aria-label="Tipos de guardianes">
+          <h3>🛡️ Guardianes</h3>
+          <div class="preview-guardian-list">
+            <p><strong>Cazador:</strong> persigue</p>
+            <p><strong>Vidente:</strong> anticipa</p>
+            <p><strong>Flanqueador:</strong> rodea</p>
+          </div>
+        </section>
       </div>
       <button id="welcome-start-btn" class="btn btn-outline welcome-start-btn hidden">📖 Mostrar instrucciones</button>
     </div>
@@ -102,7 +104,7 @@
   <div class="status-badges-container">
     <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite">
       Sacrificios <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
-        <span class="life-pip">💚</span><span class="life-pip">💚</span><span class="life-pip">💚</span>
+        <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
       </span>
     </div>
     <div id="respawn-badge" class="hud-badge respawn-badge hidden">
@@ -114,8 +116,20 @@
     <div id="freeze-badge" class="hud-badge freeze-badge hidden">
       ❄️ Guardianes congelados <span id="freeze-timer">3</span>s
     </div>
+    <div id="sacrifice-offering-badge" class="hud-badge sacrifice-offering-badge hidden" role="status">
+      🩸 Ofrenda del renacer disponible
+    </div>
+    <div id="skull-food-badge" class="hud-badge skull-food-badge hidden" role="status">
+      ☠️ Calavera maldita en el templo
+    </div>
     <div id="rain-badge" class="hud-badge rain-badge hidden">
       🌧️ Lluvia sagrada <span id="rain-timer">8</span>s · Maíz +10
+    </div>
+    <div id="cosmic-order-food-badge" class="hud-badge cosmic-order-badge hidden" role="status">
+      🌀 Sello del orden en el templo
+    </div>
+    <div id="cosmic-order-badge" class="hud-badge cosmic-order-badge hidden" role="status" aria-live="polite">
+      🌀 El orden llega en <span id="cosmic-order-timer">1</span>s
     </div>
     <div id="threat-badge" class="hud-badge threat-badge hidden">
       ◆ Guardián al acecho
@@ -214,33 +228,40 @@
         <!-- Paso 1 -->
         <div id="step-1" class="tutorial-step active">
           <div class="tutorial-icon-banner">🪶 🐍</div>
-          <p class="tutorial-lead">🐍 <strong>Guía a la serpiente emplumada:</strong> Desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
-          <p class="tutorial-tip"><strong>Entre mundos:</strong> Cruza los bordes para viajar entre la tierra y el cielo.</p>
+          <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
+          <p class="tutorial-tip">🌽 Recoge ofrendas para crecer y sumar puntos. Cruza los bordes para viajar entre la tierra y el cielo.</p>
         </div>
 
         <!-- Paso 2 -->
         <div id="step-2" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌽 🍫 🪶</div>
-          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 maíz, 🍫 cacao y jade te ayudan a crecer y sumar puntos. Durante la lluvia sagrada, el maíz da <strong>+10 extra</strong>.</p>
-          <p class="tutorial-tip">🔥 <strong>Furia:</strong> dura <strong>3 s</strong>. Actívala con el botón o <strong>Espacio/Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela guardianes <strong>3 s</strong>; embístelos para vencerlos.</p>
+          <div class="tutorial-icon-banner">🌽 🍫 🛡️</div>
+          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 el maíz y 🍫 el cacao te hacen crecer y suman puntos. Durante la 🌧️ lluvia sagrada, recoge las mazorcas al aterrizar para ganar <strong>+10 extra</strong>.</p>
+          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> te protege <strong>10 s</strong>; aprovecha el escudo para embestir y vencer guardianes.</p>
         </div>
 
         <!-- Paso 3 -->
         <div id="step-3" class="tutorial-step">
           <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
           <ul class="tutorial-guardian-list">
-            <li><strong>Cazador:</strong> te persigue.</li>
-            <li><strong>Vidente:</strong> anticipa tu rumbo.</li>
-            <li><strong>Flanqueador:</strong> intenta rodearte.</li>
+            <li><strong>Cazador</strong><span>te persigue</span></li>
+            <li><strong>Vidente</strong><span>anticipa tu rumbo</span></li>
+            <li><strong>Flanqueador</strong><span>intenta rodearte</span></li>
           </ul>
-          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> escudo por <strong>10 s</strong>. Embiste guardianes para vencerlos y ganar oro. Reaparece antes en dificultades altas.</p>
-          <p class="tutorial-tip lives-tutorial-tip">💚 Tienes <strong>3 sacrificios</strong>: si te alcanza un guardián o te enredas, pierdes uno y reapareces protegido.</p>
+          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. Reapareces protegido; 🗡️🩸 la ofrenda recupera uno (máx. 3).</p>
+        </div>
+
+        <!-- Paso 4 -->
+        <div id="step-4" class="tutorial-step">
+          <div class="tutorial-icon-banner">🌀 🔥 ❄️</div>
+          <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello dentro de <strong>15 s</strong>. Tras el aviso, elimina guardianes y da <strong>+50 puntos por cada uno</strong>.</p>
+          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela a los guardianes para embestirlos. Ambas duran <strong>3 s</strong>.</p>
         </div>
       </div>
 
       <!-- Indicadores de puntos -->
       <div class="step-dots">
         <span class="dot active"></span>
+        <span class="dot"></span>
         <span class="dot"></span>
         <span class="dot"></span>
       </div>

@@ -51,8 +51,13 @@ const respawnBadge = document.getElementById('respawn-badge');
 const respawnTimerSpan = document.getElementById('respawn-timer');
 const freezeBadge = document.getElementById('freeze-badge');
 const freezeTimerSpan = document.getElementById('freeze-timer');
+const sacrificeOfferingBadge = document.getElementById('sacrifice-offering-badge');
 const rainBadge = document.getElementById('rain-badge');
 const rainTimerSpan = document.getElementById('rain-timer');
+const cosmicOrderFoodBadge = document.getElementById('cosmic-order-food-badge');
+const cosmicOrderBadge = document.getElementById('cosmic-order-badge');
+const cosmicOrderTimerSpan = document.getElementById('cosmic-order-timer');
+const skullFoodBadge = document.getElementById('skull-food-badge');
 const threatBadge = document.getElementById('threat-badge');
 
 // Turbo y Cruceta
@@ -138,6 +143,9 @@ let foods = [];
 let bonusFoods = [];
 let shieldFoods = [];
 let freezeFoods = [];
+let cosmicOrderFoods = [];
+let sacrificeFoods = [];
+let skullFoods = [];
 let direction = { x: 1, y: 0 };
 let directionQueue = [];
 let score = 0;
@@ -174,10 +182,29 @@ let headPulseColor = '#d5bd70';
 let sacredRainUntil = 0;
 let nextSacredRainAt = null;
 let maizeSpawnRetryAt = null;
+let nextSacrificeSpawnAt = null;
+let nextSkullSpawnAt = null;
+let nextCosmicOrderSpawnAt = null;
+let cosmicOrderResolveAt = null;
+let cosmicOrderFlashStartedAt = null;
 const SACRED_RAIN_FIRST_MS = 22000;
 const SACRED_RAIN_INTERVAL_MS = 42000;
 const SACRED_RAIN_DURATION_MS = 8000;
 const MAIZE_RAIN_BONUS = 10;
+const SACRED_RAIN_MAIZE_COUNT = 3;
+const MAIZE_FALL_DURATION_MS = 700;
+const SACRIFICE_FIRST_SPAWN_MS = 30000;
+const SACRIFICE_RESPAWN_DELAY_MS = 12000;
+const SACRIFICE_REPEAT_DELAY_MS = 30000;
+const SKULL_FIRST_SPAWN_MS = 20000;
+const SKULL_RESPAWN_DELAY_MS = 38000;
+const COSMIC_ORDER_FIRST_SPAWN_MS = 30000;
+const COSMIC_ORDER_SPAWN_INTERVAL_MS = 45000;
+const COSMIC_ORDER_SPAWN_RETRY_MS = 5000;
+const COSMIC_ORDER_WARNING_MS = 1000;
+const COSMIC_ORDER_FOOD_LIFETIME_MS = 15000;
+const COSMIC_ORDER_REWARD = 50;
+const COSMIC_ORDER_FLASH_DURATION_MS = 720;
 const WELCOME_DEMO_COLS = 22;
 const WELCOME_DEMO_ROWS = 8;
 const WELCOME_DEMO_TICK_MS = 260;
@@ -479,7 +506,11 @@ function stopSuspenseMusic() {
 
 function playEatSound(type = 'normal') {
   if (isMuted) return;
-  if (type === 'freeze') {
+  if (type === 'sacrifice') {
+    playTone(392, 100, 0.17, 'triangle');
+    setTimeout(() => playTone(587, 130, 0.19, 'sine'), 70);
+    setTimeout(() => playTone(784, 210, 0.2, 'sine'), 155);
+  } else if (type === 'freeze') {
     playTone(880, 70, 0.14, 'triangle');
     setTimeout(() => playTone(660, 110, 0.16, 'sine'), 55);
     setTimeout(() => playTone(990, 150, 0.18, 'sine'), 130);
@@ -514,6 +545,36 @@ function playEnemyDefeatedSound() {
   playTone(880, 100, 0.2, 'square');
   setTimeout(() => playTone(1174, 120, 0.2, 'square'), 90);
   setTimeout(() => playTone(1760, 260, 0.25, 'triangle'), 190);
+}
+
+function playCosmicOrderSound() {
+  if (isMuted) return;
+  try {
+    const actx = getAudioContext();
+    if (!actx) return;
+    const now = actx.currentTime;
+    const layers = [
+      { frequency: 82, endFrequency: 34, duration: 0.72, volume: 0.3, type: 'sawtooth' },
+      { frequency: 196, endFrequency: 49, duration: 0.58, volume: 0.22, type: 'triangle' },
+      { frequency: 523, endFrequency: 131, duration: 0.34, volume: 0.13, type: 'square' }
+    ];
+
+    layers.forEach(layer => {
+      const oscillator = actx.createOscillator();
+      const gain = actx.createGain();
+      oscillator.type = layer.type;
+      oscillator.frequency.setValueAtTime(layer.frequency, now);
+      oscillator.frequency.exponentialRampToValueAtTime(layer.endFrequency, now + layer.duration);
+      gain.gain.setValueAtTime(layer.volume, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + layer.duration);
+      oscillator.connect(gain);
+      gain.connect(actx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + layer.duration);
+    });
+  } catch (e) {
+    return;
+  }
 }
 
 function playGameOverSound() {
@@ -653,6 +714,185 @@ function updateGameTimers(elapsedMs) {
       rainTimerSpan.textContent = String(Math.ceil((sacredRainUntil - gameTime) / 1000));
     }
   }
+
+  if (nextSacrificeSpawnAt !== null && gameTime >= nextSacrificeSpawnAt) {
+    if (lives >= MAX_LIVES) {
+      nextSacrificeSpawnAt = null;
+    } else if (sacrificeFoods.length > 0) {
+      nextSacrificeSpawnAt = gameTime + SACRIFICE_REPEAT_DELAY_MS;
+    } else if (spawnSacrificeOffering()) {
+      nextSacrificeSpawnAt = gameTime + SACRIFICE_REPEAT_DELAY_MS;
+    } else {
+      nextSacrificeSpawnAt = gameTime + 1000;
+    }
+  }
+
+  if (nextSkullSpawnAt !== null && gameTime >= nextSkullSpawnAt) {
+    if (skullFoods.length > 0) {
+      nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
+    } else if (spawnSkullFood()) {
+      nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
+    } else {
+      nextSkullSpawnAt = gameTime + 1000;
+    }
+  }
+
+  if (cosmicOrderResolveAt !== null) {
+    if (gameTime >= cosmicOrderResolveAt) {
+      resolveCosmicOrder();
+    } else {
+      cosmicOrderTimerSpan.textContent = String(Math.ceil((cosmicOrderResolveAt - gameTime) / 1000));
+    }
+  }
+
+  if (cosmicOrderFoods.some(food =>
+    food.expiresAt !== undefined && gameTime >= food.expiresAt
+  )) {
+    cosmicOrderFoods = [];
+    cosmicOrderFoodBadge.classList.add('hidden');
+  }
+
+  if (nextCosmicOrderSpawnAt !== null && gameTime >= nextCosmicOrderSpawnAt) {
+    if (cosmicOrderFoods.length > 0) {
+      nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_INTERVAL_MS;
+    } else if (enemyGuardians.length === 0) {
+      nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_RETRY_MS;
+    } else if (maybeSpawnCosmicOrderFood()) {
+      nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_INTERVAL_MS;
+    } else {
+      nextCosmicOrderSpawnAt = gameTime + 1000;
+    }
+  }
+
+  const targetCount = GUARDIAN_TARGETS[difficultySelect.value] || GUARDIAN_TARGETS.medium;
+  if (
+    isGameRunning &&
+    !isPaused &&
+    countdownEndsAt === null &&
+    cosmicOrderResolveAt === null &&
+    enemyGuardians.length < targetCount &&
+    enemySpawnAt === null
+  ) {
+    scheduleEnemySpawn();
+  }
+
+  if (
+    cosmicOrderFlashStartedAt !== null &&
+    gameTime - cosmicOrderFlashStartedAt >= COSMIC_ORDER_FLASH_DURATION_MS
+  ) {
+    cosmicOrderFlashStartedAt = null;
+  }
+}
+
+function maybeSpawnCosmicOrderFood() {
+  if (cosmicOrderFoods.length > 0 || enemyGuardians.length === 0) return false;
+
+  const start = Math.floor(Math.random() * gridCols * gridRows);
+  const totalCells = gridCols * gridRows;
+  for (let offset = 0; offset < totalCells; offset++) {
+    const cell = (start + offset) % totalCells;
+    const x = cell % gridCols;
+    const y = Math.floor(cell / gridCols);
+    if (isGuardianCellOccupied(x, y)) continue;
+    cosmicOrderFoods.push({
+      x,
+      y,
+      expiresAt: gameTime + COSMIC_ORDER_FOOD_LIFETIME_MS
+    });
+    cosmicOrderFoodBadge.classList.remove('hidden');
+    return true;
+  }
+  return false;
+}
+
+function spawnSacrificeOffering() {
+  if (lives >= MAX_LIVES || sacrificeFoods.length > 0) return false;
+
+  const start = Math.floor(Math.random() * gridCols * gridRows);
+  const totalCells = gridCols * gridRows;
+  for (let offset = 0; offset < totalCells; offset++) {
+    const cell = (start + offset) % totalCells;
+    const x = cell % gridCols;
+    const y = Math.floor(cell / gridCols);
+    if (isGuardianCellOccupied(x, y)) continue;
+    sacrificeFoods.push({ x, y });
+    sacrificeOfferingBadge.classList.remove('hidden');
+    return true;
+  }
+  return false;
+}
+
+function spawnSkullFood() {
+  if (skullFoods.length > 0) return false;
+
+  const start = Math.floor(Math.random() * gridCols * gridRows);
+  const totalCells = gridCols * gridRows;
+  for (let offset = 0; offset < totalCells; offset++) {
+    const cell = (start + offset) % totalCells;
+    const x = cell % gridCols;
+    const y = Math.floor(cell / gridCols);
+    if (isGuardianCellOccupied(x, y)) continue;
+    skullFoods.push({ x, y });
+    skullFoodBadge.classList.remove('hidden');
+    return true;
+  }
+  return false;
+}
+
+function resolveCosmicOrder() {
+  cosmicOrderResolveAt = null;
+  cosmicOrderBadge.classList.add('hidden');
+
+  const clearedCount = enemyGuardians.length;
+  if (clearedCount === 0) {
+    enemySpawnAt = null;
+    scheduleEnemySpawn();
+    return;
+  }
+
+  cosmicOrderFlashStartedAt = gameTime;
+  const defeatedGuardians = enemyGuardians;
+  runGuardiansDefeated += clearedCount;
+  defeatedGuardians.forEach(guardian => {
+    guardian.segments.forEach(segment => {
+      const x = segment.x * TILE_SIZE + TILE_SIZE / 2;
+      const y = segment.y * TILE_SIZE + TILE_SIZE / 2;
+      for (let particle = 0; particle < 5; particle++) {
+        const angle = (Math.PI * 2 * particle) / 5 + Math.random() * 0.3;
+        const speed = 1.8 + Math.random() * 2.2;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 2.5 + Math.random() * 2,
+          color: Math.random() > 0.5 ? '#d5bd70' : '#8be7ff',
+          alpha: 1,
+          decay: 0.025 + Math.random() * 0.015
+        });
+      }
+    });
+  });
+  enemyGuardians = [];
+  previousGuardianPositions.clear();
+  updateGuardianBadge();
+
+  screenShake = 10;
+  playCosmicOrderSound();
+  const reward = clearedCount * COSMIC_ORDER_REWARD;
+  score += reward;
+  updateScoresUI();
+  triggerHeadPulse('#d5bd70');
+  const playerHead = snake[0];
+  spawnFloatingText(
+    `🌀 Orden +${reward}`,
+    playerHead.x * TILE_SIZE + TILE_SIZE / 2,
+    playerHead.y * TILE_SIZE,
+    '#d5bd70'
+  );
+
+  enemySpawnAt = null;
+  scheduleEnemySpawn();
 }
 
 function startCountdown() {
@@ -931,7 +1171,7 @@ function scheduleEnemySpawn(retryDelay = null) {
   const difficulty = difficultySelect.value;
   const targetCount = GUARDIAN_TARGETS[difficulty] || GUARDIAN_TARGETS.medium;
   updateGuardianBadge();
-  if (!isGameRunning || enemyGuardians.length >= targetCount) {
+  if (!isGameRunning || enemyGuardians.length >= targetCount || cosmicOrderResolveAt !== null) {
     enemySpawnAt = null;
     return;
   }
@@ -996,7 +1236,7 @@ function spawnEnemySnake() {
 }
 
 function getGuardianDeathMessage(guardian) {
-  return `¡La serpiente guardiana ${guardian.behavior.name} (${guardian.palette.name}) te alcanzó!`;
+  return `¡El ${guardian.behavior.name} te alcanzó!`;
 }
 
 function isGuardianCellOccupied(x, y) {
@@ -1005,6 +1245,9 @@ function isGuardianCellOccupied(x, y) {
     bonusFoods.some(food => food.x === x && food.y === y) ||
     shieldFoods.some(food => food.x === x && food.y === y) ||
     freezeFoods.some(food => food.x === x && food.y === y) ||
+    cosmicOrderFoods.some(food => food.x === x && food.y === y) ||
+    sacrificeFoods.some(food => food.x === x && food.y === y) ||
+    skullFoods.some(food => food.x === x && food.y === y) ||
     enemyGuardians.some(guardian =>
       guardian.segments.some(segment => segment.x === x && segment.y === y)
     );
@@ -1074,7 +1317,11 @@ function destroyEnemySnake(guardianId, spawnBonus = true) {
 }
 
 function updateEnemySnakeAI() {
-  if (enemyGuardians.length === 0 || guardiansFrozenUntil > gameTime) return;
+  if (
+    enemyGuardians.length === 0 ||
+    guardiansFrozenUntil > gameTime ||
+    cosmicOrderResolveAt !== null
+  ) return;
   const difficulty = difficultySelect.value;
   const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
 
@@ -1233,9 +1480,21 @@ function resetGame() {
   bonusFoods = [];
   shieldFoods = [];
   freezeFoods = [];
+  cosmicOrderFoods = [];
+  sacrificeFoods = [];
+  skullFoods = [];
+  sacrificeOfferingBadge.classList.add('hidden');
+  skullFoodBadge.classList.add('hidden');
   sacredRainUntil = 0;
   nextSacredRainAt = SACRED_RAIN_FIRST_MS;
   maizeSpawnRetryAt = null;
+  nextCosmicOrderSpawnAt = COSMIC_ORDER_FIRST_SPAWN_MS;
+  cosmicOrderResolveAt = null;
+  cosmicOrderFlashStartedAt = null;
+  nextSacrificeSpawnAt = SACRIFICE_FIRST_SPAWN_MS;
+  nextSkullSpawnAt = SKULL_FIRST_SPAWN_MS;
+  cosmicOrderFoodBadge.classList.add('hidden');
+  cosmicOrderBadge.classList.add('hidden');
   rainBadge.classList.add('hidden');
   particles = [];
   floatingTexts = [];
@@ -1328,13 +1587,16 @@ function loseLife(reason) {
   triggerHeadPulse('#69d3b4');
   if (previousHead) {
     spawnFloatingText(
-      '💚 Sacrificio perdido',
+      '🫀 Sacrificio perdido',
       previousHead.x * TILE_SIZE + TILE_SIZE / 2,
       previousHead.y * TILE_SIZE,
       '#f87171'
     );
   }
   updateScoresUI();
+  if (sacrificeFoods.length === 0) {
+    nextSacrificeSpawnAt = gameTime + SACRIFICE_RESPAWN_DELAY_MS;
+  }
 }
 
 function ensureFoodCount(count = 6) {
@@ -1347,7 +1609,10 @@ function ensureFoodCount(count = 6) {
                      foods.some(f => f.x === rx && f.y === ry) ||
                      shieldFoods.some(food => food.x === rx && food.y === ry) ||
                      freezeFoods.some(food => food.x === rx && food.y === ry) ||
-                     bonusFoods.some(food => food.x === rx && food.y === ry) ||
+                     cosmicOrderFoods.some(food => food.x === rx && food.y === ry) ||
+                     sacrificeFoods.some(food => food.x === rx && food.y === ry) ||
+                                    skullFoods.some(food => food.x === rx && food.y === ry) ||
+                                    bonusFoods.some(food => food.x === rx && food.y === ry) ||
                      enemyGuardians.some(guardian =>
                        guardian.segments.some(segment => segment.x === rx && segment.y === ry)
                      );
@@ -1365,23 +1630,41 @@ function ensureFoodCount(count = 6) {
 }
 
 function ensureMaizeOffering() {
-  if (foods.some(food => food.offering === 'maize')) {
+  let maizeCount = foods.filter(food => food.offering === 'maize').length;
+  if (maizeCount >= SACRED_RAIN_MAIZE_COUNT) {
     maizeSpawnRetryAt = null;
     return true;
   }
 
-  const start = Math.floor(Math.random() * gridCols * gridRows);
-  const totalCells = gridCols * gridRows;
-  for (let offset = 0; offset < totalCells; offset++) {
-    const cell = (start + offset) % totalCells;
-    const x = cell % gridCols;
-    const y = Math.floor(cell / gridCols);
-    if (isGuardianCellOccupied(x, y)) continue;
-    foods.push({ x, y, shape: 2, offering: 'maize' });
-    maizeSpawnRetryAt = null;
-    return true;
+  while (maizeCount < SACRED_RAIN_MAIZE_COUNT) {
+    const start = Math.floor(Math.random() * gridCols * gridRows);
+    const totalCells = gridCols * gridRows;
+    let spawned = false;
+    for (let offset = 0; offset < totalCells; offset++) {
+      const cell = (start + offset) % totalCells;
+      const x = cell % gridCols;
+      const y = Math.floor(cell / gridCols);
+      if (isGuardianCellOccupied(x, y)) continue;
+      foods.push({
+        x,
+        y,
+        shape: 2,
+        offering: 'maize',
+        landingAt: gameTime + MAIZE_FALL_DURATION_MS,
+        meteorOffsetX: (Math.random() - 0.5) * TILE_SIZE * 4
+      });
+      maizeCount++;
+      spawned = true;
+      break;
+    }
+    if (!spawned) {
+      maizeSpawnRetryAt = gameTime + 500;
+      return false;
+    }
   }
-  return false;
+
+  maizeSpawnRetryAt = null;
+  return true;
 }
 
 function spawnWorldCrossingEffect(x, y) {
@@ -1419,13 +1702,28 @@ function gameUpdate() {
   let newY = (snake[0].y + direction.y + gridRows) % gridRows;
   const head = { x: newX, y: newY };
 
-  const willGrow = foods.some(food => food.x === head.x && food.y === head.y) ||
+  const willGrow = foods.some(food =>
+    food.x === head.x && food.y === head.y &&
+    (food.landingAt === undefined || gameTime >= food.landingAt)
+  ) ||
     bonusFoods.some(food => food.x === head.x && food.y === head.y) ||
     shieldFoods.some(food => food.x === head.x && food.y === head.y) ||
-    freezeFoods.some(food => food.x === head.x && food.y === head.y);
+    freezeFoods.some(food => food.x === head.x && food.y === head.y) ||
+    cosmicOrderFoods.some(food => food.x === head.x && food.y === head.y) ||
+    sacrificeFoods.some(food => food.x === head.x && food.y === head.y);
   const bodyToCheck = willGrow ? snake : snake.slice(0, -1);
   if (bodyToCheck.some(segment => segment.x === head.x && segment.y === head.y)) {
     loseLife('Kukulcán se enredó con su propio cuerpo.');
+    return;
+  }
+
+  const skullIdx = skullFoods.findIndex(food => food.x === head.x && food.y === head.y);
+  if (skullIdx !== -1) {
+    skullFoods.splice(skullIdx, 1);
+    skullFoodBadge.classList.add('hidden');
+    nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
+    screenShake = 8;
+    loseLife('¡La Calavera maldita te arrebató un sacrificio!');
     return;
   }
 
@@ -1488,34 +1786,80 @@ function gameUpdate() {
       freezeSpawnAt = gameTime + FREEZE_RESPAWN_DELAY_MS;
       updateScoresUI();
     } else {
-      const bonusIdx = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
-      const foodIdx = foods.findIndex(f => f.x === head.x && f.y === head.y);
-
-      if (bonusIdx !== -1) {
+      const sacrificeIdx = sacrificeFoods.findIndex(food => food.x === head.x && food.y === head.y);
+      if (sacrificeIdx !== -1) {
         const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
         const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-        bonusFoods.splice(bonusIdx, 1);
-        score += 50;
-        triggerHeadPulse('#facc15');
-        spawnFloatingText('+50', hx, hy, '#facc15');
-        playEatSound('bonus');
-        updateScoresUI();
-      } else if (foodIdx !== -1) {
-        const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-        const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-        const [food] = foods.splice(foodIdx, 1);
-        const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime
-          ? MAIZE_RAIN_BONUS
-          : 0;
-        const foodScore = 10 + maizeBonus;
-        score += foodScore;
-        triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
-        spawnFloatingText(maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`, hx, hy, maizeBonus ? '#facc15' : '#d5bd70');
-        playEatSound('normal');
-        ensureFoodCount(6);
-        updateScoresUI();
+        sacrificeFoods.splice(sacrificeIdx, 1);
+        sacrificeOfferingBadge.classList.add('hidden');
+        const previousLives = lives;
+        lives = Math.min(MAX_LIVES, lives + 1);
+        updateLivesUI();
+        triggerHeadPulse('#f3d7bd');
+        spawnFloatingText(
+          `🫀 +${lives - previousLives} Sacrificio`,
+          hx,
+          hy,
+          '#f3d7bd'
+        );
+        playEatSound('sacrifice');
+        nextSacrificeSpawnAt = lives < MAX_LIVES
+          ? gameTime + SACRIFICE_REPEAT_DELAY_MS
+          : null;
       } else {
-        snake.pop();
+        const cosmicOrderIdx = cosmicOrderFoods.findIndex(food => food.x === head.x && food.y === head.y);
+        const bonusIdx = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
+        const foodIdx = foods.findIndex(f =>
+          f.x === head.x && f.y === head.y &&
+          (f.landingAt === undefined || gameTime >= f.landingAt)
+        );
+
+        if (cosmicOrderIdx !== -1) {
+          const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+          const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+          cosmicOrderFoods.splice(cosmicOrderIdx, 1);
+          cosmicOrderFoodBadge.classList.add('hidden');
+          cosmicOrderResolveAt = gameTime + COSMIC_ORDER_WARNING_MS;
+          enemyGuardians.forEach(guardian => {
+            guardian.cosmicOrderHitAt = gameTime;
+          });
+          cosmicOrderTimerSpan.textContent = String(COSMIC_ORDER_WARNING_MS / 1000);
+          cosmicOrderBadge.classList.remove('hidden');
+          enemySpawnAt = null;
+          triggerHeadPulse('#d5bd70');
+          spawnFloatingText('🌀 ¡Sello del orden!', hx, hy, '#d5bd70');
+          playEatSound('bonus');
+        } else if (bonusIdx !== -1) {
+          const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+          const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+          bonusFoods.splice(bonusIdx, 1);
+          score += 50;
+          triggerHeadPulse('#facc15');
+          spawnFloatingText('+50', hx, hy, '#facc15');
+          playEatSound('bonus');
+          updateScoresUI();
+        } else if (foodIdx !== -1) {
+          const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+          const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+          const [food] = foods.splice(foodIdx, 1);
+          const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime
+            ? MAIZE_RAIN_BONUS
+            : 0;
+          const foodScore = 10 + maizeBonus;
+          score += foodScore;
+          triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
+          spawnFloatingText(
+            maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`,
+            hx,
+            hy,
+            maizeBonus ? '#facc15' : '#d5bd70'
+          );
+          playEatSound('normal');
+          ensureFoodCount(6);
+          updateScoresUI();
+        } else {
+          snake.pop();
+        }
       }
     }
   }
@@ -1606,13 +1950,50 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
   }
 
-  if (sacredRainUntil > gameTime) drawSacredRain();
-
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
   foods.forEach((food, i) => {
-    const cx = food.x * TILE_SIZE + TILE_SIZE / 2;
-    const cy = food.y * TILE_SIZE + TILE_SIZE / 2;
+    const targetX = food.x * TILE_SIZE + TILE_SIZE / 2;
+    const landingAt = food.landingAt;
+    const targetY = food.y * TILE_SIZE + TILE_SIZE / 2;
+    let cx = targetX;
+    let cy = targetY;
+    if (landingAt !== undefined && gameTime < landingAt) {
+      const progress = Math.max(
+        0,
+        Math.min(1, 1 - (landingAt - gameTime) / MAIZE_FALL_DURATION_MS)
+      );
+      const easedProgress = 1 - (1 - progress) ** 2;
+      const meteorOffsetX = food.meteorOffsetX || 0;
+      cx = targetX + meteorOffsetX * (1 - easedProgress);
+      cy = -TILE_SIZE + (targetY + TILE_SIZE) * easedProgress;
+
+      ctx.save();
+      const tailX = cx + Math.sign(meteorOffsetX || 1) * TILE_SIZE * 0.75;
+      const tailY = cy - TILE_SIZE * 1.35;
+      const trail = ctx.createLinearGradient(tailX, tailY, cx, cy);
+      trail.addColorStop(0, 'rgba(255, 102, 35, 0)');
+      trail.addColorStop(0.65, 'rgba(255, 151, 55, 0.62)');
+      trail.addColorStop(1, 'rgba(255, 240, 176, 0.96)');
+      ctx.globalAlpha = 0.45 + Math.sin(gameTime * 0.04 + food.x) * 0.12;
+      ctx.strokeStyle = trail;
+      ctx.lineWidth = TILE_SIZE * 0.24;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = '#ff8a35';
+      ctx.shadowBlur = TILE_SIZE * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = '#fff0b0';
+      ctx.shadowColor = '#ffc04d';
+      ctx.shadowBlur = TILE_SIZE * 0.8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(2, TILE_SIZE * 0.13), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     drawFoodOffering(food, cx, cy, pulse);
   });
 
@@ -1704,10 +2085,146 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
+  sacrificeFoods.forEach(offering => {
+    const cx = offering.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = offering.y * TILE_SIZE + TILE_SIZE / 2;
+    const pulse = Math.sin(gameTime * 0.008) * 1.5;
+    const size = TILE_SIZE * 0.4 + pulse;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.shadowColor = '#ef3340';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#a80f28';
+    ctx.strokeStyle = '#ffd0b8';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.bezierCurveTo(-size * 0.16, -size * 0.62, -size * 0.88, size * 0.02, -size * 0.78, size * 0.45);
+    ctx.bezierCurveTo(-size * 0.68, size * 1.22, size * 0.68, size * 1.22, size * 0.78, size * 0.45);
+    ctx.bezierCurveTo(size * 0.88, size * 0.02, size * 0.16, -size * 0.62, 0, -size);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 220, 210, 0.72)';
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.28, size * 0.15, size * 0.1, size * 0.2, -0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#332b20';
+    ctx.lineWidth = Math.max(2.8, size * 0.32);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.66, size * 0.66);
+    ctx.lineTo(size * 0.66, -size * 0.66);
+    ctx.stroke();
+    ctx.strokeStyle = '#e7eeee';
+    ctx.lineWidth = Math.max(1.6, size * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.66, size * 0.66);
+    ctx.lineTo(size * 0.66, -size * 0.66);
+    ctx.stroke();
+    ctx.strokeStyle = '#d5bd70';
+    ctx.lineWidth = Math.max(2.2, size * 0.24);
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.18, size * 0.18);
+    ctx.lineTo(-size * 0.62, size * 0.62);
+    ctx.moveTo(-size * 0.52, size * 0.35);
+    ctx.lineTo(-size * 0.35, size * 0.52);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  skullFoods.forEach(skull => {
+    const cx = skull.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = skull.y * TILE_SIZE + TILE_SIZE / 2;
+    const pulse = Math.sin(gameTime * 0.008) * 1.2;
+    const radius = TILE_SIZE * 0.44 + pulse;
+    ctx.save();
+    ctx.fillStyle = 'rgba(48, 19, 29, 0.94)';
+    ctx.strokeStyle = '#ef5261';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#ef3340';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = `${TILE_SIZE * 0.82}px "Segoe UI Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('☠️', cx, cy + 1);
+    ctx.restore();
+  });
+
+  cosmicOrderFoods.forEach(orderFood => {
+    const cx = orderFood.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = orderFood.y * TILE_SIZE + TILE_SIZE / 2;
+    const radius = Math.max(6, TILE_SIZE / 2 - 2 + pulse * 0.2);
+    const glow = 0.75 + (Math.sin(gameTime * 0.009) + 1) * 0.25;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(gameTime * 0.0007);
+    ctx.globalAlpha = glow;
+    ctx.fillStyle = 'rgba(22, 42, 48, 0.96)';
+    ctx.strokeStyle = '#fff0b0';
+    ctx.lineWidth = 2.2;
+    ctx.shadowColor = '#d5bd70';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#d5bd70';
+    ctx.beginPath();
+    for (let point = 0; point < 16; point++) {
+      const angle = -Math.PI / 2 + point * Math.PI / 8;
+      const pointRadius = radius * (point % 2 === 0 ? 1.28 : 1.04);
+      const x = Math.cos(angle) * pointRadius;
+      const y = Math.sin(angle) * pointRadius;
+      if (point === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#16343b';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#8be7ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.62, -Math.PI * 0.8, Math.PI * 0.8);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff0b0';
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 0.58);
+    ctx.lineTo(radius * 0.2, 0);
+    ctx.lineTo(0, radius * 0.58);
+    ctx.lineTo(-radius * 0.2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  });
+
   enemyGuardians.forEach(guardian => {
+    const hitAt = guardian.cosmicOrderHitAt;
     guardian.segments.forEach((seg, idx) => {
       const isHead = idx === 0;
-      ctx.fillStyle = isHead ? guardian.palette.head : guardian.palette.body;
+      const wobbleX = hitAt === undefined
+        ? 0
+        : Math.sin((gameTime - hitAt) * 0.065 + idx * 1.2) * 2.5;
+      const wobbleY = hitAt === undefined
+        ? 0
+        : Math.cos((gameTime - hitAt) * 0.065 + idx * 1.2) * 1.5;
+      ctx.fillStyle = hitAt !== undefined && Math.floor((gameTime - hitAt) / 100) % 2 === 0
+        ? '#f5e5ad'
+        : isHead ? guardian.palette.head : guardian.palette.body;
       ctx.shadowColor = isHead ? guardian.palette.head : 'transparent';
       ctx.shadowBlur = isHead ? 12 : 0;
       const previousSegments = previousGuardianPositions.get(guardian.id);
@@ -1716,6 +2233,8 @@ function draw(interpolation = 1, updateEffects = false) {
         previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1],
         interpolation
       );
+      renderSegment.x += wobbleX / TILE_SIZE;
+      renderSegment.y += wobbleY / TILE_SIZE;
 
       roundRect(
         ctx,
@@ -1898,6 +2417,19 @@ function draw(interpolation = 1, updateEffects = false) {
 
   drawFireBreath();
   updateAndDrawParticles(updateEffects);
+  if (cosmicOrderFlashStartedAt !== null) {
+    const elapsed = gameTime - cosmicOrderFlashStartedAt;
+    if (elapsed >= 0 && elapsed < COSMIC_ORDER_FLASH_DURATION_MS) {
+      const progress = elapsed / COSMIC_ORDER_FLASH_DURATION_MS;
+      const pulseCount = 3;
+      const flash = Math.max(0, Math.sin(progress * Math.PI * pulseCount));
+      ctx.save();
+      ctx.globalAlpha = flash * (1 - progress * 0.35) * 0.38;
+      ctx.fillStyle = Math.floor(progress * pulseCount) % 2 === 0 ? '#fff0b0' : '#8be7ff';
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.restore();
+    }
+  }
   ctx.restore();
 }
 
@@ -2022,23 +2554,6 @@ function drawFoodOffering(food, cx, cy, pulse) {
       ctx.fill();
     }
   }
-  ctx.restore();
-}
-
-function drawSacredRain() {
-  const frame = Math.floor(gameTime / 80);
-  const dropCount = Math.min(42, Math.ceil(window.innerWidth / 28));
-  ctx.save();
-  ctx.strokeStyle = 'rgba(139, 231, 255, 0.24)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 0; i < dropCount; i++) {
-    const x = (i * 97 + frame * 2) % window.innerWidth;
-    const y = (i * 137 + frame * 5) % window.innerHeight;
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - 3, y + 8);
-  }
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -2238,6 +2753,18 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   sacredRainUntil = 0;
   nextSacredRainAt = null;
   rainBadge.classList.add('hidden');
+  nextCosmicOrderSpawnAt = null;
+  cosmicOrderResolveAt = null;
+  cosmicOrderFlashStartedAt = null;
+  cosmicOrderFoods = [];
+  sacrificeFoods = [];
+  skullFoods = [];
+  nextSacrificeSpawnAt = null;
+  nextSkullSpawnAt = null;
+  sacrificeOfferingBadge.classList.add('hidden');
+  skullFoodBadge.classList.add('hidden');
+  cosmicOrderFoodBadge.classList.add('hidden');
+  cosmicOrderBadge.classList.add('hidden');
   respawnProtectedUntil = 0;
   respawnBadge.classList.add('hidden');
   enemyGuardians = [];
@@ -2274,11 +2801,12 @@ function changeDirection(newDir) {
 // SISTEMA DE TUTORIAL PASO A PASO (ONBOARDING)
 // ========================================================
 let currentTutorialStep = 1;
-const totalTutorialSteps = 3;
+const totalTutorialSteps = 4;
 const tutorialTitles = [
   'La Travesía de Kukulcán',
-  '🌽 Ofrendas y 🔥 Furia de Kukulcán',
-  '🛡️ Los guardianes'
+  '🌽 Las ofrendas sagradas',
+  '🛡️ Los guardianes',
+  '🌀 Poderes y sacrificios'
 ];
 
 function showTutorialStep(step) {
