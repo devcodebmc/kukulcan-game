@@ -146,6 +146,7 @@ let freezeFoods = [];
 let cosmicOrderFoods = [];
 let sacrificeFoods = [];
 let skullFoods = [];
+let lastSkullPosition = null;
 let direction = { x: 1, y: 0 };
 let directionQueue = [];
 let score = 0;
@@ -184,6 +185,7 @@ let nextSacredRainAt = null;
 let maizeSpawnRetryAt = null;
 let nextSacrificeSpawnAt = null;
 let nextSkullSpawnAt = null;
+let nextSkullMoveAt = null;
 let nextCosmicOrderSpawnAt = null;
 let cosmicOrderResolveAt = null;
 let cosmicOrderFlashStartedAt = null;
@@ -198,6 +200,8 @@ const SACRIFICE_RESPAWN_DELAY_MS = 12000;
 const SACRIFICE_REPEAT_DELAY_MS = 30000;
 const SKULL_FIRST_SPAWN_MS = 20000;
 const SKULL_RESPAWN_DELAY_MS = 38000;
+const SKULL_MOVE_INTERVAL_MS = 8000;
+const SKULL_REAPPEAR_DELAY_MS = 300;
 const COSMIC_ORDER_FIRST_SPAWN_MS = 30000;
 const COSMIC_ORDER_SPAWN_INTERVAL_MS = 45000;
 const COSMIC_ORDER_SPAWN_RETRY_MS = 5000;
@@ -727,13 +731,37 @@ function updateGameTimers(elapsedMs) {
     }
   }
 
-  if (nextSkullSpawnAt !== null && gameTime >= nextSkullSpawnAt) {
-    if (skullFoods.length > 0) {
+  if (
+    nextSkullSpawnAt !== null &&
+    gameTime >= nextSkullSpawnAt &&
+    skullFoods.length > 0
+  ) {
+    nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
+  } else if (
+    nextSkullSpawnAt !== null &&
+    gameTime >= nextSkullSpawnAt &&
+    skullFoods.length === 0 &&
+    nextSkullMoveAt === null
+  ) {
+    if (spawnSkullFood()) {
       nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
-    } else if (spawnSkullFood()) {
-      nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
+      nextSkullMoveAt = gameTime + SKULL_MOVE_INTERVAL_MS;
     } else {
       nextSkullSpawnAt = gameTime + 1000;
+    }
+  }
+
+  if (nextSkullMoveAt !== null && gameTime >= nextSkullMoveAt) {
+    if (skullFoods.length > 0) {
+      skullFoods = [];
+      skullFoodBadge.classList.add('hidden');
+      nextSkullMoveAt = gameTime + SKULL_REAPPEAR_DELAY_MS;
+    } else {
+      if (spawnSkullFood()) {
+        nextSkullMoveAt = gameTime + SKULL_MOVE_INTERVAL_MS;
+      } else {
+        nextSkullMoveAt = gameTime + 1000;
+      }
     }
   }
 
@@ -825,18 +853,24 @@ function spawnSacrificeOffering() {
 function spawnSkullFood() {
   if (skullFoods.length > 0) return false;
 
-  const start = Math.floor(Math.random() * gridCols * gridRows);
-  const totalCells = gridCols * gridRows;
-  for (let offset = 0; offset < totalCells; offset++) {
-    const cell = (start + offset) % totalCells;
-    const x = cell % gridCols;
-    const y = Math.floor(cell / gridCols);
-    if (isGuardianCellOccupied(x, y)) continue;
-    skullFoods.push({ x, y });
-    skullFoodBadge.classList.remove('hidden');
-    return true;
+  const availableCells = [];
+  for (let y = 0; y < gridRows; y++) {
+    for (let x = 0; x < gridCols; x++) {
+      if (!isGuardianCellOccupied(x, y)) availableCells.push({ x, y });
+    }
   }
-  return false;
+
+  const differentCells = availableCells.filter(({ x, y }) =>
+    !lastSkullPosition || x !== lastSkullPosition.x || y !== lastSkullPosition.y
+  );
+  const spawnCells = differentCells.length > 0 ? differentCells : availableCells;
+  if (spawnCells.length === 0) return false;
+
+  const position = spawnCells[Math.floor(Math.random() * spawnCells.length)];
+  skullFoods.push(position);
+  lastSkullPosition = { ...position };
+  skullFoodBadge.classList.remove('hidden');
+  return true;
 }
 
 function resolveCosmicOrder() {
@@ -1017,6 +1051,11 @@ function spawnTurboTrail(x, y) {
 // TEXTOS FLOTANTES Y PARTÍCULAS
 // ========================================================
 function spawnFloatingText(text, x, y, color = '#69d3b4') {
+  const maxFloatingTexts = window.innerWidth <= 768 ? 3 : 8;
+  if (floatingTexts.length >= maxFloatingTexts) {
+    floatingTexts.splice(0, floatingTexts.length - maxFloatingTexts + 1);
+  }
+
   let targetY = y - 38;
   let targetX = x;
 
@@ -1483,6 +1522,8 @@ function resetGame() {
   cosmicOrderFoods = [];
   sacrificeFoods = [];
   skullFoods = [];
+  lastSkullPosition = null;
+  nextSkullMoveAt = null;
   sacrificeOfferingBadge.classList.add('hidden');
   skullFoodBadge.classList.add('hidden');
   sacredRainUntil = 0;
@@ -1720,6 +1761,7 @@ function gameUpdate() {
   const skullIdx = skullFoods.findIndex(food => food.x === head.x && food.y === head.y);
   if (skullIdx !== -1) {
     skullFoods.splice(skullIdx, 1);
+    nextSkullMoveAt = null;
     skullFoodBadge.classList.add('hidden');
     nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
     screenShake = 8;
@@ -2088,49 +2130,17 @@ function draw(interpolation = 1, updateEffects = false) {
   sacrificeFoods.forEach(offering => {
     const cx = offering.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = offering.y * TILE_SIZE + TILE_SIZE / 2;
-    const pulse = Math.sin(gameTime * 0.008) * 1.5;
-    const size = TILE_SIZE * 0.4 + pulse;
+    const pulse = Math.sin(gameTime * 0.008) * 0.8;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.shadowColor = '#ef3340';
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = '#a80f28';
-    ctx.strokeStyle = '#ffd0b8';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, -size);
-    ctx.bezierCurveTo(-size * 0.16, -size * 0.62, -size * 0.88, size * 0.02, -size * 0.78, size * 0.45);
-    ctx.bezierCurveTo(-size * 0.68, size * 1.22, size * 0.68, size * 1.22, size * 0.78, size * 0.45);
-    ctx.bezierCurveTo(size * 0.88, size * 0.02, size * 0.16, -size * 0.62, 0, -size);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255, 220, 210, 0.72)';
-    ctx.beginPath();
-    ctx.ellipse(-size * 0.28, size * 0.15, size * 0.1, size * 0.2, -0.35, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#332b20';
-    ctx.lineWidth = Math.max(2.8, size * 0.32);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.66, size * 0.66);
-    ctx.lineTo(size * 0.66, -size * 0.66);
-    ctx.stroke();
-    ctx.strokeStyle = '#e7eeee';
-    ctx.lineWidth = Math.max(1.6, size * 0.18);
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.66, size * 0.66);
-    ctx.lineTo(size * 0.66, -size * 0.66);
-    ctx.stroke();
-    ctx.strokeStyle = '#d5bd70';
-    ctx.lineWidth = Math.max(2.2, size * 0.24);
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.18, size * 0.18);
-    ctx.lineTo(-size * 0.62, size * 0.62);
-    ctx.moveTo(-size * 0.52, size * 0.35);
-    ctx.lineTo(-size * 0.35, size * 0.52);
-    ctx.stroke();
+    ctx.shadowBlur = 18 + pulse;
+    ctx.fillStyle = '#ffd0b8';
+    ctx.font = `${TILE_SIZE * 1.05 + pulse}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.rotate(Math.PI * 0.75);
+    ctx.fillText('🗡️', 0, 0);
     ctx.restore();
   });
 
@@ -2759,6 +2769,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   cosmicOrderFoods = [];
   sacrificeFoods = [];
   skullFoods = [];
+  nextSkullMoveAt = null;
   nextSacrificeSpawnAt = null;
   nextSkullSpawnAt = null;
   sacrificeOfferingBadge.classList.add('hidden');

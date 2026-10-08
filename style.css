@@ -808,41 +808,6 @@ h1, h2, h3 {
   line-height: 1.35;
 }
 
-.preview-guardian-guide {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px 7px;
-  border-top: 1px solid rgba(105, 211, 180, 0.12);
-  background: rgba(9, 16, 20, 0.7);
-  color: #b7c5ad;
-  font-size: 0.66rem;
-  line-height: 1.2;
-}
-
-.preview-guardian-guide h3 {
-  color: #d2b264;
-  font-size: 0.68rem;
-  white-space: nowrap;
-}
-
-.preview-guardian-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.preview-guardian-list p {
-  min-width: 0;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.preview-guardian-list strong {
-  color: #69d3b4;
-}
-
 .welcome-card > #tutorial-modal {
   position: static;
   flex: 1 1 0;
@@ -1471,17 +1436,6 @@ h1, h2, h3 {
     padding: 2px 6px;
     font-size: 0.66rem;
   }
-  .preview-guardian-guide {
-    gap: 5px;
-    padding: 4px 6px 5px;
-    font-size: 0.58rem;
-  }
-  .preview-guardian-guide h3 {
-    font-size: 0.6rem;
-  }
-  .preview-guardian-list {
-    gap: 2px;
-  }
   .preview-callout {
     min-height: 26px;
     padding: 3px 6px;
@@ -1490,12 +1444,6 @@ h1, h2, h3 {
   .preview-callout {
     min-height: 28px;
     padding: 4px 8px;
-  }
-  .preview-guardian-guide {
-    font-size: 0.56rem;
-  }
-  .preview-guardian-guide h3 {
-    font-size: 0.58rem;
   }
   .welcome-card > #tutorial-modal > .tutorial-card {
     gap: 4px;
@@ -1523,10 +1471,36 @@ h1, h2, h3 {
   .status-badges-container {
     left: max(12px, calc(env(safe-area-inset-left) + 12px));
     right: max(12px, calc(env(safe-area-inset-right) + 12px));
+    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: center;
+    justify-items: stretch;
+    gap: 4px;
   }
 
-  .hud-badge {
-    max-width: min(70vw, 320px);
-    text-align: right;
+  .status-badges-container .hud-badge {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 3px 8px;
+    font-size: 0.68rem;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-badges-container .lives-badge {
+    justify-content: center;
+  }
+
+  .status-badges-container .threat-badge {
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .status-badges-container .lives-indicator {
+    font-size: 0.9rem;
   }
 }
