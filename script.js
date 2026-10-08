@@ -14,6 +14,13 @@ const dtStartBtn = document.getElementById('dt-start-btn');
 const dtPauseBtn = document.getElementById('dt-pause-btn');
 const difficultySelect = document.getElementById('difficulty-select');
 const dtStatsBtn = document.getElementById('dt-stats-btn');
+const welcomeScreen = document.getElementById('welcome-screen');
+const welcomeCard = welcomeScreen.querySelector('.welcome-card');
+const welcomePreview = welcomeCard.querySelector('.welcome-preview');
+const welcomeStartBtn = document.getElementById('welcome-start-btn');
+const welcomeDemo = document.getElementById('welcome-demo');
+const welcomeDemoCallout = document.getElementById('welcome-demo-callout');
+const welcomeDemoContext = welcomeDemo.getContext('2d');
 
 // HUD Móvil
 const menuToggleBtn = document.getElementById('menu-toggle-btn');
@@ -37,6 +44,13 @@ const drawerStatsBtn = document.getElementById('drawer-stats-btn');
 // Insignias y Alertas
 const immunityBadge = document.getElementById('immunity-badge');
 const immunityTimerSpan = document.getElementById('immunity-timer');
+const livesBadge = document.getElementById('lives-badge');
+const livesIndicator = document.getElementById('lives-indicator');
+const lifePips = livesIndicator.querySelectorAll('.life-pip');
+const respawnBadge = document.getElementById('respawn-badge');
+const respawnTimerSpan = document.getElementById('respawn-timer');
+const freezeBadge = document.getElementById('freeze-badge');
+const freezeTimerSpan = document.getElementById('freeze-timer');
 const threatBadge = document.getElementById('threat-badge');
 
 // Turbo y Cruceta
@@ -56,6 +70,7 @@ const tutorialStepTitle = document.getElementById('tutorial-step-title');
 const tutPrevBtn = document.getElementById('tut-prev-btn');
 const tutNextBtn = document.getElementById('tut-next-btn');
 const tutStartBtn = document.getElementById('tut-start-btn');
+const closeTutorialBtn = document.getElementById('close-tutorial-btn');
 const stepDots = document.querySelectorAll('.step-dots .dot');
 
 // Game Over Modal
@@ -120,9 +135,13 @@ let snake = [];
 let foods = [];
 let bonusFoods = [];
 let shieldFoods = [];
+let freezeFoods = [];
 let direction = { x: 1, y: 0 };
 let directionQueue = [];
 let score = 0;
+const MAX_LIVES = 3;
+const RESPAWN_PROTECTION_MS = 2500;
+let lives = MAX_LIVES;
 let highScore = Math.max(0, Number.parseInt(safeGetItem('snakeIoHighScore', '0'), 10) || 0);
 let isGameRunning = false;
 let isPaused = false;
@@ -130,7 +149,13 @@ let isMuted = safeGetItem('snakeIoMuted', 'false') === 'true';
 let runStartedAt = null;
 let runDifficulty = null;
 let runGuardiansDefeated = 0;
-let resumeAfterStatistics = false;
+let statisticsWasRunning = false;
+let statisticsWasPaused = false;
+let statisticsDrawerWasVisible = false;
+let tutorialWasRunning = false;
+let tutorialWasPaused = false;
+let tutorialDrawerWasVisible = false;
+let tutorialOpenedFromWelcome = false;
 let gameTime = 0;
 let simulationAccumulator = 0;
 let lastFrameTimestamp = null;
@@ -142,6 +167,37 @@ let previousSnakePositions = [];
 let previousGuardianPositions = new Map();
 let boardCanvas = null;
 let boardContext = null;
+let headPulse = 0;
+let headPulseColor = '#d5bd70';
+const WELCOME_DEMO_COLS = 22;
+const WELCOME_DEMO_ROWS = 8;
+const WELCOME_DEMO_TICK_MS = 260;
+const WELCOME_DEMO_ROUTE = [
+  { direction: { x: 1, y: 0 }, steps: 8 },
+  { direction: { x: 0, y: 1 }, steps: 2 },
+  { direction: { x: 1, y: 0 }, steps: 2 },
+  { direction: { x: 0, y: -1 }, steps: 2 },
+  { direction: { x: 1, y: 0 }, steps: 4 }
+];
+let welcomeDemoSnake = [];
+let welcomeDemoPreviousSnake = [];
+let welcomeDemoGuardian = [];
+let welcomeDemoPreviousGuardian = [];
+let welcomeDemoDirection = { x: 1, y: 0 };
+let welcomeDemoRouteIndex = 0;
+let welcomeDemoRouteSteps = 0;
+let welcomeDemoTick = 0;
+let welcomeDemoAccumulator = 0;
+let welcomeDemoLastFrame = null;
+let welcomeDemoFrameId = null;
+let welcomeDemoScore = 0;
+let welcomeDemoMaize = { x: 8, y: 4 };
+let welcomeDemoJade = { x: 14, y: 6 };
+let welcomeDemoImmuneUntil = 0;
+let welcomeDemoFlashUntil = 0;
+let welcomeDemoGuardianDefeatedUntil = 0;
+let welcomeDemoGameOverUntil = 0;
+let welcomeDemoStatus = '¡Guía a Kukulcán con las flechas o WASD!';
 
 function createEmptyGameStatistics() {
   return Object.fromEntries(Object.keys(DIFFICULTY_NAMES).map(difficulty => [
@@ -193,6 +249,7 @@ const TURBO_COOLDOWN_MS = 5000;
 let isImmune = false;
 let immunitySeconds = 0;
 let immunityExpiresAt = 0;
+let respawnProtectedUntil = 0;
 
 // Guardianes rojos
 let enemyGuardians = [];
@@ -200,12 +257,17 @@ let nextEnemyId = 1;
 let hasSpawnedGuardian = false;
 let enemySpawnAt = null;
 let jadeSpawnAt = null;
+let freezeSpawnAt = null;
+let guardiansFrozenUntil = 0;
+const GUARDIAN_FREEZE_DURATION_MS = 3000;
+const FREEZE_FIRST_SPAWN_MS = 16000;
+const FREEZE_RESPAWN_DELAY_MS = 22000;
 const GUARDIAN_TARGETS = { easy: 1, medium: 2, hard: 3, extreme: 4 };
 const GUARDIAN_PALETTES = [
-  { head: '#e2574c', body: '#9b2929', crest: '#ff9b83' },
-  { head: '#f28c28', body: '#a64b1b', crest: '#ffc078' },
-  { head: '#f2c230', body: '#a87916', crest: '#ffe27a' },
-  { head: '#a65bd4', body: '#64328e', crest: '#d4a0f0' }
+  { name: 'rojo', head: '#e2574c', body: '#9b2929', crest: '#ff9b83' },
+  { name: 'naranja', head: '#f28c28', body: '#a64b1b', crest: '#ffc078' },
+  { name: 'dorado', head: '#f2c230', body: '#a87916', crest: '#ffe27a' },
+  { name: 'violeta', head: '#a65bd4', body: '#64328e', crest: '#d4a0f0' }
 ];
 const GUARDIAN_BEHAVIORS = [
   { id: 'hunter', name: 'Cazador' },
@@ -408,7 +470,11 @@ function stopSuspenseMusic() {
 
 function playEatSound(type = 'normal') {
   if (isMuted) return;
-  if (type === 'shield') {
+  if (type === 'freeze') {
+    playTone(880, 70, 0.14, 'triangle');
+    setTimeout(() => playTone(660, 110, 0.16, 'sine'), 55);
+    setTimeout(() => playTone(990, 150, 0.18, 'sine'), 130);
+  } else if (type === 'shield') {
     playTone(523, 80, 0.16, 'triangle');
     setTimeout(() => playTone(659, 90, 0.18, 'triangle'), 70);
     setTimeout(() => playTone(1046, 200, 0.22, 'sine'), 150);
@@ -485,13 +551,45 @@ function triggerTurboBurst() {
   playTurboStartSound();
 }
 
+function triggerHeadPulse(color = '#d5bd70') {
+  headPulse = 1;
+  headPulseColor = color;
+}
+
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
+  if (headPulse > 0) {
+    headPulse = Math.max(0, headPulse - (elapsedMs / 240));
+  }
+
+  if (guardiansFrozenUntil > 0) {
+    if (gameTime >= guardiansFrozenUntil) {
+      enemyGuardians.forEach(guardian => {
+        if (guardian.frozenAt !== null) {
+          guardian.expiresAt += gameTime - guardian.frozenAt;
+          guardian.frozenAt = null;
+        }
+      });
+      guardiansFrozenUntil = 0;
+      freezeBadge.classList.add('hidden');
+    } else {
+      freezeTimerSpan.textContent = String(Math.ceil((guardiansFrozenUntil - gameTime) / 1000));
+    }
+  }
 
   if (isImmune) {
     immunitySeconds = Math.max(0, Math.ceil((immunityExpiresAt - gameTime) / 1000));
     immunityTimerSpan.textContent = immunitySeconds;
     if (gameTime >= immunityExpiresAt) deactivateImmunity();
+  }
+
+  if (respawnProtectedUntil > 0) {
+    if (gameTime >= respawnProtectedUntil) {
+      respawnProtectedUntil = 0;
+      respawnBadge.classList.add('hidden');
+    } else {
+      respawnTimerSpan.textContent = String(Math.ceil((respawnProtectedUntil - gameTime) / 1000));
+    }
   }
 
   if (isTurbo && gameTime >= turboReadyAt) {
@@ -516,6 +614,13 @@ function updateGameTimers(elapsedMs) {
   if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) {
     jadeSpawnAt = null;
     maybeSpawnShieldFood();
+  }
+
+  if (freezeSpawnAt !== null && gameTime >= freezeSpawnAt) {
+    freezeSpawnAt = null;
+    if (enemyGuardians.length === 0 || !maybeSpawnFreezeFood()) {
+      freezeSpawnAt = gameTime + 1500;
+    }
   }
 }
 
@@ -736,6 +841,10 @@ function deactivateImmunity() {
   clearFireBreath();
 }
 
+function hasGuardianProtection() {
+  return isImmune || gameTime < respawnProtectedUntil;
+}
+
 function maybeSpawnShieldFood() {
   const targetCount = GUARDIAN_TARGETS[difficultySelect.value] || GUARDIAN_TARGETS.medium;
   let attempts = 0;
@@ -747,6 +856,41 @@ function maybeSpawnShieldFood() {
       shieldFoods.push({ x: rx, y: ry });
     }
   }
+}
+
+function maybeSpawnFreezeFood() {
+  if (freezeFoods.length > 0) return true;
+
+  const head = snake[0];
+  for (let attempt = 0; attempt < 160; attempt++) {
+    const x = (head.x + Math.floor(Math.random() * 17) - 8 + gridCols) % gridCols;
+    const y = (head.y + Math.floor(Math.random() * 17) - 8 + gridRows) % gridRows;
+    const dx = Math.min(Math.abs(x - head.x), gridCols - Math.abs(x - head.x));
+    const dy = Math.min(Math.abs(y - head.y), gridRows - Math.abs(y - head.y));
+    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) {
+      freezeFoods.push({ x, y });
+      return true;
+    }
+  }
+
+  for (let attempt = 0; attempt < gridCols * gridRows; attempt++) {
+    const x = Math.floor(Math.random() * gridCols);
+    const y = Math.floor(Math.random() * gridRows);
+    if (isGuardianCellOccupied(x, y)) continue;
+    freezeFoods.push({ x, y });
+    return true;
+  }
+
+  return false;
+}
+
+function activateGuardianFreeze() {
+  guardiansFrozenUntil = gameTime + GUARDIAN_FREEZE_DURATION_MS;
+  enemyGuardians.forEach(guardian => {
+    if (guardian.frozenAt === null) guardian.frozenAt = gameTime;
+  });
+  freezeTimerSpan.textContent = String(GUARDIAN_FREEZE_DURATION_MS / 1000);
+  freezeBadge.classList.remove('hidden');
 }
 
 // ========================================================
@@ -774,16 +918,24 @@ function spawnEnemySnake() {
   if (!isGameRunning || enemyGuardians.length >= targetCount) return false;
 
   let segments = null;
+  const safeMarginX = Math.max(3, Math.ceil(56 / TILE_SIZE));
+  const safeMarginY = Math.max(3, Math.ceil(88 / TILE_SIZE));
+  const minSpawnX = safeMarginX + 3;
+  const maxSpawnX = gridCols - safeMarginX - 1;
+  const minSpawnY = safeMarginY;
+  const maxSpawnY = gridRows - safeMarginY - 1;
+
   for (let attempt = 0; attempt < gridCols * gridRows; attempt++) {
-    const x = Math.floor(Math.random() * gridCols);
-    const y = Math.floor(Math.random() * gridRows);
+    if (minSpawnX > maxSpawnX || minSpawnY > maxSpawnY) break;
+    const x = minSpawnX + Math.floor(Math.random() * (maxSpawnX - minSpawnX + 1));
+    const y = minSpawnY + Math.floor(Math.random() * (maxSpawnY - minSpawnY + 1));
     const candidate = Array.from({ length: 4 }, (_, index) => ({
       x: (x - index + gridCols) % gridCols,
       y
     }));
     const dx = Math.min(Math.abs(x - snake[0].x), gridCols - Math.abs(x - snake[0].x));
     const dy = Math.min(Math.abs(y - snake[0].y), gridRows - Math.abs(y - snake[0].y));
-    const safelyDistant = dx + dy >= 6;
+    const safelyDistant = dx + dy >= 8;
     const overlaps = candidate.some(cell => isGuardianCellOccupied(cell.x, cell.y));
     if (safelyDistant && !overlaps) {
       segments = candidate;
@@ -802,6 +954,7 @@ function spawnEnemySnake() {
     direction: { x: 1, y: 0 },
     tickCounter: 0,
     expiresAt: gameTime + (GUARDIAN_LIFETIME_MS[difficulty] || GUARDIAN_LIFETIME_MS.medium),
+    frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
     palette: GUARDIAN_PALETTES[(id - 1) % GUARDIAN_PALETTES.length],
     behavior: GUARDIAN_BEHAVIORS[(id - 1) % GUARDIAN_BEHAVIORS.length]
   };
@@ -811,11 +964,16 @@ function spawnEnemySnake() {
   return true;
 }
 
+function getGuardianDeathMessage(guardian) {
+  return `¡La serpiente guardiana ${guardian.behavior.name} (${guardian.palette.name}) te alcanzó!`;
+}
+
 function isGuardianCellOccupied(x, y) {
   return snake.some(segment => segment.x === x && segment.y === y) ||
     foods.some(food => food.x === x && food.y === y) ||
     bonusFoods.some(food => food.x === x && food.y === y) ||
     shieldFoods.some(food => food.x === x && food.y === y) ||
+    freezeFoods.some(food => food.x === x && food.y === y) ||
     enemyGuardians.some(guardian =>
       guardian.segments.some(segment => segment.x === x && segment.y === y)
     );
@@ -885,7 +1043,7 @@ function destroyEnemySnake(guardianId, spawnBonus = true) {
 }
 
 function updateEnemySnakeAI() {
-  if (enemyGuardians.length === 0) return;
+  if (enemyGuardians.length === 0 || guardiansFrozenUntil > gameTime) return;
   const difficulty = difficultySelect.value;
   const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
 
@@ -908,7 +1066,7 @@ function updateEnemySnakeAI() {
 
     if (Math.abs(dx) > gridCols / 2) dx = -Math.sign(dx) * (gridCols - Math.abs(dx));
     if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
-    if (isImmune) {
+    if (hasGuardianProtection()) {
       dx = -dx;
       dy = -dy;
     }
@@ -934,17 +1092,19 @@ function updateEnemySnakeAI() {
       segment.x === newEnemyHead.x && segment.y === newEnemyHead.y
     );
     if (touchesPlayer) {
-      if (isImmune) {
+      if (hasGuardianProtection()) {
         screenShake = 10;
         playEnemyDefeatedSound();
         runGuardiansDefeated++;
         score += 100;
-        spawnFloatingText('+100 🛡️ ¡GUARDIÁN VENCIDO!', playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, '#facc15');
+        const rewardLabel = isImmune ? '+100 🛡️ ¡GUARDIÁN VENCIDO!' : '+100 🪶 ¡GUARDIÁN VENCIDO!';
+        const rewardColor = isImmune ? '#facc15' : '#69d3b4';
+        spawnFloatingText(rewardLabel, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, rewardColor);
         updateScoresUI();
         destroyEnemySnake(guardian.id);
         continue;
       }
-      gameOver('¡La serpiente roja te ha alcanzado y devorado!');
+      loseLife(getGuardianDeathMessage(guardian));
       return;
     }
 
@@ -994,20 +1154,31 @@ function finishRunStatistics() {
 }
 
 function openStatistics() {
-  resumeAfterStatistics = isGameRunning && !isPaused;
-  if (resumeAfterStatistics) togglePause();
+  if (!statisticsModal.classList.contains('hidden')) return;
+  statisticsWasRunning = isGameRunning;
+  statisticsWasPaused = isPaused;
+  statisticsDrawerWasVisible = !drawerMenu.classList.contains('hidden');
+  if (statisticsWasRunning && !statisticsWasPaused) togglePause();
   drawerMenu.classList.add('hidden');
   updateStatisticsUI();
   statisticsModal.classList.remove('hidden');
 }
 
 function closeStatistics() {
+  if (statisticsModal.classList.contains('hidden')) return;
   statisticsModal.classList.add('hidden');
-  if (resumeAfterStatistics && isGameRunning && isPaused) {
+  if (statisticsWasRunning && !statisticsWasPaused && isGameRunning && isPaused) {
     togglePause();
-    drawerMenu.classList.add('hidden');
+  } else if (statisticsWasRunning && statisticsWasPaused && isGameRunning && isPaused) {
+    drawerMenu.classList.remove('hidden');
   }
-  resumeAfterStatistics = false;
+  drawerMenu.classList.toggle(
+    'hidden',
+    !(statisticsWasRunning && statisticsWasPaused) && !statisticsDrawerWasVisible
+  );
+  statisticsWasRunning = false;
+  statisticsWasPaused = false;
+  statisticsDrawerWasVisible = false;
 }
 
 function resetGame() {
@@ -1021,18 +1192,27 @@ function resetGame() {
   ];
   direction = { x: 1, y: 0 };
   directionQueue = [];
+  lives = MAX_LIVES;
+  respawnProtectedUntil = 0;
+  respawnBadge.classList.add('hidden');
   previousSnakePositions = snake.map(segment => ({ ...segment }));
   previousGuardianPositions.clear();
   score = 0;
   foods = [];
   bonusFoods = [];
   shieldFoods = [];
+  freezeFoods = [];
   particles = [];
   floatingTexts = [];
   screenShake = 0;
+  headPulse = 0;
+  headPulseColor = '#d5bd70';
   clearFireBreath();
   enemySpawnAt = null;
   jadeSpawnAt = null;
+  freezeSpawnAt = FREEZE_FIRST_SPAWN_MS;
+  guardiansFrozenUntil = 0;
+  freezeBadge.classList.add('hidden');
   enemyGuardians = [];
   hasSpawnedGuardian = false;
   updateGuardianBadge();
@@ -1045,11 +1225,81 @@ function resetGame() {
   updateTurboUI();
 
   updateScoresUI();
+  updateLivesUI();
   deactivateImmunity();
   ensureFoodCount(6);
   maybeSpawnShieldFood();
 
   gameOverlay.classList.add('hidden');
+}
+
+function findRespawnPosition() {
+  const centerX = Math.floor(gridCols / 2);
+  const centerY = Math.floor(gridRows / 2);
+  for (let offset = 0; offset < gridCols * gridRows; offset++) {
+    const x = (centerX + offset % gridCols) % gridCols;
+    const y = (centerY + Math.floor(offset / gridCols)) % gridRows;
+    const segments = [0, 1, 2].map(distance => ({
+      x: (x - distance + gridCols) % gridCols,
+      y
+    }));
+    const overlapsGuardian = segments.some(position =>
+      enemyGuardians.some(guardian =>
+        guardian.segments.some(segment =>
+          segment.x === position.x && segment.y === position.y
+        )
+      )
+    );
+    if (!overlapsGuardian) return { x, y };
+  }
+  return null;
+}
+
+function loseLife(reason) {
+  lives = Math.max(0, lives - 1);
+  updateLivesUI();
+
+  if (lives === 0) {
+    gameOver(`${reason} Se agotaron los tres sacrificios.`);
+    return;
+  }
+
+  const previousHead = snake[0];
+  const spawn = findRespawnPosition();
+  if (!spawn) {
+    gameOver('Los guardianes han cerrado todos los caminos. La travesía termina.');
+    return;
+  }
+
+  snake = [
+    { x: spawn.x, y: spawn.y },
+    { x: (spawn.x - 1 + gridCols) % gridCols, y: spawn.y },
+    { x: (spawn.x - 2 + gridCols) % gridCols, y: spawn.y }
+  ];
+  direction = { x: 1, y: 0 };
+  directionQueue = [];
+  previousSnakePositions = snake.map(segment => ({ ...segment }));
+  deactivateImmunity();
+  isTurbo = false;
+  turboRemaining = 0;
+  turboCooldown = 0;
+  turboReadyAt = 0;
+  turboCooldownUntil = 0;
+  updateTurboUI();
+  respawnProtectedUntil = gameTime + RESPAWN_PROTECTION_MS;
+  respawnTimerSpan.textContent = String(Math.ceil(RESPAWN_PROTECTION_MS / 1000));
+  respawnBadge.classList.remove('hidden');
+  screenShake = 8;
+  triggerHeadPulse('#69d3b4');
+  if (previousHead) {
+    spawnFloatingText(
+      '💚 Sacrificio perdido',
+      previousHead.x * TILE_SIZE + TILE_SIZE / 2,
+      previousHead.y * TILE_SIZE,
+      '#f87171'
+    );
+  }
+  updateScoresUI();
 }
 
 function ensureFoodCount(count = 6) {
@@ -1061,6 +1311,7 @@ function ensureFoodCount(count = 6) {
     const occupied = snake.some(s => s.x === rx && s.y === ry) ||
                      foods.some(f => f.x === rx && f.y === ry) ||
                      shieldFoods.some(food => food.x === rx && food.y === ry) ||
+                     freezeFoods.some(food => food.x === rx && food.y === ry) ||
                      bonusFoods.some(food => food.x === rx && food.y === ry) ||
                      enemyGuardians.some(guardian =>
                        guardian.segments.some(segment => segment.x === rx && segment.y === ry)
@@ -1082,9 +1333,13 @@ function gameUpdate() {
   let newY = (snake[0].y + direction.y + gridRows) % gridRows;
   const head = { x: newX, y: newY };
 
-  if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-    screenShake = 8;
-    gameOver('Has chocado contra tu propio cuerpo.');
+  const willGrow = foods.some(food => food.x === head.x && food.y === head.y) ||
+    bonusFoods.some(food => food.x === head.x && food.y === head.y) ||
+    shieldFoods.some(food => food.x === head.x && food.y === head.y) ||
+    freezeFoods.some(food => food.x === head.x && food.y === head.y);
+  const bodyToCheck = willGrow ? snake : snake.slice(0, -1);
+  if (bodyToCheck.some(segment => segment.x === head.x && segment.y === head.y)) {
+    loseLife('Kukulcán se enredó con su propio cuerpo.');
     return;
   }
 
@@ -1092,19 +1347,29 @@ function gameUpdate() {
     guardian.segments.some(segment => segment.x === head.x && segment.y === head.y)
   );
   if (hitGuardian) {
-      if (isImmune) {
-        screenShake = 10;
-        playEnemyDefeatedSound();
-        runGuardiansDefeated++;
-        score += 100;
-        spawnFloatingText('+100 🛡️ ¡GUARDIÁN VENCIDO!', head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#facc15');
-        updateScoresUI();
-        destroyEnemySnake(hitGuardian.id);
-      } else {
-        screenShake = 8;
-        gameOver('¡Has impactado contra la serpiente roja enemiga!');
-        return;
-      }
+    if (hasGuardianProtection() || guardiansFrozenUntil > gameTime) {
+      const shieldProtected = isImmune;
+      const guardianFrozen = guardiansFrozenUntil > gameTime;
+      const protectionColor = shieldProtected ? '#facc15' : guardianFrozen ? '#8be7ff' : '#69d3b4';
+      const protectionSymbol = shieldProtected ? '🛡️' : guardianFrozen ? '❄️' : '🪶';
+      screenShake = 10;
+      triggerHeadPulse(protectionColor);
+      playEnemyDefeatedSound();
+      runGuardiansDefeated++;
+      score += 100;
+      spawnFloatingText(
+        `+100 ${protectionSymbol} ¡GUARDIÁN VENCIDO!`,
+        head.x * TILE_SIZE + TILE_SIZE / 2,
+        head.y * TILE_SIZE,
+        protectionColor
+      );
+      updateScoresUI();
+      destroyEnemySnake(hitGuardian.id);
+    } else {
+      screenShake = 8;
+      loseLife(getGuardianDeathMessage(hitGuardian));
+      return;
+    }
   }
 
   snake.unshift(head);
@@ -1115,6 +1380,7 @@ function gameUpdate() {
     const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
     shieldFoods.splice(jadeIdx, 1);
     score += 25;
+    triggerHeadPulse('#69d3b4');
     spawnFloatingText('🛡️ ¡Jade +25!', hx, hy, '#69d3b4');
     playEatSound('shield');
     activateImmunity(10);
@@ -1122,28 +1388,45 @@ function gameUpdate() {
     updateScoresUI();
     jadeSpawnAt = gameTime + (JADE_RESPAWN_DELAY_MS[difficultySelect.value] || JADE_RESPAWN_DELAY_MS.medium);
   } else {
-    const bonusIdx = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
-    const foodIdx = foods.findIndex(f => f.x === head.x && f.y === head.y);
+    const freezeIdx = freezeFoods.findIndex(food => food.x === head.x && food.y === head.y);
 
-    if (bonusIdx !== -1) {
+    if (freezeIdx !== -1) {
       const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
       const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      bonusFoods.splice(bonusIdx, 1);
-      score += 50;
-      spawnFloatingText('+50', hx, hy, '#facc15');
-      playEatSound('bonus');
-      updateScoresUI();
-    } else if (foodIdx !== -1) {
-      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      foods.splice(foodIdx, 1);
-      score += 10;
-      spawnFloatingText('+10', hx, hy, '#d5bd70');
-      playEatSound('normal');
-      ensureFoodCount(6);
+      freezeFoods.splice(freezeIdx, 1);
+      score += 25;
+      triggerHeadPulse('#8be7ff');
+      spawnFloatingText('❄️ ¡Esencia helada +25!', hx, hy, '#8be7ff');
+      playEatSound('freeze');
+      activateGuardianFreeze();
+      freezeSpawnAt = gameTime + FREEZE_RESPAWN_DELAY_MS;
       updateScoresUI();
     } else {
-      snake.pop();
+      const bonusIdx = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
+      const foodIdx = foods.findIndex(f => f.x === head.x && f.y === head.y);
+
+      if (bonusIdx !== -1) {
+        const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+        const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+        bonusFoods.splice(bonusIdx, 1);
+        score += 50;
+        triggerHeadPulse('#facc15');
+        spawnFloatingText('+50', hx, hy, '#facc15');
+        playEatSound('bonus');
+        updateScoresUI();
+      } else if (foodIdx !== -1) {
+        const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+        const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+        foods.splice(foodIdx, 1);
+        score += 10;
+        triggerHeadPulse('#d5bd70');
+        spawnFloatingText('+10', hx, hy, '#d5bd70');
+        playEatSound('normal');
+        ensureFoodCount(6);
+        updateScoresUI();
+      } else {
+        snake.pop();
+      }
     }
   }
 
@@ -1173,6 +1456,13 @@ function updateScoresUI() {
     drawerHighScore.textContent = highScore;
     safeSetItem('snakeIoHighScore', highScore);
   }
+}
+
+function updateLivesUI() {
+  lifePips.forEach((pip, index) => {
+    pip.classList.toggle('spent', index >= lives);
+  });
+  livesBadge.setAttribute('aria-label', `Sacrificios: ${lives} de ${MAX_LIVES}`);
 }
 
 // ========================================================
@@ -1282,6 +1572,40 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.shadowBlur = 0;
   });
 
+  freezeFoods.forEach(freezeFood => {
+    const cx = freezeFood.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = freezeFood.y * TILE_SIZE + TILE_SIZE / 2;
+    const radius = Math.max(4, TILE_SIZE / 2 - 3 + pulse * 0.3);
+    ctx.save();
+    ctx.fillStyle = '#4fc3f7';
+    ctx.strokeStyle = '#d7f6ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius);
+    ctx.lineTo(cx + radius * 0.8, cy - radius * 0.45);
+    ctx.lineTo(cx + radius * 0.8, cy + radius * 0.45);
+    ctx.lineTo(cx, cy + radius);
+    ctx.lineTo(cx - radius * 0.8, cy + radius * 0.45);
+    ctx.lineTo(cx - radius * 0.8, cy - radius * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#effbff';
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.42, cy);
+    ctx.lineTo(cx + radius * 0.42, cy);
+    ctx.moveTo(cx, cy - radius * 0.42);
+    ctx.lineTo(cx, cy + radius * 0.42);
+    ctx.moveTo(cx - radius * 0.3, cy - radius * 0.3);
+    ctx.lineTo(cx + radius * 0.3, cy + radius * 0.3);
+    ctx.moveTo(cx + radius * 0.3, cy - radius * 0.3);
+    ctx.lineTo(cx - radius * 0.3, cy + radius * 0.3);
+    ctx.stroke();
+    ctx.restore();
+  });
+
   enemyGuardians.forEach(guardian => {
     guardian.segments.forEach((seg, idx) => {
       const isHead = idx === 0;
@@ -1356,10 +1680,43 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.fill();
       ctx.stroke();
     });
+
+    if (guardiansFrozenUntil > gameTime) {
+      ctx.save();
+      guardian.segments.forEach(segment => {
+        const x = segment.x * TILE_SIZE + 2;
+        const y = segment.y * TILE_SIZE + 2;
+        ctx.fillStyle = 'rgba(117, 218, 255, 0.22)';
+        ctx.strokeStyle = 'rgba(225, 249, 255, 0.65)';
+        ctx.lineWidth = 1;
+        roundRect(ctx, x, y, TILE_SIZE - 4, TILE_SIZE - 4, 5);
+        ctx.fill();
+        ctx.stroke();
+      });
+      const head = guardian.segments[0];
+      const cx = head.x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = head.y * TILE_SIZE + TILE_SIZE / 2;
+      const mark = TILE_SIZE * 0.2;
+      ctx.strokeStyle = 'rgba(239, 251, 255, 0.95)';
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - mark, cy);
+      ctx.lineTo(cx + mark, cy);
+      ctx.moveTo(cx, cy - mark);
+      ctx.lineTo(cx, cy + mark);
+      ctx.moveTo(cx - mark * 0.7, cy - mark * 0.7);
+      ctx.lineTo(cx + mark * 0.7, cy + mark * 0.7);
+      ctx.moveTo(cx + mark * 0.7, cy - mark * 0.7);
+      ctx.lineTo(cx - mark * 0.7, cy + mark * 0.7);
+      ctx.stroke();
+      ctx.restore();
+    }
   });
 
   if (updateEffects) blinkCounter++;
   const isBlinking = (blinkCounter % 90) > 85;
+  const isPlayerProtected = hasGuardianProtection();
 
   snake.forEach((segment, index) => {
     const isHead = index === 0;
@@ -1369,7 +1726,7 @@ function draw(interpolation = 1, updateEffects = false) {
       interpolation
     );
 
-    if (isImmune) {
+    if (isPlayerProtected) {
       ctx.fillStyle = isHead ? '#62d8bd' : '#168c75';
       ctx.shadowColor = '#62d8bd';
       ctx.shadowBlur = isHead ? 18 : 0;
@@ -1381,6 +1738,11 @@ function draw(interpolation = 1, updateEffects = false) {
       }
     }
 
+    if (isHead && headPulse > 0) {
+      ctx.shadowColor = headPulseColor;
+      ctx.shadowBlur = 18 + headPulse * 25;
+    }
+
     roundRect(
       ctx,
       renderSegment.x * TILE_SIZE + 1,
@@ -1390,12 +1752,27 @@ function draw(interpolation = 1, updateEffects = false) {
       isHead ? 8 : 5
     );
     ctx.fill();
+
+    if (isHead && headPulse > 0) {
+      ctx.beginPath();
+      ctx.arc(
+        renderSegment.x * TILE_SIZE + TILE_SIZE / 2,
+        renderSegment.y * TILE_SIZE + TILE_SIZE / 2,
+        TILE_SIZE / 2 + 3 + headPulse * 8,
+        0,
+        Math.PI * 2
+      );
+      ctx.lineWidth = 1.5 + headPulse * 2;
+      ctx.strokeStyle = headPulseColor;
+      ctx.stroke();
+    }
+
     ctx.shadowBlur = 0;
 
     if (!isHead) {
-      drawFeatherScale(renderSegment, index, isImmune ? '#b6f2d1' : '#d5bd70');
+      drawFeatherScale(renderSegment, index, isPlayerProtected ? '#b6f2d1' : '#d5bd70');
     } else {
-      drawFeatherCrest(renderSegment, direction, isImmune ? '#e0fff2' : '#d5bd70');
+      drawFeatherCrest(renderSegment, direction, isPlayerProtected ? '#e0fff2' : '#d5bd70');
     }
 
     if (isHead && !isBlinking) {
@@ -1630,9 +2007,10 @@ function drawFeatherCrest(segment, dir, color) {
 
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
-  let spd = SPEEDS[sel] || SPEEDS.medium;
-  if (isTurbo) spd *= 0.58;
-  return spd;
+  const baseSpeed = SPEEDS[sel] || SPEEDS.medium;
+  const lengthPenalty = Math.max(0, snake.length - 3) * 2.4;
+  const adaptiveSpeed = Math.max(baseSpeed * 0.72, baseSpeed - lengthPenalty);
+  return isTurbo ? adaptiveSpeed * 0.58 : adaptiveSpeed;
 }
 
 // Iniciar o reiniciar juego
@@ -1658,6 +2036,8 @@ function startGame() {
   tutorialModal.classList.add('hidden');
   drawerMenu.classList.add('hidden');
   gameOverlay.classList.add('hidden');
+  stopWelcomeDemo();
+  welcomeScreen.classList.add('hidden');
 
   startSuspenseMusic();
   startGameLoop();
@@ -1699,6 +2079,12 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   updateTurboUI();
   enemySpawnAt = null;
   jadeSpawnAt = null;
+  freezeSpawnAt = null;
+  guardiansFrozenUntil = 0;
+  freezeFoods = [];
+  freezeBadge.classList.add('hidden');
+  respawnProtectedUntil = 0;
+  respawnBadge.classList.add('hidden');
   enemyGuardians = [];
   updateGuardianBadge();
   deactivateImmunity();
@@ -1716,15 +2102,17 @@ function changeDirection(newDir) {
   if (!isGameRunning || isPaused) return;
   if (directionQueue.length >= 2) return;
 
-  const lastDirection = directionQueue.length > 0
+  const currentDirection = directionQueue.length > 0
     ? directionQueue[directionQueue.length - 1]
     : direction;
-  const isOpposite = (newDir.x !== 0 && newDir.x === -lastDirection.x) ||
-                     (newDir.y !== 0 && newDir.y === -lastDirection.y);
+
+  const isOpposite = (newDir.x !== 0 && newDir.x === -currentDirection.x) ||
+                     (newDir.y !== 0 && newDir.y === -currentDirection.y);
   if (isOpposite) return;
 
-  const isDuplicate = newDir.x === lastDirection.x && newDir.y === lastDirection.y;
-  if (!isDuplicate) directionQueue.push({ ...newDir });
+  if (newDir.x === currentDirection.x && newDir.y === currentDirection.y) return;
+
+  directionQueue.push({ ...newDir });
 }
 
 // ========================================================
@@ -1733,7 +2121,7 @@ function changeDirection(newDir) {
 let currentTutorialStep = 1;
 const totalTutorialSteps = 3;
 const tutorialTitles = [
-  '🪶 Guía a Kukulcán',
+  'La Travesía de Kukulcán',
   '🌽 Ofrendas y 🔥 Furia de Kukulcán',
   '🛡️ Los guardianes'
 ];
@@ -1757,10 +2145,44 @@ function showTutorialStep(step) {
 }
 
 function openTutorial() {
-  if (isGameRunning && !isPaused) togglePause();
+  if (!tutorialModal.classList.contains('hidden')) return;
+  tutorialWasRunning = isGameRunning;
+  tutorialWasPaused = isPaused;
+  tutorialDrawerWasVisible = !drawerMenu.classList.contains('hidden');
+  tutorialOpenedFromWelcome = !welcomeScreen.classList.contains('hidden');
+  if (tutorialWasRunning && !tutorialWasPaused) togglePause();
+  if (!tutorialOpenedFromWelcome) document.body.appendChild(tutorialModal);
+  welcomeStartBtn.classList.add('hidden');
   drawerMenu.classList.add('hidden');
   tutorialModal.classList.remove('hidden');
   showTutorialStep(1);
+}
+
+function closeTutorial() {
+  if (tutorialModal.classList.contains('hidden')) return;
+  tutorialModal.classList.add('hidden');
+  if (tutorialWasRunning && !tutorialWasPaused && isGameRunning && isPaused) {
+    togglePause();
+  } else if (tutorialWasRunning && tutorialWasPaused && isGameRunning && isPaused) {
+    drawerMenu.classList.remove('hidden');
+  } else if (tutorialDrawerWasVisible) {
+    drawerMenu.classList.remove('hidden');
+  }
+  if (tutorialModal.parentElement !== welcomeCard) {
+    welcomeCard.insertBefore(tutorialModal, welcomeStartBtn);
+  }
+  if (tutorialOpenedFromWelcome) {
+    welcomeScreen.classList.remove('hidden');
+    startWelcomeDemo();
+  }
+  welcomeStartBtn.classList.toggle(
+    'hidden',
+    welcomeScreen.classList.contains('hidden') || !tutorialModal.classList.contains('hidden')
+  );
+  tutorialWasRunning = false;
+  tutorialWasPaused = false;
+  tutorialDrawerWasVisible = false;
+  tutorialOpenedFromWelcome = false;
 }
 
 tutNextBtn.addEventListener('click', () => {
@@ -1776,8 +2198,16 @@ tutPrevBtn.addEventListener('click', () => {
 });
 
 tutStartBtn.addEventListener('click', () => {
+  tutorialWasRunning = false;
+  tutorialWasPaused = false;
+  tutorialDrawerWasVisible = false;
+  tutorialOpenedFromWelcome = false;
   tutorialModal.classList.add('hidden');
   startGame();
+});
+closeTutorialBtn.addEventListener('click', closeTutorial);
+tutorialModal.addEventListener('click', (event) => {
+  if (event.target === tutorialModal) closeTutorial();
 });
 
 // ========================================================
@@ -1823,6 +2253,10 @@ btnTurbo.addEventListener('pointerdown', (e) => {
 
 // Teclado
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !tutorialModal.classList.contains('hidden')) {
+    closeTutorial();
+    return;
+  }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) {
     closeStatistics();
     return;
@@ -1867,7 +2301,11 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Eventos de botones
-dtStartBtn.addEventListener('click', startGame);
+welcomeStartBtn.addEventListener('click', openTutorial);
+dtStartBtn.addEventListener('click', () => {
+  if (!welcomeScreen.classList.contains('hidden')) openTutorial();
+  else startGame();
+});
 dtPauseBtn.addEventListener('click', togglePause);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
@@ -1909,6 +2347,441 @@ drawerDpadToggle.addEventListener('change', (e) => {
   touchControls.classList.toggle('hidden', !showDpad);
 });
 
+function resetWelcomeDemo() {
+  welcomeDemoSnake = [
+    { x: 4, y: 4 },
+    { x: 3, y: 4 },
+    { x: 2, y: 4 }
+  ];
+  welcomeDemoPreviousSnake = welcomeDemoSnake.map(segment => ({ ...segment }));
+  welcomeDemoGuardian = [
+    { x: 18, y: 4 },
+    { x: 19, y: 4 },
+    { x: 20, y: 4 },
+    { x: 21, y: 4 }
+  ];
+  welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(segment => ({ ...segment }));
+  welcomeDemoDirection = { x: 1, y: 0 };
+  welcomeDemoRouteIndex = 0;
+  welcomeDemoRouteSteps = 0;
+  welcomeDemoTick = 0;
+  welcomeDemoAccumulator = 0;
+  welcomeDemoScore = 0;
+  welcomeDemoMaize = { x: 8, y: 4 };
+  welcomeDemoJade = { x: 14, y: 6 };
+  welcomeDemoImmuneUntil = 0;
+  welcomeDemoFlashUntil = 0;
+  welcomeDemoGuardianDefeatedUntil = 0;
+  welcomeDemoGameOverUntil = 0;
+  welcomeDemoStatus = '¡Guía a Kukulcán con las flechas o WASD!';
+  welcomeDemoCallout.textContent = welcomeDemoStatus;
+}
+
+function resizeWelcomeDemo() {
+  const bounds = welcomeDemo.getBoundingClientRect();
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const pixelWidth = Math.max(1, Math.round(bounds.width * pixelRatio));
+  const pixelHeight = Math.max(1, Math.round(bounds.height * pixelRatio));
+  if (welcomeDemo.width === pixelWidth && welcomeDemo.height === pixelHeight) return;
+  welcomeDemo.width = pixelWidth;
+  welcomeDemo.height = pixelHeight;
+  welcomeDemoContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  drawWelcomeDemo(1);
+}
+window.addEventListener('resize', resizeWelcomeDemo);
+new ResizeObserver(resizeWelcomeDemo).observe(welcomePreview);
+
+function drawWelcomeCell(segment, index, options = {}) {
+  const { x, y, size } = segment;
+  const inset = Math.max(1, size * 0.07);
+  const isHead = index === 0;
+  const direction = options.direction || { x: 1, y: 0 };
+  const colors = options.guardian
+    ? ['#e2574c', '#9b2929']
+    : options.immune ? ['#62d8bd', '#168c75'] : ['#54c98f', '#187a5c'];
+  welcomeDemoContext.fillStyle = isHead ? colors[0] : colors[1];
+  welcomeDemoContext.shadowColor = isHead ? colors[0] : 'transparent';
+  welcomeDemoContext.shadowBlur = isHead ? size * 0.55 : 0;
+  roundRect(
+    welcomeDemoContext,
+    x + inset,
+    y + inset,
+    size - inset * 2,
+    size - inset * 2,
+    isHead ? size * 0.32 : size * 0.2
+  );
+  welcomeDemoContext.fill();
+  welcomeDemoContext.shadowBlur = 0;
+
+  if (!isHead) {
+    const centerX = x + size / 2;
+    const centerY = y + size / 2;
+    welcomeDemoContext.strokeStyle = options.guardian ? '#ff9b83' : '#d5bd70';
+    welcomeDemoContext.lineWidth = Math.max(1, size * 0.08);
+    welcomeDemoContext.beginPath();
+    welcomeDemoContext.moveTo(centerX - size * 0.18, centerY - size * 0.16);
+    welcomeDemoContext.lineTo(centerX, centerY + size * 0.16);
+    welcomeDemoContext.lineTo(centerX + size * 0.18, centerY - size * 0.16);
+    welcomeDemoContext.stroke();
+    return;
+  }
+
+  welcomeDemoContext.fillStyle = options.guardian ? '#fff0c6' : '#141720';
+  const eyeSize = Math.max(1.5, size * 0.16);
+  const eyePositions = direction.x > 0
+    ? [[0.65, 0.28], [0.65, 0.58]]
+    : direction.x < 0
+      ? [[0.19, 0.28], [0.19, 0.58]]
+      : direction.y < 0
+        ? [[0.28, 0.19], [0.58, 0.19]]
+        : [[0.28, 0.65], [0.58, 0.65]];
+  eyePositions.forEach(([eyeX, eyeY]) => {
+    welcomeDemoContext.fillRect(x + size * eyeX, y + size * eyeY, eyeSize, eyeSize);
+  });
+  if (!options.guardian) {
+    welcomeDemoContext.strokeStyle = options.immune ? '#e0fff2' : '#d5bd70';
+    welcomeDemoContext.lineWidth = Math.max(1, size * 0.08);
+    welcomeDemoContext.beginPath();
+    welcomeDemoContext.moveTo(x + size * 0.28, y + size * 0.22);
+    welcomeDemoContext.lineTo(x + size * 0.18, y - size * 0.08);
+    welcomeDemoContext.moveTo(x + size * 0.5, y + size * 0.2);
+    welcomeDemoContext.lineTo(x + size * 0.58, y - size * 0.08);
+    welcomeDemoContext.stroke();
+  } else {
+    welcomeDemoContext.fillStyle = '#ff9b83';
+    welcomeDemoContext.fillRect(x + size * 0.35, y + size * 0.68, size * 0.3, size * 0.1);
+  }
+}
+
+function drawWelcomeOffering(point, x, y, size, jade = false) {
+  const centerX = x + size / 2;
+  const centerY = y + size / 2;
+  const radius = size * (jade ? 0.36 : 0.29);
+  welcomeDemoContext.save();
+  welcomeDemoContext.fillStyle = jade ? '#168c75' : '#e8c768';
+  welcomeDemoContext.strokeStyle = jade ? '#72dfbd' : '#fff0b0';
+  welcomeDemoContext.lineWidth = Math.max(1, size * 0.1);
+  welcomeDemoContext.shadowColor = jade ? '#55c7a2' : '#e3ae43';
+  welcomeDemoContext.shadowBlur = size * 0.6;
+  welcomeDemoContext.beginPath();
+  if (jade) {
+    welcomeDemoContext.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    welcomeDemoContext.fill();
+    welcomeDemoContext.beginPath();
+    welcomeDemoContext.arc(centerX, centerY, radius + size * 0.13, 0, Math.PI * 2);
+    welcomeDemoContext.stroke();
+    welcomeDemoContext.beginPath();
+    welcomeDemoContext.moveTo(centerX, centerY - radius * 0.55);
+    welcomeDemoContext.lineTo(centerX + radius * 0.55, centerY);
+    welcomeDemoContext.lineTo(centerX, centerY + radius * 0.55);
+    welcomeDemoContext.lineTo(centerX - radius * 0.55, centerY);
+    welcomeDemoContext.closePath();
+    welcomeDemoContext.stroke();
+  } else {
+    welcomeDemoContext.beginPath();
+    for (let pointIndex = 0; pointIndex < 6; pointIndex++) {
+      const angle = -Math.PI / 2 + pointIndex * Math.PI / 3;
+      const px = centerX + Math.cos(angle) * radius;
+      const py = centerY + Math.sin(angle) * radius;
+      if (pointIndex === 0) welcomeDemoContext.moveTo(px, py);
+      else welcomeDemoContext.lineTo(px, py);
+    }
+    welcomeDemoContext.closePath();
+    welcomeDemoContext.fill();
+    welcomeDemoContext.stroke();
+  }
+  welcomeDemoContext.restore();
+}
+
+function setWelcomeDemoStatus(message) {
+  welcomeDemoStatus = message;
+  welcomeDemoCallout.textContent = message;
+}
+
+function moveWelcomeDemoGuardian() {
+  if (welcomeDemoImmuneUntil <= welcomeDemoTick) return;
+  if (welcomeDemoGuardianDefeatedUntil > welcomeDemoTick) return;
+  if (welcomeDemoGuardianDefeatedUntil) {
+    welcomeDemoGuardian = [
+      { x: 18, y: 4 },
+      { x: 19, y: 4 },
+      { x: 20, y: 4 },
+      { x: 21, y: 4 }
+    ];
+    welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(segment => ({ ...segment }));
+    welcomeDemoGuardianDefeatedUntil = 0;
+  }
+
+  const enemyHead = welcomeDemoGuardian[0];
+  const playerHead = welcomeDemoSnake[0];
+  const dx = playerHead.x - enemyHead.x;
+  const dy = playerHead.y - enemyHead.y;
+  const candidates = Math.abs(dx) >= Math.abs(dy)
+    ? [{ x: Math.sign(dx), y: 0 }, { x: 0, y: Math.sign(dy) }]
+    : [{ x: 0, y: Math.sign(dy) }, { x: Math.sign(dx), y: 0 }];
+  candidates.push(
+    { x: -candidates[0].x, y: -candidates[0].y },
+    { x: -candidates[1].x, y: -candidates[1].y }
+  );
+
+  const nextDirection = candidates.find(candidate => {
+    if (!candidate.x && !candidate.y) return false;
+    const x = enemyHead.x + candidate.x;
+    const y = enemyHead.y + candidate.y;
+    if (x < 1 || x >= WELCOME_DEMO_COLS - 1 || y < 1 || y >= WELCOME_DEMO_ROWS - 1) return false;
+    return !welcomeDemoGuardian.slice(1, -1).some(segment => segment.x === x && segment.y === y);
+  });
+  if (!nextDirection) return;
+
+  const newHead = { x: enemyHead.x + nextDirection.x, y: enemyHead.y + nextDirection.y };
+  const touchesPlayer = welcomeDemoSnake.some(segment =>
+    segment.x === newHead.x && segment.y === newHead.y
+  );
+  if (touchesPlayer) {
+    if (welcomeDemoImmuneUntil > welcomeDemoTick) {
+      welcomeDemoGuardian = [];
+      welcomeDemoGuardianDefeatedUntil = welcomeDemoTick + 7;
+      setWelcomeDemoStatus('¡El jade repelió al guardián!');
+    } else {
+      endWelcomeDemoRun();
+    }
+    return;
+  }
+  welcomeDemoGuardian.unshift(newHead);
+  welcomeDemoGuardian.pop();
+}
+
+function endWelcomeDemoRun() {
+  welcomeDemoGuardian = [];
+  welcomeDemoGameOverUntil = welcomeDemoTick + 7;
+  setWelcomeDemoStatus('¡El guardián te alcanzó! Sin jade, termina la partida.');
+}
+
+function advanceWelcomeDemo() {
+  if (welcomeDemoGameOverUntil) {
+    welcomeDemoTick++;
+    if (welcomeDemoTick >= welcomeDemoGameOverUntil) resetWelcomeDemo();
+    return;
+  }
+
+  if (welcomeDemoRouteIndex === WELCOME_DEMO_ROUTE.length) {
+    welcomeDemoTick++;
+    if (welcomeDemoTick >= welcomeDemoGuardianDefeatedUntil) resetWelcomeDemo();
+    return;
+  }
+
+  welcomeDemoPreviousSnake = welcomeDemoSnake.map(segment => ({ ...segment }));
+  welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(segment => ({ ...segment }));
+  const route = WELCOME_DEMO_ROUTE[welcomeDemoRouteIndex];
+  welcomeDemoDirection = route.direction;
+  const newHead = {
+    x: welcomeDemoSnake[0].x + route.direction.x,
+    y: welcomeDemoSnake[0].y + route.direction.y
+  };
+
+  const guardianCollision = welcomeDemoGuardian.some(segment =>
+    segment.x === newHead.x && segment.y === newHead.y
+  );
+  if (guardianCollision) {
+    if (welcomeDemoImmuneUntil > welcomeDemoTick) {
+      welcomeDemoGuardian = [];
+      welcomeDemoGuardianDefeatedUntil = welcomeDemoTick + 7;
+      setWelcomeDemoStatus('¡Con el jade activo, embiste y vence al guardián!');
+    } else {
+      endWelcomeDemoRun();
+      return;
+    }
+  }
+
+  welcomeDemoSnake.unshift(newHead);
+
+  let grows = false;
+  if (welcomeDemoMaize && newHead.x === welcomeDemoMaize.x && newHead.y === welcomeDemoMaize.y) {
+    welcomeDemoMaize = null;
+    welcomeDemoScore += 10;
+    welcomeDemoFlashUntil = welcomeDemoTick + 3;
+    grows = true;
+    setWelcomeDemoStatus('¡+10 puntos! Al comer, la serpiente crece.');
+  } else if (welcomeDemoJade && newHead.x === welcomeDemoJade.x && newHead.y === welcomeDemoJade.y) {
+    welcomeDemoJade = null;
+    welcomeDemoImmuneUntil = welcomeDemoTick + 12;
+    grows = true;
+    setWelcomeDemoStatus('¡Jade recogido! El escudo repele al guardián.');
+  }
+  if (!grows) welcomeDemoSnake.pop();
+
+  welcomeDemoTick++;
+  welcomeDemoRouteSteps++;
+  if (welcomeDemoRouteSteps >= route.steps) {
+    welcomeDemoRouteIndex++;
+    welcomeDemoRouteSteps = 0;
+  }
+  if (welcomeDemoTick % 2 === 0) moveWelcomeDemoGuardian();
+}
+
+function drawWelcomeDemo(interpolation = 1) {
+  const width = welcomeDemo.clientWidth;
+  const height = welcomeDemo.clientHeight;
+  if (!width || !height) return;
+
+  const demoCtx = welcomeDemoContext;
+  demoCtx.clearRect(0, 0, width, height);
+  demoCtx.fillStyle = '#141720';
+  demoCtx.fillRect(0, 0, width, height);
+  const cellSize = Math.min(width / (WELCOME_DEMO_COLS + 2), (height - 32) / (WELCOME_DEMO_ROWS + 1));
+  const boardWidth = cellSize * WELCOME_DEMO_COLS;
+  const boardHeight = cellSize * WELCOME_DEMO_ROWS;
+  const boardX = (width - boardWidth) / 2;
+  const boardY = 29 + Math.max(0, (height - 32 - boardHeight) / 2);
+
+  demoCtx.fillStyle = 'rgba(20, 23, 32, 0.9)';
+  roundRect(demoCtx, 8, 6, Math.min(112, width * 0.38), 19, 8);
+  demoCtx.fill();
+  demoCtx.fillStyle = '#b8c6b4';
+  demoCtx.font = '700 8px sans-serif';
+  demoCtx.textBaseline = 'middle';
+  demoCtx.fillText('PUNTOS', 16, 15.5);
+  demoCtx.fillStyle = '#f1cb71';
+  demoCtx.font = '800 10px sans-serif';
+  demoCtx.fillText(String(welcomeDemoScore), 56, 15.5);
+  demoCtx.fillStyle = '#9ba7a0';
+  demoCtx.font = '700 8px sans-serif';
+  demoCtx.fillText(`LONG. ${welcomeDemoSnake.length}`, 78, 15.5);
+
+  if (welcomeDemoGuardian.length) {
+    const threatWidth = Math.min(105, width * 0.34);
+    demoCtx.fillStyle = 'rgba(116, 31, 36, 0.9)';
+    roundRect(demoCtx, width - threatWidth - 8, 6, threatWidth, 19, 8);
+    demoCtx.fill();
+    demoCtx.fillStyle = '#ffe1d8';
+    demoCtx.font = '700 8px sans-serif';
+    demoCtx.textAlign = 'center';
+    demoCtx.fillText('◆ GUARDIÁN', width - threatWidth / 2 - 8, 15.5);
+    demoCtx.textAlign = 'start';
+  }
+
+  demoCtx.strokeStyle = 'rgba(144, 153, 177, 0.17)';
+  demoCtx.lineWidth = 1;
+  for (let col = 0; col <= WELCOME_DEMO_COLS; col++) {
+    const x = boardX + col * cellSize;
+    demoCtx.beginPath();
+    demoCtx.moveTo(x, boardY);
+    demoCtx.lineTo(x, boardY + boardHeight);
+    demoCtx.stroke();
+  }
+  for (let row = 0; row <= WELCOME_DEMO_ROWS; row++) {
+    const y = boardY + row * cellSize;
+    demoCtx.beginPath();
+    demoCtx.moveTo(boardX, y);
+    demoCtx.lineTo(boardX + boardWidth, y);
+    demoCtx.stroke();
+  }
+
+  const drawSegments = (current, previous, options = {}) => {
+    current.forEach((segment, index) => {
+      const oldSegment = previous[index] || previous[previous.length - 1] || segment;
+      const x = oldSegment.x + (segment.x - oldSegment.x) * interpolation;
+      const y = oldSegment.y + (segment.y - oldSegment.y) * interpolation;
+      const nextSegment = current[index + 1] || current[index - 1] || segment;
+      const direction = index === 0
+        ? options.direction
+        : { x: segment.x - nextSegment.x, y: segment.y - nextSegment.y };
+      drawWelcomeCell({
+        x: boardX + x * cellSize,
+        y: boardY + y * cellSize,
+        size: cellSize
+      }, index, { ...options, direction });
+    });
+  };
+
+  if (welcomeDemoMaize) {
+    drawWelcomeOffering(welcomeDemoMaize, boardX + welcomeDemoMaize.x * cellSize, boardY + welcomeDemoMaize.y * cellSize, cellSize);
+  }
+  if (welcomeDemoJade) {
+    drawWelcomeOffering(welcomeDemoJade, boardX + welcomeDemoJade.x * cellSize, boardY + welcomeDemoJade.y * cellSize, cellSize, true);
+  }
+  if (welcomeDemoGuardian.length) {
+    const guardianHead = welcomeDemoGuardian[0];
+    const guardianNeck = welcomeDemoGuardian[1] || guardianHead;
+    drawSegments(welcomeDemoGuardian, welcomeDemoPreviousGuardian, {
+      guardian: true,
+      direction: { x: guardianHead.x - guardianNeck.x, y: guardianHead.y - guardianNeck.y }
+    });
+  }
+
+  const isImmune = welcomeDemoImmuneUntil > welcomeDemoTick;
+  drawSegments(welcomeDemoSnake, welcomeDemoPreviousSnake, {
+    immune: isImmune,
+    direction: welcomeDemoDirection
+  });
+  if (isImmune && welcomeDemoSnake.length) {
+    const head = welcomeDemoSnake[0];
+    const centerX = boardX + (head.x + 0.5) * cellSize;
+    const centerY = boardY + (head.y + 0.5) * cellSize;
+    demoCtx.strokeStyle = 'rgba(105, 211, 180, 0.88)';
+    demoCtx.lineWidth = 2;
+    demoCtx.shadowColor = '#55c7a2';
+    demoCtx.shadowBlur = 10;
+    demoCtx.beginPath();
+    demoCtx.arc(centerX, centerY, cellSize * 0.77, 0, Math.PI * 2);
+    demoCtx.stroke();
+    demoCtx.shadowBlur = 0;
+  }
+  if (welcomeDemoTick < welcomeDemoFlashUntil && welcomeDemoSnake.length) {
+    const head = welcomeDemoSnake[0];
+    demoCtx.save();
+    demoCtx.fillStyle = '#ffe27a';
+    demoCtx.font = `800 ${Math.max(9, cellSize * 0.55)}px sans-serif`;
+    demoCtx.textAlign = 'center';
+    demoCtx.shadowColor = '#e3ae43';
+    demoCtx.shadowBlur = 8;
+    demoCtx.fillText('+10', boardX + (head.x + 0.5) * cellSize, boardY + head.y * cellSize - 3);
+    demoCtx.restore();
+  }
+}
+
+function welcomeDemoFrame(timestamp) {
+  welcomeDemoFrameId = null;
+  if (welcomeScreen.classList.contains('hidden')) {
+    welcomeDemoLastFrame = null;
+    return;
+  }
+  if (document.hidden) {
+    welcomeDemoLastFrame = timestamp;
+  } else {
+    const elapsed = welcomeDemoLastFrame === null ? 0 : Math.min(100, timestamp - welcomeDemoLastFrame);
+    welcomeDemoLastFrame = timestamp;
+    welcomeDemoAccumulator += elapsed;
+    let ticks = 0;
+    while (welcomeDemoAccumulator >= WELCOME_DEMO_TICK_MS) {
+      welcomeDemoAccumulator -= WELCOME_DEMO_TICK_MS;
+      advanceWelcomeDemo();
+      ticks++;
+      if (ticks >= 3) {
+        welcomeDemoAccumulator = 0;
+        break;
+      }
+    }
+  }
+  drawWelcomeDemo(welcomeDemoAccumulator / WELCOME_DEMO_TICK_MS);
+  welcomeDemoFrameId = requestAnimationFrame(welcomeDemoFrame);
+}
+
+function startWelcomeDemo() {
+  if (welcomeDemoFrameId !== null) return;
+  resizeWelcomeDemo();
+  welcomeDemoLastFrame = null;
+  welcomeDemoFrameId = requestAnimationFrame(welcomeDemoFrame);
+}
+
+function stopWelcomeDemo() {
+  if (welcomeDemoFrameId !== null) {
+    cancelAnimationFrame(welcomeDemoFrameId);
+    welcomeDemoFrameId = null;
+  }
+  welcomeDemoLastFrame = null;
+}
+
 // Sincronizar selectores de dificultad
 difficultySelect.addEventListener('change', () => {
   drawerDifficulty.value = difficultySelect.value;
@@ -1942,4 +2815,9 @@ bindDpad(btnRight, { x: 1, y: 0 });
 resetGame();
 draw();
 updateStatisticsUI();
-showTutorialStep(1); // Inicia mostrando el tutorial interactivo
+showTutorialStep(1);
+welcomeCard.insertBefore(tutorialModal, welcomeStartBtn);
+tutorialModal.classList.remove('hidden');
+welcomeStartBtn.classList.add('hidden');
+resetWelcomeDemo();
+startWelcomeDemo();

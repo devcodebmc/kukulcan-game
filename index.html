@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#11131b">
-  <meta name="description" content="Kukulcán - Game: una aventura de serpientes, jade y maíz inspirada en la mitología maya.">
-  <title>Kukulcán - Game</title>
+  <meta name="description" content="La Travesía de Kukulcán: una aventura de serpientes, jade y maíz inspirada en la mitología maya.">
+  <title>La Travesía de Kukulcán</title>
   <!-- Favicon e iconos con snk.png -->
   <link rel="icon" type="image/png" href="snk.png">
   <link rel="apple-touch-icon" href="snk.png">
@@ -16,13 +16,35 @@
   <canvas id="gameCanvas"></canvas>
   <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive" aria-atomic="true"></div>
 
+  <section id="welcome-screen" class="welcome-screen" aria-label="Demostración del juego e instrucciones">
+    <div class="welcome-card">
+      <div class="welcome-preview">
+        <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego: Kukulcán recoge ofrendas, crece y evita a un guardián"></canvas>
+        <div class="preview-legend" aria-label="Jade verde; guardianes en rojo, naranja, dorado y violeta">
+          <span class="preview-legend-item"><span class="jade-swatch" aria-hidden="true">◆</span> Jade</span>
+          <span class="preview-legend-item">
+            <span class="guardian-swatches" aria-hidden="true">
+              <i class="guardian-swatch guardian-swatch-red"></i>
+              <i class="guardian-swatch guardian-swatch-orange"></i>
+              <i class="guardian-swatch guardian-swatch-gold"></i>
+              <i class="guardian-swatch guardian-swatch-violet"></i>
+            </span>
+            Guardianes
+          </span>
+        </div>
+        <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
+      </div>
+      <button id="welcome-start-btn" class="btn btn-outline welcome-start-btn hidden">📖 Mostrar instrucciones</button>
+    </div>
+  </section>
+
   <!-- ========================================== -->
   <!-- TOOLBAR COMPLETO PARA PANTALLAS GRANDES (PC/TABLET) -->
   <!-- ========================================== -->
   <header id="desktop-toolbar" class="desktop-toolbar">
     <div class="toolbar-left">
       <img src="snk.png" alt="Serpiente emplumada" class="brand-logo">
-      <h1 class="brand-title">Kukulcán - Game <span class="brand-subtitle">Aventura de serpientes</span></h1>
+      <h1 class="brand-title">La Travesía de Kukulcán</h1>
     </div>
 
     <div class="toolbar-center">
@@ -67,7 +89,7 @@
 
     <div class="hud-center-pill">
       <img src="snk.png" alt="Serpiente emplumada" class="hud-mini-logo">
-      <span class="hud-game-title">Kukulcán - Game</span>
+      <span class="hud-game-title">Travesía de Kukulcán</span>
       <span class="hud-stat">Puntos: <strong id="mb-score">0</strong></span>
       <span class="hud-divider">|</span>
       <span class="hud-stat">Récord: <strong id="mb-high-score">0</strong></span>
@@ -78,8 +100,19 @@
 
   <!-- Insignias de Estado en Partida -->
   <div class="status-badges-container">
+    <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite">
+      Sacrificios <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
+        <span class="life-pip">💚</span><span class="life-pip">💚</span><span class="life-pip">💚</span>
+      </span>
+    </div>
+    <div id="respawn-badge" class="hud-badge respawn-badge hidden">
+      🪶 Protección del renacer <span id="respawn-timer">3</span>s
+    </div>
     <div id="immunity-badge" class="hud-badge immunity-badge hidden">
       🛡️ ¡INMUNE! <span id="immunity-timer">10</span>s
+    </div>
+    <div id="freeze-badge" class="hud-badge freeze-badge hidden">
+      ❄️ Guardianes congelados <span id="freeze-timer">3</span>s
     </div>
     <div id="threat-badge" class="hud-badge threat-badge hidden">
       ◆ Guardián al acecho
@@ -166,33 +199,39 @@
   <!-- ========================================== -->
   <!-- TUTORIAL INTERACTIVO PASO A PASO (ONBOARDING) -->
   <!-- ========================================== -->
-  <div id="tutorial-modal" class="modal-backdrop">
+  <div id="tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-step-title">
     <div class="tutorial-card">
       <div class="tutorial-header">
         <img src="snk.png" alt="Serpiente emplumada" class="tutorial-logo">
-        <h2 id="tutorial-step-title">🎮 Cómo Moverte</h2>
+        <h2 id="tutorial-step-title">La Travesía de Kukulcán</h2>
+        <button id="close-tutorial-btn" class="close-btn tutorial-close-btn" aria-label="Cerrar instrucciones">✕</button>
       </div>
 
       <div class="tutorial-content">
         <!-- Paso 1 -->
         <div id="step-1" class="tutorial-step active">
           <div class="tutorial-icon-banner">🪶 🐍</div>
-          <p class="tutorial-lead"><strong>Guía a la serpiente emplumada:</strong> Desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
-          <p class="tutorial-tip">◆ <strong>Caminos del inframundo:</strong> Cruza los bordes de la pantalla y aparecerás por el lado opuesto.</p>
+          <p class="tutorial-lead">🐍 <strong>Guía a la serpiente emplumada:</strong> Desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
+          <p class="tutorial-tip"><strong>Caminos del inframundo:</strong> Cruza los bordes de la pantalla y aparecerás por el lado opuesto.</p>
         </div>
 
         <!-- Paso 2 -->
         <div id="step-2" class="tutorial-step">
           <div class="tutorial-icon-banner">🌽 🍫 🪶</div>
-          <p class="tutorial-lead"><strong>Ofrendas sagradas:</strong> Reúne maíz, cacao, jade y reliquias geométricas para crecer y sumar puntos.</p>
-          <p class="tutorial-tip">🔥 <strong>Furia de Kukulcán:</strong> Invoca su poder durante <strong>3 segundos</strong> con el botón o con <strong>Espacio/Shift</strong>. El aro azul muestra cuándo vuelve a estar listo.</p>
+          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 maíz, 🍫 cacao y jade te ayudan a crecer y sumar puntos.</p>
+          <p class="tutorial-tip">🔥 <strong>Furia:</strong> dura <strong>3 s</strong>. Actívala con el botón o <strong>Espacio/Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela guardianes <strong>3 s</strong>; embístelos para vencerlos.</p>
         </div>
 
         <!-- Paso 3 -->
         <div id="step-3" class="tutorial-step">
           <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
-          <p class="tutorial-lead"><strong>Los guardianes acechan:</strong> Serpientes rojas, naranjas, amarillas y violetas aparecerán con estilos distintos: el <strong>Cazador</strong> (marca cuadrada) te sigue, el <strong>Vidente</strong> (triángulo) anticipa tu rumbo y el <strong>Flanqueador</strong> (rombo) intenta rodearte. Su nombre aparece en la insignia de amenaza.</p>
-          <p class="tutorial-tip">🛡️ <strong>Amuleto de jade:</strong> Recógelo para obtener <strong>10 segundos de protección</strong> y ver a Kukulcán exhalar fuego. Hay más jades y se reponen antes en las dificultades altas. Para vencer a un guardián, embístelo mientras estás protegido; entonces se tambalea y deja ofrendas de oro.</p>
+          <ul class="tutorial-guardian-list">
+            <li><strong>Cazador:</strong> te persigue.</li>
+            <li><strong>Vidente:</strong> anticipa tu rumbo.</li>
+            <li><strong>Flanqueador:</strong> intenta rodearte.</li>
+          </ul>
+          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> escudo por <strong>10 s</strong>. Embiste guardianes para vencerlos y ganar oro. Reaparece antes en dificultades altas.</p>
+          <p class="tutorial-tip lives-tutorial-tip">💚 Tienes <strong>3 sacrificios</strong>: si te alcanza un guardián o te enredas, pierdes uno y reapareces protegido.</p>
         </div>
       </div>
 
@@ -218,7 +257,7 @@
   <div id="game-overlay" class="modal-backdrop hidden">
     <div class="modal-card">
       <img src="snk.png" alt="Serpiente emplumada" class="modal-gameover-logo">
-      <h2 id="overlay-title">El viaje termina</h2>
+      <h2 id="overlay-title">La travesía termina</h2>
       <p id="overlay-reason" class="death-reason">Has chocado con tu propio cuerpo</p>
       <div class="final-stats">
         <p>Puntuación: <strong id="final-score">0</strong></p>
