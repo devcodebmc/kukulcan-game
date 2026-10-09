@@ -92,6 +92,109 @@ const statisticsStorageStatus = document.getElementById('statistics-storage-stat
 const countdownOverlay = document.getElementById('countdown-overlay');
 
 // ========================================================
+// GESTOR DE BADGES EN PANTALLA (ANTI-SATURACIÓN)
+// ========================================================
+const BadgeManager = (() => {
+  const isMobile = () => window.innerWidth <= 768;
+  const MAX_MEDIUM_VISIBLE_MOBILE = 1;
+
+  // Registro de badges con su prioridad
+  const registry = {
+    lives:               { el: () => document.getElementById('lives-badge'), priority: 'high', autoHide: false },
+    immunity:            { el: () => document.getElementById('immunity-badge'), priority: 'high', autoHide: false },
+    respawn:             { el: () => document.getElementById('respawn-badge'), priority: 'high', autoHide: false },
+    freeze:              { el: () => document.getElementById('freeze-badge'), priority: 'high', autoHide: false },
+    rain:                { el: () => document.getElementById('rain-badge'), priority: 'medium', autoHide: false },
+    cosmicOrderFood:     { el: () => document.getElementById('cosmic-order-food-badge'), priority: 'medium', autoHide: false },
+    cosmicOrder:         { el: () => document.getElementById('cosmic-order-badge'), priority: 'medium', autoHide: false },
+    sacrificeOffering:   { el: () => document.getElementById('sacrifice-offering-badge'), priority: 'medium', autoHide: false },
+    skullFood:           { el: () => document.getElementById('skull-food-badge'), priority: 'medium', autoHide: false },
+    threat:              { el: () => document.getElementById('threat-badge'), priority: 'medium', autoHide: false }
+  };
+
+  // Estado de visibilidad lógica (lo que el juego quiere mostrar)
+  const logicalState = {};
+
+  // Orden de prioridad (mayor índice = menos prioritario)
+  const mediumPriorityOrder = [
+    'cosmicOrder',       // ¡Crítico! El jugador debe reaccionar ya
+    'rain',              // Oportunidad limitada
+    'freeze',            // (es high, pero por si acaso)
+    'sacrificeOffering', // Oportunidad
+    'cosmicOrderFood',   // Pista
+    'skullFood',         // Peligro estático
+    'threat'             // Informativo
+  ];
+
+  function setVisible(key, visible) {
+    logicalState[key] = visible;
+    applyVisibility();
+  }
+
+  function applyVisibility() {
+    const mobile = isMobile();
+
+    // High priority: mostrar todos los que estén activos
+    Object.entries(registry).forEach(([key, config]) => {
+      if (config.priority !== 'high') return;
+      const el = config.el();
+      if (!el) return;
+      el.classList.toggle('hidden', !logicalState[key]);
+    });
+
+    // Medium priority: en móvil solo los top N
+    const activeMedium = mediumPriorityOrder.filter(key => logicalState[key]);
+
+    if (mobile) {
+      const visibleSet = new Set(activeMedium.slice(0, MAX_MEDIUM_VISIBLE_MOBILE));
+      mediumPriorityOrder.forEach(key => {
+        const el = registry[key]?.el();
+        if (!el) return;
+        const shouldShow = logicalState[key] && visibleSet.has(key);
+        el.classList.toggle('is-visible', shouldShow);
+        el.classList.toggle('hidden', !logicalState[key]);
+      });
+    } else {
+      // Desktop: mostrar todos los activos
+      Object.entries(registry).forEach(([key, config]) => {
+        if (config.priority !== 'medium') return;
+        const el = config.el();
+        if (!el) return;
+        el.classList.toggle('hidden', !logicalState[key]);
+        el.classList.remove('is-visible');
+      });
+    }
+  }
+
+  // Auto-ocultado para badges informativos (threat, skull, cosmicOrderFood)
+  const autoHideTimers = {};
+  function scheduleAutoHide(key, delayMs = 4000) {
+    if (autoHideTimers[key]) clearTimeout(autoHideTimers[key]);
+    autoHideTimers[key] = setTimeout(() => {
+      setVisible(key, false);
+    }, delayMs);
+  }
+
+  function cancelAutoHide(key) {
+    if (autoHideTimers[key]) {
+      clearTimeout(autoHideTimers[key]);
+      delete autoHideTimers[key];
+    }
+  }
+
+  return {
+    setVisible,
+    scheduleAutoHide,
+    cancelAutoHide,
+    refresh: applyVisibility,
+    isMobile
+  };
+})();
+
+// Re-evaluar al cambiar tamaño
+window.addEventListener('resize', () => BadgeManager.refresh());
+
+// ========================================================
 // CONFIGURACIÓN DE CUADRÍCULA Y VELOCIDADES
 // ========================================================
 let TILE_SIZE = window.innerWidth < 480 ? 20 : 24;
@@ -99,10 +202,10 @@ let gridCols = 30;
 let gridRows = 20;
 
 const SPEEDS = {
-  easy: 185,
-  medium: 138,
-  hard: 102,
-  extreme: 74
+  easy: 195,
+  medium: 145,
+  hard: 105,
+  extreme: 75
 };
 const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
 const DIFFICULTY_NAMES = {
@@ -340,51 +443,6 @@ updateSoundUI();
 // ========================================================
 // ESCALADO ADAPTATIVO RETINA / HIGH-DPI Y MÓVILES
 // ========================================================
-function migrateEntitiesOnResize(newCols, newRows) {
-  if (!snake || snake.length === 0) return;
-
-  // 1. Reubicar y ajustar serpiente del jugador si excede los límites
-  const head = snake[0];
-  let shiftX = 0;
-  let shiftY = 0;
-  if (head.x >= newCols) shiftX = (newCols - 1) - head.x;
-  if (head.y >= newRows) shiftY = (newRows - 1) - head.y;
-
-  snake.forEach(seg => {
-    seg.x = Math.max(0, Math.min(newCols - 1, seg.x + shiftX));
-    seg.y = Math.max(0, Math.min(newRows - 1, seg.y + shiftY));
-  });
-
-  // 2. Ajustar guardianes dentro de los límites
-  enemyGuardians.forEach(guardian => {
-    if (!guardian.segments || guardian.segments.length === 0) return;
-    const gHead = guardian.segments[0];
-    let gShiftX = 0;
-    let gShiftY = 0;
-    if (gHead.x >= newCols) gShiftX = (newCols - 1) - gHead.x;
-    if (gHead.y >= newRows) gShiftY = (newRows - 1) - gHead.y;
-    guardian.segments.forEach(seg => {
-      seg.x = Math.max(0, Math.min(newCols - 1, seg.x + gShiftX));
-      seg.y = Math.max(0, Math.min(newRows - 1, seg.y + gShiftY));
-    });
-  });
-
-  // 3. Ajustar todas las ofrendas y reliquias activas
-  const clampItem = (item) => {
-    if (item.x >= newCols) item.x = Math.floor(Math.random() * newCols);
-    if (item.y >= newRows) item.y = Math.floor(Math.random() * newRows);
-  };
-  foods.forEach(clampItem);
-  bonusFoods.forEach(clampItem);
-  shieldFoods.forEach(clampItem);
-  freezeFoods.forEach(clampItem);
-  cosmicOrderFoods.forEach(clampItem);
-  sacrificeFoods.forEach(clampItem);
-  skullFoods.forEach(clampItem);
-
-  snapshotRenderPositions();
-}
-
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const width = window.innerWidth;
@@ -403,15 +461,8 @@ function resizeCanvas() {
     ctx.scale(dpr, dpr);
   }
 
-  const newCols = Math.max(14, Math.floor(width / TILE_SIZE));
-  const newRows = Math.max(14, Math.floor(height / TILE_SIZE));
-
-  if (isGameRunning && (newCols !== gridCols || newRows !== gridRows)) {
-    migrateEntitiesOnResize(newCols, newRows);
-  }
-
-  gridCols = newCols;
-  gridRows = newRows;
+  gridCols = Math.max(14, Math.floor(width / TILE_SIZE));
+  gridRows = Math.max(14, Math.floor(height / TILE_SIZE));
 
   rebuildBoardCanvas(width, height, dpr);
   if (!isGameRunning) draw();
@@ -424,19 +475,9 @@ function rebuildBoardCanvas(width = window.innerWidth, height = window.innerHeig
   boardContext = boardCanvas.getContext('2d');
   boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // 1. Fondo ceremonial con vignette de templo nocturno
-  const grad = boardContext.createRadialGradient(
-    width / 2, height / 2, Math.min(width, height) * 0.15,
-    width / 2, height / 2, Math.max(width, height) * 0.78
-  );
-  grad.addColorStop(0, '#171c28');
-  grad.addColorStop(0.55, '#10131d');
-  grad.addColorStop(1, '#080a0f');
-  boardContext.fillStyle = grad;
+  boardContext.fillStyle = '#141720';
   boardContext.fillRect(0, 0, width, height);
-
-  // 2. Cuadrícula de piedra ceremonial
-  boardContext.strokeStyle = 'rgba(74, 185, 145, 0.09)';
+  boardContext.strokeStyle = 'rgba(144, 153, 177, 0.16)';
   boardContext.lineWidth = 1;
   const offsetX = (width % TILE_SIZE) / 2;
   const offsetY = (height % TILE_SIZE) / 2;
@@ -454,25 +495,18 @@ function rebuildBoardCanvas(width = window.innerWidth, height = window.innerHeig
     boardContext.stroke();
   }
 
-  // 3. Glifos solares en intersecciones de cuadrícula
-  boardContext.fillStyle = 'rgba(213, 168, 79, 0.15)';
-  const glyphStep = TILE_SIZE * 4;
-  for (let x = offsetX + TILE_SIZE * 2; x <= width; x += glyphStep) {
-    for (let y = offsetY + TILE_SIZE * 2; y <= height; y += glyphStep) {
+  boardContext.fillStyle = 'rgba(198, 164, 85, 0.1)';
+  for (let x = offsetX + TILE_SIZE; x <= width; x += TILE_SIZE * 4) {
+    for (let y = offsetY + TILE_SIZE; y <= height; y += TILE_SIZE * 4) {
       boardContext.beginPath();
-      boardContext.moveTo(x, y - 3);
-      boardContext.lineTo(x + 3, y);
-      boardContext.lineTo(x, y + 3);
-      boardContext.lineTo(x - 3, y);
+      boardContext.moveTo(x, y - 2);
+      boardContext.lineTo(x + 2, y);
+      boardContext.lineTo(x, y + 2);
+      boardContext.lineTo(x - 2, y);
       boardContext.closePath();
       boardContext.fill();
     }
   }
-
-  // 4. Borde perimetral ceremonial del templo
-  boardContext.strokeStyle = 'rgba(213, 168, 79, 0.28)';
-  boardContext.lineWidth = 2;
-  boardContext.strokeRect(offsetX + 1, offsetY + 1, (gridCols * TILE_SIZE) - 2, (gridRows * TILE_SIZE) - 2);
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
@@ -701,6 +735,9 @@ function triggerHeadPulse(color = '#d5bd70') {
 
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
+  if (headPulse > 0) {
+    headPulse = Math.max(0, headPulse - (elapsedMs / 240));
+  }
 
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
@@ -995,36 +1032,17 @@ function resolveCosmicOrder() {
   scheduleEnemySpawn();
 }
 
-function updateCountdownDisplay(val) {
-  const glyphs = {
-    3: { glyph: "🪶 K'IN", label: 'EL SOL SE ALZA' },
-    2: { glyph: '⚡ WITZ', label: 'LA MONTAÑA RUGE' },
-    1: { glyph: "🔥 IK'", label: 'EL VIENTO ENCIENDE' }
-  };
-  const data = glyphs[val] || { glyph: '◆', label: 'PREPÁRATE' };
-  countdownOverlay.innerHTML = `
-    <div class="countdown-solar-disk">
-      <span class="countdown-number">${val}</span>
-      <span class="countdown-glyph">${data.glyph}</span>
-      <span class="countdown-sub">${data.label}</span>
-    </div>
-  `;
-  if (!isMuted) {
-    playTone(320 + (4 - val) * 110, 140, 0.18, 'triangle');
-  }
-}
-
 function startCountdown() {
   countdownEndsAt = performance.now() + 3000;
   countdownValue = 3;
-  updateCountdownDisplay(3);
+  countdownOverlay.textContent = String(countdownValue);
   countdownOverlay.classList.remove('hidden');
 }
 
 function cancelCountdown() {
   countdownEndsAt = null;
   countdownValue = 0;
-  countdownOverlay.innerHTML = '';
+  countdownOverlay.textContent = '';
   countdownOverlay.classList.add('hidden');
 }
 
@@ -1048,10 +1066,9 @@ function gameLoopFrame(timestamp) {
       const nextValue = Math.ceil(remainingMs / 1000);
       if (nextValue > 0 && nextValue !== countdownValue) {
         countdownValue = nextValue;
-        updateCountdownDisplay(countdownValue);
+        countdownOverlay.textContent = String(countdownValue);
       }
       if (remainingMs === 0) {
-        if (!isMuted) playTone(784, 250, 0.22, 'sine');
         cancelCountdown();
         simulationAccumulator = 0;
         snapshotRenderPositions();
@@ -1060,31 +1077,24 @@ function gameLoopFrame(timestamp) {
       }
     } else {
       updateEffects = true;
-      const clampedDeltaMs = Math.min(elapsedMs, 100);
-
-      // Decaimiento visual independiente del framerate
-      if (headPulse > 0) {
-        headPulse = Math.max(0, headPulse - (clampedDeltaMs / 240));
-      }
-
+      updateGameTimers(elapsedMs);
       simulationAccumulator = Math.min(
-        simulationAccumulator + clampedDeltaMs,
-        getCurrentSpeed() * 3
+        simulationAccumulator + elapsedMs,
+        getCurrentSpeed() * 5
       );
 
       let ticks = 0;
-      const stepDuration = getCurrentSpeed();
       while (
         isGameRunning &&
         !isPaused &&
         countdownEndsAt === null &&
-        ticks < 4 &&
-        simulationAccumulator >= stepDuration
+        ticks < 5 &&
+        simulationAccumulator >= getCurrentSpeed()
       ) {
-        updateGameTimers(stepDuration);
+        const tickDuration = getCurrentSpeed();
         snapshotRenderPositions();
         gameUpdate();
-        simulationAccumulator -= stepDuration;
+        simulationAccumulator -= tickDuration;
         ticks++;
       }
       renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
@@ -1234,13 +1244,13 @@ function activateImmunity(seconds = 10) {
   immunityExpiresAt = gameTime + seconds * 1000;
   immunitySeconds = seconds;
   immunityTimerSpan.textContent = immunitySeconds;
-  immunityBadge.classList.remove('hidden');
+  BadgeManager.setVisible('immunity', true);
 }
 
 function deactivateImmunity() {
   isImmune = false;
   immunityExpiresAt = 0;
-  immunityBadge.classList.add('hidden');
+  BadgeManager.setVisible('immunity', false);
   clearFireBreath();
 }
 
@@ -1457,8 +1467,6 @@ function updateEnemySnakeAI() {
   const difficulty = difficultySelect.value;
   const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
 
-  const reservedCells = new Set();
-
   for (const guardian of [...enemyGuardians]) {
     if (gameTime >= guardian.expiresAt) {
       destroyEnemySnake(guardian.id);
@@ -1483,66 +1491,22 @@ function updateEnemySnakeAI() {
       dy = -dy;
     }
 
-    const rawCandidates = Math.abs(dx) >= Math.abs(dy)
+    const candidates = Math.abs(dx) >= Math.abs(dy)
       ? [{ x: Math.sign(dx) || 1, y: 0 }, { x: 0, y: Math.sign(dy) || 1 }]
       : [{ x: 0, y: Math.sign(dy) || 1 }, { x: Math.sign(dx) || 1, y: 0 }];
-    rawCandidates.push({ x: -rawCandidates[0].x, y: -rawCandidates[0].y });
-    rawCandidates.push({ x: -rawCandidates[1].x, y: -rawCandidates[1].y });
+    candidates.push({ x: -candidates[0].x, y: -candidates[0].y });
+    candidates.push({ x: -candidates[1].x, y: -candidates[1].y });
 
-    // Filtrar giros imposibles de 180° sobre el propio cuello
-    const legalCandidates = rawCandidates.filter(candidate =>
+    const guardianDirection = candidates.find(candidate =>
       !((candidate.x !== 0 && candidate.x === -guardian.direction.x) ||
         (candidate.y !== 0 && candidate.y === -guardian.direction.y))
-    );
-
-    // Evaluar colisiones con otros guardianes, reservas y cuerpo propio
-    let bestDirection = legalCandidates[0] || guardian.direction;
-    let foundClearPath = false;
-
-    for (const candidate of legalCandidates) {
-      const candX = (enemyHead.x + candidate.x + gridCols) % gridCols;
-      const candY = (enemyHead.y + candidate.y + gridRows) % gridRows;
-      const cellKey = `${candX},${candY}`;
-
-      const cellReserved = reservedCells.has(cellKey);
-      const hitsOtherGuardian = enemyGuardians.some(other =>
-        other.id !== guardian.id &&
-        other.segments.some(seg => seg.x === candX && seg.y === candY)
-      );
-      const hitsSelfBody = guardian.segments.slice(0, -1).some(seg =>
-        seg.x === candX && seg.y === candY
-      );
-
-      // Si el jugador está protegido, el guardián debe evitar chocar con él
-      const hitsProtectedPlayer = hasGuardianProtection() && snake.some(seg =>
-        seg.x === candX && seg.y === candY
-      );
-
-      if (!cellReserved && !hitsOtherGuardian && !hitsSelfBody && !hitsProtectedPlayer) {
-        bestDirection = candidate;
-        foundClearPath = true;
-        break;
-      }
-    }
-
-    if (!foundClearPath && legalCandidates.length > 0) {
-      // Si todos tienen algún conflicto, escoger el que al menos no se monte en otra cabeza reservada
-      const unreserved = legalCandidates.find(cand => {
-        const cx = (enemyHead.x + cand.x + gridCols) % gridCols;
-        const cy = (enemyHead.y + cand.y + gridRows) % gridRows;
-        return !reservedCells.has(`${cx},${cy}`);
-      });
-      if (unreserved) bestDirection = unreserved;
-    }
-
-    guardian.direction = bestDirection;
+    ) || guardian.direction;
+    guardian.direction = guardianDirection;
 
     const newEnemyHead = {
       x: (enemyHead.x + guardian.direction.x + gridCols) % gridCols,
       y: (enemyHead.y + guardian.direction.y + gridRows) % gridRows
     };
-
-    reservedCells.add(`${newEnemyHead.x},${newEnemyHead.y}`);
 
     const touchesPlayer = snake.some(segment =>
       segment.x === newEnemyHead.x && segment.y === newEnemyHead.y
@@ -1893,12 +1857,8 @@ function gameUpdate() {
     sacrificeFoods.some(food => food.x === head.x && food.y === head.y);
   const bodyToCheck = willGrow ? snake : snake.slice(0, -1);
   if (bodyToCheck.some(segment => segment.x === head.x && segment.y === head.y)) {
-    if (gameTime < respawnProtectedUntil) {
-      // Gracia de renacer: no penalizar colisión temporal
-    } else {
-      loseLife('Kukulcán se enredó con su propio cuerpo.');
-      return;
-    }
+    loseLife('Kukulcán se enredó con su propio cuerpo.');
+    return;
   }
 
   const skullIdx = skullFoods.findIndex(food => food.x === head.x && food.y === head.y);
@@ -1908,13 +1868,8 @@ function gameUpdate() {
     skullFoodBadge.classList.add('hidden');
     nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
     screenShake = 8;
-    if (gameTime < respawnProtectedUntil || isImmune) {
-      triggerHeadPulse('#8be7ff');
-      spawnFloatingText('🛡️ ¡Calavera repelida!', head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#8be7ff');
-    } else {
-      loseLife('¡La Calavera maldita te arrebató un sacrificio!');
-      return;
-    }
+    loseLife('¡La Calavera maldita te arrebató un sacrificio!');
+    return;
   }
 
   const hitGuardian = enemyGuardians.find(guardian =>
@@ -2099,9 +2054,7 @@ function updateLivesUI() {
 // RENDERIZADO EN EL CANVAS
 // ========================================================
 function interpolateGridPosition(current, previous, progress) {
-  if (!previous || progress >= 1) {
-    return { x: current.x, y: current.y };
-  }
+  if (!previous || progress >= 1) return current;
   let dx = current.x - previous.x;
   let dy = current.y - previous.y;
   if (dx > gridCols / 2) dx -= gridCols;
@@ -2393,14 +2346,13 @@ function draw(interpolation = 1, updateEffects = false) {
         previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1],
         interpolation
       );
-
-      const drawPxX = renderSegment.x * TILE_SIZE + 1 + wobbleX;
-      const drawPxY = renderSegment.y * TILE_SIZE + 1 + wobbleY;
+      renderSegment.x += wobbleX / TILE_SIZE;
+      renderSegment.y += wobbleY / TILE_SIZE;
 
       roundRect(
         ctx,
-        drawPxX,
-        drawPxY,
+        renderSegment.x * TILE_SIZE + 1,
+        renderSegment.y * TILE_SIZE + 1,
         TILE_SIZE - 2,
         TILE_SIZE - 2,
         isHead ? 8 : 4
@@ -2554,8 +2506,9 @@ function draw(interpolation = 1, updateEffects = false) {
     }
 
     if (isHead && !isBlinking) {
+      ctx.fillStyle = '#141720';
       const eyeOffset = 5;
-      const eyeSize = Math.max(3.5, TILE_SIZE * 0.18);
+      const eyeSize = 3.5;
       let eye1X = renderSegment.x * TILE_SIZE + eyeOffset;
       let eye1Y = renderSegment.y * TILE_SIZE + eyeOffset;
       let eye2X = renderSegment.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
@@ -2570,14 +2523,8 @@ function draw(interpolation = 1, updateEffects = false) {
         eye2Y = renderSegment.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       }
 
-      ctx.fillStyle = isPlayerProtected ? '#fef08a' : '#6ee7b7';
       ctx.fillRect(eye1X, eye1Y, eyeSize, eyeSize);
       ctx.fillRect(eye2X, eye2Y, eyeSize, eyeSize);
-
-      ctx.fillStyle = '#061712';
-      const pupilWidth = Math.max(1, eyeSize * 0.36);
-      ctx.fillRect(eye1X + (eyeSize - pupilWidth) / 2, eye1Y, pupilWidth, eyeSize);
-      ctx.fillRect(eye2X + (eyeSize - pupilWidth) / 2, eye2Y, pupilWidth, eyeSize);
     }
   });
 
@@ -2841,8 +2788,8 @@ function drawFeatherCrest(segment, dir, color) {
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const baseSpeed = SPEEDS[sel] || SPEEDS.medium;
-  const lengthPenalty = Math.min(baseSpeed * 0.32, Math.max(0, snake.length - 3) * 1.8);
-  const adaptiveSpeed = Math.max(baseSpeed * 0.68, baseSpeed - lengthPenalty);
+  const lengthPenalty = Math.max(0, snake.length - 3) * 2.4;
+  const adaptiveSpeed = Math.max(baseSpeed * 0.72, baseSpeed - lengthPenalty);
   return isTurbo ? adaptiveSpeed * 0.58 : adaptiveSpeed;
 }
 
@@ -2884,8 +2831,6 @@ function togglePause() {
     isPaused = true;
   } else {
     isPaused = false;
-    lastFrameTimestamp = performance.now();
-    simulationAccumulator = 0;
     startCountdown();
   }
   dtPauseBtn.textContent = isPaused ? '▶ Reanudar' : '⏸ Pausa';
@@ -3020,7 +2965,7 @@ function closeTutorial() {
   } else if (tutorialDrawerWasVisible) {
     drawerMenu.classList.remove('hidden');
   }
-  if (tutorialOpenedFromWelcome && tutorialModal.parentElement !== welcomeCard) {
+  if (tutorialModal.parentElement !== welcomeCard) {
     welcomeCard.insertBefore(tutorialModal, welcomeStartBtn);
   }
   if (tutorialOpenedFromWelcome) {
@@ -3645,19 +3590,10 @@ drawerDifficulty.addEventListener('change', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && isGameRunning && !isPaused) {
-    togglePause();
-  } else if (!document.hidden && isGameRunning) {
-    lastFrameTimestamp = performance.now();
-  }
+  if (document.hidden && isGameRunning && !isPaused) togglePause();
 });
 window.addEventListener('blur', () => {
   if (isGameRunning && !isPaused) togglePause();
-});
-window.addEventListener('focus', () => {
-  if (isGameRunning) {
-    lastFrameTimestamp = performance.now();
-  }
 });
 
 // Controles virtuales D-Pad

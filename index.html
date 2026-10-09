@@ -92,39 +92,63 @@
     <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
   </header>
 
-  <!-- Insignias de Estado en Partida -->
-  <div class="status-badges-container">
-    <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite">
-      Sacrificios <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
-        <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
-      </span>
+  <!-- Insignias de Estado en Partida (con prioridad) -->
+  <div class="status-badges-container" id="status-badges-container">
+    <!-- PRIORIDAD ALTA: siempre visibles -->
+    <div class="badges-priority-high" id="badges-priority-high">
+      <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite">
+        <span class="badge-icon">🫀</span>
+        <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
+          <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
+        </span>
+        <span class="badge-text-mobile">Vidas</span>
+      </div>
+      <div id="immunity-badge" class="hud-badge immunity-badge hidden">
+        <span class="badge-icon">🛡️</span>
+        <span class="badge-compact"><span id="immunity-timer">10</span>s</span>
+      </div>
+      <div id="respawn-badge" class="hud-badge respawn-badge hidden">
+        <span class="badge-icon">🪶</span>
+        <span class="badge-compact"><span id="respawn-timer">3</span>s</span>
+      </div>
+      <div id="freeze-badge" class="hud-badge freeze-badge hidden">
+        <span class="badge-icon">❄️</span>
+        <span class="badge-compact"><span id="freeze-timer">3</span>s</span>
+      </div>
     </div>
-    <div id="respawn-badge" class="hud-badge respawn-badge hidden">
-      🪶 Protección del renacer <span id="respawn-timer">3</span>s
-    </div>
-    <div id="immunity-badge" class="hud-badge immunity-badge hidden">
-      🛡️ ¡INMUNE! <span id="immunity-timer">10</span>s
-    </div>
-    <div id="freeze-badge" class="hud-badge freeze-badge hidden">
-      ❄️ Guardianes congelados <span id="freeze-timer">3</span>s
-    </div>
-    <div id="sacrifice-offering-badge" class="hud-badge sacrifice-offering-badge hidden" role="status">
-      🗡️ Ofrenda del renacer disponible
-    </div>
-    <div id="skull-food-badge" class="hud-badge skull-food-badge hidden" role="status">
-      ☠️ Calavera maldita en el templo
-    </div>
-    <div id="rain-badge" class="hud-badge rain-badge hidden">
-      🌧️ Lluvia sagrada <span id="rain-timer">8</span>s · Maíz +10
-    </div>
-    <div id="cosmic-order-food-badge" class="hud-badge cosmic-order-badge hidden" role="status">
-      🌀 Sello del orden en el templo
-    </div>
-    <div id="cosmic-order-badge" class="hud-badge cosmic-order-badge hidden" role="status" aria-live="polite">
-      🌀 El orden llega en <span id="cosmic-order-timer">1</span>s
-    </div>
-    <div id="threat-badge" class="hud-badge threat-badge hidden">
-      ◆ Guardián al acecho
+
+    <!-- PRIORIDAD MEDIA: rotan si hay muchas -->
+    <div class="badges-priority-medium" id="badges-priority-medium">
+      <div id="rain-badge" class="hud-badge rain-badge hidden">
+        <span class="badge-icon">🌧️</span>
+        <span class="badge-text-desktop">Lluvia sagrada</span>
+        <span class="badge-compact"><span id="rain-timer">8</span>s · +10</span>
+      </div>
+      <div id="cosmic-order-badge" class="hud-badge cosmic-order-badge hidden">
+        <span class="badge-icon">🌀</span>
+        <span class="badge-text-desktop">Orden cósmico</span>
+        <span class="badge-compact"><span id="cosmic-order-timer">1</span>s</span>
+      </div>
+      <div id="cosmic-order-food-badge" class="hud-badge cosmic-order-badge hidden">
+        <span class="badge-icon">🌀</span>
+        <span class="badge-text-desktop">Sello del orden en el templo</span>
+        <span class="badge-text-mobile">Sello</span>
+      </div>
+      <div id="sacrifice-offering-badge" class="hud-badge sacrifice-offering-badge hidden">
+        <span class="badge-icon">🗡️</span>
+        <span class="badge-text-desktop">Ofrenda del renacer disponible</span>
+        <span class="badge-text-mobile">Ofrenda</span>
+      </div>
+      <div id="skull-food-badge" class="hud-badge skull-food-badge hidden">
+        <span class="badge-icon">☠️</span>
+        <span class="badge-text-desktop">Calavera maldita en el templo</span>
+        <span class="badge-text-mobile">Calavera</span>
+      </div>
+      <div id="threat-badge" class="hud-badge threat-badge hidden">
+        <span class="badge-icon">◆</span>
+        <span class="badge-text-desktop">Guardián al acecho</span>
+        <span class="badge-text-mobile">Guardián</span>
+      </div>
     </div>
   </div>
 
@@ -219,91 +243,34 @@
       <div class="tutorial-content">
         <!-- Paso 1 -->
         <div id="step-1" class="tutorial-step active">
-          <div class="tutorial-icon-banner">🪶 🐍 🌌</div>
-          <p class="tutorial-lead">🐍 <strong>Guía a la Serpiente Emplumada:</strong> desliza en pantalla o usa <strong>Flechas / WASD</strong>.</p>
-          <div class="tutorial-cards-row">
-            <div class="tutorial-mini-card">
-              <span class="mini-glyph">🌌</span>
-              <div class="mini-card-text">
-                <strong>Horizontes Infinitos</strong>
-                <p>Cruza los bordes del templo libremente: viajas entre el cielo y la tierra sin chocar con muros.</p>
-              </div>
-            </div>
-            <div class="tutorial-mini-card">
-              <span class="mini-glyph">⚡</span>
-              <div class="mini-card-text">
-                <strong>Ritmo Arcade</strong>
-                <p>Conforme devoras ofrendas, Kukulcán crece en tamaño, sumando más puntos y adrenalina.</p>
-              </div>
-            </div>
-          </div>
+          <div class="tutorial-icon-banner">🪶 🐍</div>
+          <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
+          <p class="tutorial-tip">🌽 Recoge ofrendas para crecer y sumar puntos. Cruza los bordes para viajar entre la tierra y el cielo.</p>
         </div>
 
         <!-- Paso 2 -->
         <div id="step-2" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌽 🍫 🛡️ 🌧️</div>
-          <p class="tutorial-lead">Recoge las ofrendas ceremoniales esparcidas por la piedra sagrada:</p>
-          <div class="tutorial-offerings-grid">
-            <div class="offering-badge-card">
-              <span class="badge-icon">🌽</span>
-              <strong>Maíz Sagrado</strong>
-              <small>+10 pts · (+20 extra durante la 🌧️ Lluvia Sagrada)</small>
-            </div>
-            <div class="offering-badge-card">
-              <span class="badge-icon">🍫</span>
-              <strong>Cacao Ritual</strong>
-              <small>Crece en longitud y gana favores divinos</small>
-            </div>
-            <div class="offering-badge-card">
-              <span class="badge-icon">🛡️</span>
-              <strong>Orbe de Jade</strong>
-              <small><strong>10s de Escudo:</strong> embiste y destruye guardianes</small>
-            </div>
-          </div>
+          <div class="tutorial-icon-banner">🌽 🍫 🛡️</div>
+          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 el maíz y 🍫 el cacao te hacen crecer y suman puntos. Durante la 🌧️ lluvia sagrada, recoge las mazorcas al aterrizar para ganar <strong>+10 extra</strong>.</p>
+          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> te protege <strong>10 s</strong>; aprovecha el escudo para embestir y vencer guardianes.</p>
         </div>
 
         <!-- Paso 3 -->
         <div id="step-3" class="tutorial-step">
-          <div class="tutorial-icon-banner">🔴 🟣 🟠 🫀</div>
+          <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
           <ul class="tutorial-guardian-list">
-            <li class="guardian-item hunter-item">
-              <strong>🔴 Cazador</strong>
-              <span>Persigue tu cabeza de frente</span>
-            </li>
-            <li class="guardian-item seer-item">
-              <strong>🟣 Vidente</strong>
-              <span>Anticipa tu rumbo e intercepta</span>
-            </li>
-            <li class="guardian-item flanker-item">
-              <strong>🟠 Flanqueador</strong>
-              <span>Rodea tus flancos para cerrarte</span>
-            </li>
+            <li><strong>Cazador</strong><span>te persigue</span></li>
+            <li><strong>Vidente</strong><span>anticipa tu rumbo</span></li>
+            <li><strong>Flanqueador</strong><span>intenta rodearte</span></li>
           </ul>
-          <div class="tutorial-tip lives-tutorial-tip">
-            🫀 <strong>3 Sacrificios (Vidas):</strong> Choques y ☠️ Calaveras restan 1. Reapareces con protección temporal; la 🗡️ Ofrenda restaura 1 (máx. 3).
-          </div>
+          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. Reapareces protegido; 🗡️ la ofrenda recupera uno (máx. 3).</p>
         </div>
 
         <!-- Paso 4 -->
         <div id="step-4" class="tutorial-step">
-          <div class="tutorial-icon-banner">🔥 ❄️ 🌀</div>
-          <div class="tutorial-powers-grid">
-            <div class="power-badge-card">
-              <span class="badge-icon">🔥</span>
-              <strong>Furia de Kukulcán</strong>
-              <small>Turbo veloz de 3s con rastro solar (botón o Espacio / Shift). Requiere recarga.</small>
-            </div>
-            <div class="power-badge-card">
-              <span class="badge-icon">❄️</span>
-              <strong>Esencia Helada</strong>
-              <small>Paraliza a todos los guardianes durante 3s: ¡aprovecha para embestirlos!</small>
-            </div>
-            <div class="power-badge-card">
-              <span class="badge-icon">🌀</span>
-              <strong>Orden Cósmico</strong>
-              <small>Recoge el sello sagrado: purifica y elimina guardianes (+50 pts cada uno).</small>
-            </div>
-          </div>
+          <div class="tutorial-icon-banner">🌀 🔥 ❄️</div>
+          <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello dentro de <strong>15 s</strong>. Tras el aviso, elimina guardianes y da <strong>+50 puntos por cada uno</strong>.</p>
+          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela a los guardianes para embestirlos. Ambas duran <strong>3 s</strong>.</p>
         </div>
       </div>
 
