@@ -28,6 +28,10 @@ const menuToggleBtn = document.getElementById('menu-toggle-btn');
 const mbScore = document.getElementById('mb-score');
 const mbHighScore = document.getElementById('mb-high-score');
 const mbSoundBtn = document.getElementById('mb-sound-btn');
+const mbPauseBtn = document.getElementById('mb-pause-btn');
+const mbTutorialBtn = document.getElementById('mb-tutorial-btn');
+const mobileLivesIndicator = document.getElementById('mobile-lives-indicator');
+const mobileLifePips = mobileLivesIndicator ? mobileLivesIndicator.querySelectorAll('.life-pip') : [];
 
 const drawerMenu = document.getElementById('drawer-menu');
 const closeDrawerBtn = document.getElementById('close-drawer-btn');
@@ -41,9 +45,10 @@ const drawerRestartBtn = document.getElementById('drawer-restart-btn');
 const drawerTutorialBtn = document.getElementById('drawer-tutorial-btn');
 const drawerStatsBtn = document.getElementById('drawer-stats-btn');
 
-const livesBadge = document.getElementById('lives-badge');
+// Badges de estado (el de vidas ya no está en el DOM visible, pero lo mantenemos por si acaso)
+const livesBadge = document.getElementById('lives-badge'); 
 const livesIndicator = document.getElementById('lives-indicator');
-const lifePips = livesIndicator.querySelectorAll('.life-pip');
+const lifePips = livesIndicator ? livesIndicator.querySelectorAll('.life-pip') : [];
 const livesCount = document.getElementById('lives-count');
 const immunityTimerSpan = document.getElementById('immunity-timer');
 const respawnBadge = document.getElementById('respawn-badge');
@@ -99,10 +104,9 @@ const BadgeManager = (() => {
     'cosmicOrder', 'rain', 'sacrificeOffering',
     'cosmicOrderFood', 'skullFood', 'threat'
   ];
-  const highOrder = ['lives', 'immunity', 'freeze', 'respawn'];
+  const highOrder = ['immunity', 'freeze', 'respawn']; // 'lives' ya no está aquí
 
   const refs = {
-    lives: livesBadge,
     immunity: document.getElementById('immunity-badge'),
     respawn: respawnBadge,
     freeze: freezeBadge,
@@ -115,7 +119,6 @@ const BadgeManager = (() => {
   };
 
   const logical = {
-    lives: true,
     immunity: false,
     respawn: false,
     freeze: false,
@@ -128,6 +131,7 @@ const BadgeManager = (() => {
   };
 
   function setVisible(key, visible) {
+    if (logical[key] === visible) return;
     logical[key] = visible;
     apply();
   }
@@ -231,9 +235,9 @@ const GUARDIAN_DEFS = [
       body: '#1a0a1a',
       crest: '#8b0000',
       eye: '#ff1a2e',
-      wing: '#2a0a1a',
-      wingBone: '#5a1020',
-      glow: '#ff3344'
+      wing: '#0a0208', // Más oscuro
+      wingBone: '#4a0a15', // Rojo tinto
+      glow: '#ff1a2e'
     },
     traits: { fangs: true, crestCount: 4, eyeMark: false, wings: true, isBoss: true }
   }
@@ -262,16 +266,14 @@ const COSMIC_ORDER_FOOD_LIFETIME_MS = 15000;
 const COSMIC_ORDER_REWARD = 50;
 const COSMIC_ORDER_FLASH_DURATION_MS = 720;
 
-const WELCOME_DEMO_COLS = 22;
-const WELCOME_DEMO_ROWS = 8;
 const WELCOME_DEMO_TICK_MS = 260;
-const WELCOME_DEMO_ROUTE = [
-  { direction: { x: 1, y: 0 }, steps: 8 },
-  { direction: { x: 0, y: 1 }, steps: 2 },
-  { direction: { x: 1, y: 0 }, steps: 2 },
-  { direction: { x: 0, y: -1 }, steps: 2 },
-  { direction: { x: 1, y: 0 }, steps: 4 }
-];
+
+// El tablero de la demo se calcula según el tamaño real del canvas
+let welcomeDemoCols = 22;
+let welcomeDemoRows = 8;
+let welcomeDemoRoute = [];
+let welcomeScenario = null;
+let welcomeLayout = null; // { cell, bx, by }
 
 const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
 const DIFFICULTY_NAMES = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil', extreme: 'Pesadilla' };
@@ -917,7 +919,6 @@ function spawnEnemySnake() {
     if (candidate.some(c => !isCellFreeForNewGuardian(c.x, c.y))) continue;
 
     const id = nextEnemyId++;
-    // Excluir a Xibalbá del spawn normal (solo aparece por condición especial)
     const normalDefs = GUARDIAN_DEFS.filter(d => d.behavior !== 'ambusher');
     const def = normalDefs[(id - 1) % normalDefs.length];
     const guardian = {
@@ -1059,13 +1060,11 @@ function reconcileGuardianCount() {
   const newDifficulty = difficultySelect.value;
   const target = GUARDIAN_TARGETS[newDifficulty] || GUARDIAN_TARGETS.medium;
 
-  // Si cambia a dificultad donde Xibalbá no aparece, eliminarlo
   if (newDifficulty !== 'hard' && newDifficulty !== 'extreme') {
     const xibalba = enemyGuardians.find(g => g.behavior.id === 'ambusher');
     if (xibalba) destroyEnemySnake(xibalba.id);
   }
 
-  // Eliminar guardianes normales sobrantes
   let normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalCount > target) {
     for (let i = enemyGuardians.length - 1; i >= 0 && normalCount > target; i--) {
@@ -1089,7 +1088,6 @@ function destroyEnemySnake(id, spawnBonus = true) {
   if (spawnBonus) {
     g.segments.forEach(s => bonusFoods.push({ x: s.x, y: s.y }));
     if (g.behavior.id === 'ambusher') {
-      // Recompensa extra por vencer a Xibalbá
       g.segments.forEach(s => {
         bonusFoods.push({ x: s.x, y: s.y });
         for (let p = 0; p < 4; p++) {
@@ -1105,7 +1103,6 @@ function destroyEnemySnake(id, spawnBonus = true) {
           });
         }
       });
-      // Reaparece en 60s
       nextXibalbaSpawnAt = gameTime + XIBALBA_COOLDOWN_MS;
     }
   }
@@ -1502,7 +1499,6 @@ function updateGameTimers(elapsedMs) {
     scheduleEnemySpawn(ok ? null : 1500);
   }
 
-  // Spawn de Xibalbá — condición especial
   const difficultyForBoss = difficultySelect.value;
   if (
     (difficultyForBoss === 'hard' || difficultyForBoss === 'extreme') &&
@@ -1513,7 +1509,6 @@ function updateGameTimers(elapsedMs) {
     if (!nextXibalbaSpawnAt || gameTime >= nextXibalbaSpawnAt) {
       const spawned = spawnXibalba();
       if (spawned) {
-        // Partículas de apertura
         const xibalba = enemyGuardians.find(g => g.behavior.id === 'ambusher');
         if (xibalba) {
           const head = xibalba.segments[0];
@@ -1538,7 +1533,6 @@ function updateGameTimers(elapsedMs) {
     }
   }
 
-  // Partículas continuas de Xibalbá mientras esté activo
   const xibalbaActive = enemyGuardians.find(g => g.behavior.id === 'ambusher');
   if (xibalbaActive && Math.random() < 0.35) {
     const head = xibalbaActive.segments[0];
@@ -2028,10 +2022,20 @@ function updateScoresUI() {
   }
 }
 function updateLivesUI() {
-  lifePips.forEach((pip, i) => pip.classList.toggle('spent', i >= lives));
+  // Actualizar los corazones en el HUD móvil
+  if (mobileLifePips.length > 0) {
+    mobileLifePips.forEach((pip, i) => pip.classList.toggle('spent', i >= lives));
+  }
+  
+  // Si aún existe el badge de vidas en el DOM (aunque oculto), actualizarlo también
+  if (livesBadge) {
+    const lifePips = livesBadge.querySelectorAll('.life-pip');
+    lifePips.forEach((pip, i) => pip.classList.toggle('spent', i >= lives));
+    livesBadge.setAttribute('aria-label', `Sacrificios: ${lives} de ${MAX_LIVES}`);
+    livesBadge.setAttribute('data-lives-label', String(lives));
+  }
+  
   if (livesCount) livesCount.textContent = String(lives);
-  livesBadge.setAttribute('aria-label', `Sacrificios: ${lives} de ${MAX_LIVES}`);
-  livesBadge.setAttribute('data-lives-label', String(lives));
 }
 
 // ========================================================
@@ -2102,7 +2106,6 @@ function drawBodyDiamond(segment, index) {
 
   ctx.save();
 
-  // Rombo dorado principal
   ctx.globalAlpha = isEven ? 0.95 : 0.65;
   ctx.fillStyle = '#d5bd70';
   ctx.beginPath();
@@ -2113,20 +2116,17 @@ function drawBodyDiamond(segment, index) {
   ctx.closePath();
   ctx.fill();
 
-  // Contorno dorado pálido
   ctx.globalAlpha = isEven ? 0.9 : 0.6;
   ctx.strokeStyle = '#fff2c2';
   ctx.lineWidth = 0.7;
   ctx.stroke();
 
-  // Gema central brillante
   ctx.globalAlpha = 0.95;
   ctx.fillStyle = '#fff8dc';
   ctx.beginPath();
   ctx.arc(cx, cy, size * 0.26, 0, Math.PI * 2);
   ctx.fill();
 
-  // En segmentos pares: plumas laterales
   if (isEven) {
     ctx.globalAlpha = 0.55;
     ctx.fillStyle = '#d5bd70';
@@ -2611,72 +2611,76 @@ function drawGuardianHead(rs, guardian) {
   }
 }
 
-// ==== XIBALBÁ — Render especial ====
+// ==== XIBALBÁ — Render especial (MEJORADO: más murciélago y oscuro) ====
 function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
-  const wingColor = guardian.palette.wing;
-  const wingBone = guardian.palette.wingBone;
-  const glowColor = guardian.palette.glow;
-  const wingSpan = TILE_SIZE * 1.15;
-  const flap = Math.sin(gameTime * 0.008) * 0.22;
+  // Paleta más oscura y "tinta"
+  const wingColor = '#0a0208'; // Casi negro con un toque rojo
+  const wingBone = '#4a0a15'; // Rojo sangre oscuro
+  const glowColor = '#ff1a2e'; // Rojo brillante para los detalles
+  const wingSpan = TILE_SIZE * 1.35; // Alas más grandes
+  const flap = Math.sin(gameTime * 0.008) * 0.25; // Aleteo más pronunciado
   const wingPhase = (Math.sin(gameTime * 0.01) + 1) * 0.5;
 
   ctx.save();
 
-  // Aura infernal
-  const auraR = TILE_SIZE * 1.35;
+  // Aura infernal más intensa
+  const auraR = TILE_SIZE * 1.6; // Aura más grande
   const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
-  aura.addColorStop(0, 'rgba(139, 0, 0, 0.55)');
-  aura.addColorStop(0.5, 'rgba(90, 0, 20, 0.28)');
+  aura.addColorStop(0, 'rgba(139, 0, 0, 0.7)'); // Más opaco
+  aura.addColorStop(0.6, 'rgba(90, 0, 20, 0.4)');
   aura.addColorStop(1, 'rgba(61, 13, 30, 0)');
   ctx.fillStyle = aura;
   ctx.beginPath();
   ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Alas de murciélago
+  // Alas de murciélago — Más grandes y detalladas
   for (let side = -1; side <= 1; side += 2) {
     ctx.save();
     ctx.translate(cx, cy);
-    const wingAngle = side * (0.35 + flap);
+    const wingAngle = side * (0.45 + flap); // Ángulo más abierto
     ctx.rotate(wingAngle);
 
     ctx.fillStyle = wingColor;
     ctx.strokeStyle = wingBone;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(0, 0);
+    // Borde superior del ala
     ctx.quadraticCurveTo(
-      side * wingSpan * 0.4, -wingSpan * 0.55,
-      side * wingSpan * 0.95, -wingSpan * 0.35
+      side * wingSpan * 0.5, -wingSpan * 0.7,
+      side * wingSpan * 1.1, -wingSpan * 0.45
     );
-    ctx.lineTo(side * wingSpan * 0.9, -wingSpan * 0.15);
+    // Puntas de los "dedos" del ala
+    ctx.lineTo(side * wingSpan * 1.05, -wingSpan * 0.2);
     ctx.quadraticCurveTo(
-      side * wingSpan * 0.75, -wingSpan * 0.05,
-      side * wingSpan * 0.85, wingSpan * 0.1
+      side * wingSpan * 0.85, -wingSpan * 0.05,
+      side * wingSpan * 0.95, wingSpan * 0.15
     );
-    ctx.lineTo(side * wingSpan * 0.7, wingSpan * 0.2);
+    ctx.lineTo(side * wingSpan * 0.75, wingSpan * 0.28);
     ctx.quadraticCurveTo(
-      side * wingSpan * 0.5, wingSpan * 0.15,
-      side * wingSpan * 0.6, wingSpan * 0.4
+      side * wingSpan * 0.55, wingSpan * 0.2,
+      side * wingSpan * 0.7, wingSpan * 0.5
     );
+    // Borde inferior
     ctx.quadraticCurveTo(
-      side * wingSpan * 0.25, wingSpan * 0.25,
+      side * wingSpan * 0.35, wingSpan * 0.35,
       0, 0
     );
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Huesos
+    // Huesos del ala (más visibles)
     ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.globalAlpha = 0.7 + wingPhase * 0.3;
     for (let bone = 1; bone <= 3; bone++) {
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(
-        side * wingSpan * 0.4, -wingSpan * 0.15 * bone,
-        side * wingSpan * (0.5 + bone * 0.14), -wingSpan * (0.05 * bone - 0.08)
+        side * wingSpan * 0.4, -wingSpan * 0.2 * bone,
+        side * wingSpan * (0.5 + bone * 0.18), -wingSpan * (0.08 * bone - 0.1)
       );
       ctx.stroke();
     }
@@ -2684,9 +2688,9 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
 
     // Puntas brillantes
     ctx.fillStyle = glowColor;
-    for (let tip = 0; tip < 3; tip++) {
-      const tipX = side * wingSpan * (0.85 - tip * 0.08);
-      const tipY = -wingSpan * (0.15 - tip * 0.1);
+    for (let tip = 0; tip < 4; tip++) {
+      const tipX = side * wingSpan * (0.9 - tip * 0.09);
+      const tipY = -wingSpan * (0.18 - tip * 0.1);
       ctx.beginPath();
       ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2);
       ctx.fill();
@@ -2698,13 +2702,13 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
   // Cresta de huesos (4 puntas)
   const crestTop = { x: cx - dir.x * TILE_SIZE * 0.3, y: cy - dir.y * TILE_SIZE * 0.3 };
   for (let c = -1.5; c <= 1.5; c += 1) {
-    const spread = c * 2.8;
+    const spread = c * 3.2;
     const baseX = crestTop.x + perp.x * spread;
     const baseY = crestTop.y + perp.y * spread;
-    const tipX = crestTop.x - dir.x * 9 + perp.x * (c * 4.5);
-    const tipY = crestTop.y - dir.y * 9 + perp.y * (c * 4.5);
+    const tipX = crestTop.x - dir.x * 10 + perp.x * (c * 5.5);
+    const tipY = crestTop.y - dir.y * 10 + perp.y * (c * 5.5);
     ctx.strokeStyle = guardian.palette.crest;
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
@@ -2712,21 +2716,21 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.stroke();
     ctx.fillStyle = glowColor;
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 5;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
 
-  // Halo rojo
-  const eyeGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, TILE_SIZE * 0.5);
-  eyeGlow.addColorStop(0, 'rgba(255, 26, 46, 0.45)');
-  eyeGlow.addColorStop(0.7, 'rgba(255, 26, 46, 0.15)');
+  // Halo rojo alrededor de la cabeza
+  const eyeGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, TILE_SIZE * 0.6);
+  eyeGlow.addColorStop(0, 'rgba(255, 26, 46, 0.5)');
+  eyeGlow.addColorStop(0.7, 'rgba(255, 26, 46, 0.18)');
   eyeGlow.addColorStop(1, 'rgba(255, 26, 46, 0)');
   ctx.fillStyle = eyeGlow;
   ctx.beginPath();
-  ctx.arc(cx, cy, TILE_SIZE * 0.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, TILE_SIZE * 0.6, 0, Math.PI * 2);
   ctx.fill();
 
   // Ojos diamante
@@ -2750,10 +2754,10 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
     const ecx = eye.x + 1.5;
     const ecy = eye.y + 1.5;
     ctx.beginPath();
-    ctx.moveTo(ecx, ecy - 2);
-    ctx.lineTo(ecx + 1.5, ecy);
-    ctx.lineTo(ecx, ecy + 2);
-    ctx.lineTo(ecx - 1.5, ecy);
+    ctx.moveTo(ecx, ecy - 2.2);
+    ctx.lineTo(ecx + 1.8, ecy);
+    ctx.lineTo(ecx, ecy + 2.2);
+    ctx.lineTo(ecx - 1.8, ecy);
     ctx.closePath();
     ctx.fill();
   }
@@ -2763,7 +2767,7 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.globalAlpha = 0.9;
   for (const eye of [{ x: e1x, y: e1y }, { x: e2x, y: e2y }]) {
     ctx.beginPath();
-    ctx.arc(eye.x + 1, eye.y + 1, 0.6, 0, Math.PI * 2);
+    ctx.arc(eye.x + 1, eye.y + 1, 0.7, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -2774,7 +2778,7 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.lineWidth = 0.6;
   const mouthX = cx + dir.x * TILE_SIZE * 0.42;
   const mouthY = cy + dir.y * TILE_SIZE * 0.42;
-  const fangLen = TILE_SIZE * 0.36;
+  const fangLen = TILE_SIZE * 0.4;
   for (let side = -1; side <= 1; side += 2) {
     const fx = mouthX + perp.x * side * 3.2;
     const fy = mouthY + perp.y * side * 3.2;
@@ -2789,7 +2793,7 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
     const fy2 = fy - perp.y * side * 1.5;
     ctx.beginPath();
     ctx.moveTo(fx2, fy2);
-    ctx.lineTo(fx2 + dir.x * fangLen * 0.6, fy2 + dir.y * fangLen * 0.6);
+    ctx.lineTo(fx2 + dir.x * fangLen * 0.7, fy2 + dir.y * fangLen * 0.7);
     ctx.lineTo(fx2 + perp.x * side * 1.2, fy2 + perp.y * side * 1.2);
     ctx.closePath();
     ctx.fill();
@@ -3561,6 +3565,22 @@ window.addEventListener('touchend', e => {
 
 btnTurbo.addEventListener('pointerdown', e => { e.preventDefault(); triggerTurboBurst(); });
 
+// NUEVOS BOTONES DEL HUD MÓVIL
+mbPauseBtn.addEventListener('click', () => {
+  if (isGameRunning) {
+    togglePause();
+  } else {
+    drawerMenu.classList.toggle('hidden');
+  }
+});
+
+mbTutorialBtn.addEventListener('click', () => {
+  if (isGameRunning && !isPaused) {
+    togglePause(); 
+  }
+  openTutorial();
+});
+
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !tutorialModal.classList.contains('hidden')) { closeTutorial(); return; }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) { closeStatistics(); return; }
@@ -3687,34 +3707,94 @@ window.addEventListener('blur', () => {
 // ========================================================
 // 28. WELCOME DEMO
 // ========================================================
+// Genera el escenario (posiciones y ruta) para cualquier tamaño de tablero
+function buildWelcomeScenario(cols, rows) {
+  const sx = 4;
+  const yTop = Math.max(1, Math.round(rows * 0.22));
+  let yBot = Math.min(rows - 2, rows - 1 - Math.round(rows * 0.22));
+  yBot = Math.max(yBot, yTop + 2);
+  const yG = Math.round((yTop + yBot) / 2);          // carril del guardián
+  const jx = Math.max(sx + 5, Math.round(cols * 0.62));
+  const xTurn = jx - 2;
+  const mx = Math.max(sx + 2, Math.min(xTurn - 1, Math.round(cols * 0.36)));
+  const last = Math.max(2, cols - 4 - jx);
+
+  welcomeScenario = { sx, yTop, yBot, yG, jx, mx };
+  welcomeDemoRoute = [
+    { direction: { x: 1, y: 0 },  steps: xTurn - sx },    // arriba: come maíz
+    { direction: { x: 0, y: 1 },  steps: yBot - yTop },   // baja
+    { direction: { x: 1, y: 0 },  steps: 2 },             // recoge jade
+    { direction: { x: 0, y: -1 }, steps: yBot - yG },     // sube al carril del guardián
+    { direction: { x: 1, y: 0 },  steps: last }           // embiste
+  ];
+}
+
+function welcomeGuardianStart() {
+  const { yG } = welcomeScenario;
+  return [0, 1, 2, 3].map(i => ({ x: welcomeDemoCols - 4 + i, y: yG }));
+}
+
 function resetWelcomeDemo() {
-  welcomeDemoSnake = [{ x: 4, y: 4 }, { x: 3, y: 4 }, { x: 2, y: 4 }];
-  welcomeDemoPreviousSnake = welcomeDemoSnake.map(s => ({ ...s }));
-  welcomeDemoGuardian = [{ x: 18, y: 4 }, { x: 19, y: 4 }, { x: 20, y: 4 }, { x: 21, y: 4 }];
-  welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(s => ({ ...s }));
+  if (!welcomeScenario) buildWelcomeScenario(welcomeDemoCols, welcomeDemoRows);
+  const s = welcomeScenario;
+  welcomeDemoSnake = [
+    { x: s.sx, y: s.yTop }, { x: s.sx - 1, y: s.yTop }, { x: s.sx - 2, y: s.yTop }
+  ];
+  welcomeDemoPreviousSnake = welcomeDemoSnake.map(p => ({ ...p }));
+  welcomeDemoGuardian = welcomeGuardianStart();
+  welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(p => ({ ...p }));
   welcomeDemoDirection = { x: 1, y: 0 };
   welcomeDemoRouteIndex = 0;
   welcomeDemoRouteSteps = 0;
   welcomeDemoTick = 0;
   welcomeDemoAccumulator = 0;
   welcomeDemoScore = 0;
-  welcomeDemoMaize = { x: 8, y: 4 };
-  welcomeDemoJade = { x: 14, y: 6 };
+  welcomeDemoMaize = { x: s.mx, y: s.yTop };
+  welcomeDemoJade = { x: s.jx, y: s.yBot };
   welcomeDemoImmuneUntil = 0;
   welcomeDemoFlashUntil = 0;
   welcomeDemoGuardianDefeatedUntil = 0;
   welcomeDemoGameOverUntil = 0;
   welcomeDemoCallout.textContent = 'Muévete por la cuadrícula y busca ofrendas';
 }
+
+// Calcula columnas/filas para llenar TODO el canvas
+function updateWelcomeLayout(width, height) {
+  const PAD = 8, HUD_H = 36;
+  const availW = Math.max(100, width - PAD * 2);
+  const availH = Math.max(60, height - HUD_H - PAD);
+  const target = Math.max(18, Math.min(28, width / 15));
+  const cols = Math.max(14, Math.min(30, Math.floor(availW / target)));
+  const rows = Math.max(7, Math.min(22, Math.floor(availH / target)));
+  const cell = Math.max(8, Math.min(availW / cols, availH / rows));
+  welcomeLayout = {
+    cell,
+    bx: (width - cell * cols) / 2,
+    by: HUD_H + (availH - cell * rows) / 2
+  };
+  const changed = cols !== welcomeDemoCols || rows !== welcomeDemoRows;
+  if (changed) {
+    welcomeDemoCols = cols;
+    welcomeDemoRows = rows;
+    buildWelcomeScenario(cols, rows);
+    resetWelcomeDemo();
+  }
+  return changed;
+}
+
 function resizeWelcomeDemo() {
   const bounds = welcomeDemo.getBoundingClientRect();
   if (bounds.width === 0 || bounds.height === 0) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const pw = Math.max(1, Math.round(bounds.width * dpr));
   const ph = Math.max(1, Math.round(bounds.height * dpr));
-  if (welcomeDemo.width === pw && welcomeDemo.height === ph) return;
-  welcomeDemo.width = pw;
-  welcomeDemo.height = ph;
+  const sizeChanged = welcomeDemo.width !== pw || welcomeDemo.height !== ph;
+  const layoutChanged = updateWelcomeLayout(bounds.width, bounds.height);
+  if (!sizeChanged && !layoutChanged) return;
+  if (sizeChanged) {
+    welcomeDemo.width = pw;
+    welcomeDemo.height = ph;
+  }
   welcomeDemoContext.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawWelcomeDemo(1);
 }
@@ -3813,9 +3893,7 @@ function moveWelcomeDemoGuardian() {
   if (welcomeDemoImmuneUntil <= welcomeDemoTick) return;
   if (welcomeDemoGuardianDefeatedUntil > welcomeDemoTick) return;
   if (welcomeDemoGuardianDefeatedUntil) {
-    welcomeDemoGuardian = [{ x: 18, y: 4 }, { x: 19, y: 4 }, { x: 20, y: 4 }, { x: 21, y: 4 }];
-    welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(s => ({ ...s }));
-    welcomeDemoGuardianDefeatedUntil = 0;
+      welcomeDemoGuardian = welcomeGuardianStart();
   }
   const eHead = welcomeDemoGuardian[0];
   const pHead = welcomeDemoSnake[0];
@@ -3829,7 +3907,7 @@ function moveWelcomeDemoGuardian() {
     if (!c.x && !c.y) return false;
     const x = eHead.x + c.x;
     const y = eHead.y + c.y;
-    if (x < 1 || x >= WELCOME_DEMO_COLS - 1 || y < 1 || y >= WELCOME_DEMO_ROWS - 1) return false;
+    if (x < 1 || x >= welcomeDemoCols - 1 || y < 1 || y >= welcomeDemoRows - 1) return false;
     return !welcomeDemoGuardian.slice(1, -1).some(s => s.x === x && s.y === y);
   });
   if (!nd) return;
@@ -3856,14 +3934,14 @@ function advanceWelcomeDemo() {
     if (welcomeDemoTick >= welcomeDemoGameOverUntil) resetWelcomeDemo();
     return;
   }
-  if (welcomeDemoRouteIndex === WELCOME_DEMO_ROUTE.length) {
+  if (welcomeDemoRouteIndex === welcomeDemoRoute.length) {
     welcomeDemoTick++;
     if (welcomeDemoTick >= welcomeDemoGuardianDefeatedUntil) resetWelcomeDemo();
     return;
   }
   welcomeDemoPreviousSnake = welcomeDemoSnake.map(s => ({ ...s }));
   welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(s => ({ ...s }));
-  const route = WELCOME_DEMO_ROUTE[welcomeDemoRouteIndex];
+  const route = welcomeDemoRoute[welcomeDemoRouteIndex];
   welcomeDemoDirection = route.direction;
   const nh = {
     x: welcomeDemoSnake[0].x + route.direction.x,
@@ -3909,38 +3987,41 @@ function drawWelcomeDemo(interpolation = 1) {
   const width = welcomeDemo.clientWidth;
   const height = welcomeDemo.clientHeight;
   if (!width || !height) return;
+  if (!welcomeLayout) updateWelcomeLayout(width, height);
+  const { cell: cellSize, bx, by } = welcomeLayout;
+  const bw = cellSize * welcomeDemoCols;
+  const bh = cellSize * welcomeDemoRows;
   const c = welcomeDemoContext;
+
   c.fillStyle = '#141720';
   c.fillRect(0, 0, width, height);
-  const cellSize = Math.min(width / (WELCOME_DEMO_COLS + 2), (height - 32) / (WELCOME_DEMO_ROWS + 1));
-  const bw = cellSize * WELCOME_DEMO_COLS;
-  const bh = cellSize * WELCOME_DEMO_ROWS;
-  const bx = (width - bw) / 2;
-  const by = 29 + Math.max(0, (height - 32 - bh) / 2);
+
+  // HUD con fuentes más grandes
   c.fillStyle = 'rgba(20, 23, 32, 0.9)';
-  roundRect(c, 8, 6, Math.min(120, width * 0.4), 19, 8);
+  roundRect(c, 8, 6, Math.min(170, width * 0.55), 24, 9);
   c.fill();
-  c.fillStyle = '#b8c6b4';
-  c.font = '700 8px sans-serif';
   c.textBaseline = 'middle';
   c.textAlign = 'left';
-  c.fillText('PUNTOS', 16, 15.5);
+  c.fillStyle = '#b8c6b4';
+  c.font = '700 10px sans-serif';
+  c.fillText('PUNTOS', 18, 18.5);
   c.fillStyle = '#f1cb71';
-  c.font = '800 10px sans-serif';
-  c.fillText(String(welcomeDemoScore), 60, 15.5);
+  c.font = '800 13px sans-serif';
+  c.fillText(String(welcomeDemoScore), 72, 18.5);
   c.fillStyle = '#9ba7a0';
-  c.font = '700 8px sans-serif';
-  c.fillText(`LONG. ${welcomeDemoSnake.length}`, 82, 15.5);
+  c.font = '700 10px sans-serif';
+  c.fillText(`LONG. ${welcomeDemoSnake.length}`, 104, 18.5);
+
   c.strokeStyle = 'rgba(144, 153, 177, 0.17)';
   c.lineWidth = 1;
-  for (let col = 0; col <= WELCOME_DEMO_COLS; col++) {
+  for (let col = 0; col <= welcomeDemoCols; col++) {
     const x = bx + col * cellSize;
     c.beginPath();
     c.moveTo(x, by);
     c.lineTo(x, by + bh);
     c.stroke();
   }
-  for (let row = 0; row <= WELCOME_DEMO_ROWS; row++) {
+  for (let row = 0; row <= welcomeDemoRows; row++) {
     const y = by + row * cellSize;
     c.beginPath();
     c.moveTo(bx, y);
@@ -4045,6 +4126,5 @@ resetWelcomeDemo();
 startWelcomeDemo();
 resetGame();
 
-// resizeCanvas() se llama AL FINAL, después de definir todas las funciones
 resizeCanvas();
 draw();

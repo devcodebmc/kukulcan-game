@@ -231,7 +231,7 @@ h1, h2, h3 {
   color: var(--text);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   pointer-events: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   min-width: 0;
@@ -240,6 +240,44 @@ h1, h2, h3 {
 .hud-mini-logo { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
 .hud-stat { white-space: nowrap; }
 .hud-divider { opacity: 0.3; }
+
+.hud-lives-mobile {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.85rem;
+  margin-left: 4px;
+}
+.hud-lives-mobile .life-pip {
+  font-size: 0.85rem;
+  transition: opacity 0.2s, filter 0.2s;
+}
+.hud-lives-mobile .life-pip.spent {
+  opacity: 0.22;
+  filter: grayscale(1);
+}
+
+.hud-actions {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+.hud-action-btn {
+  background: rgba(26, 30, 40, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 36px; height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  touch-action: manipulation;
+}
+.hud-action-btn:active { transform: scale(0.92); }
 
 /* =========================================================
    BADGES DE ESTADO
@@ -271,6 +309,10 @@ h1, h2, h3 {
   gap: 6px;
 }
 
+#lives-badge {
+  display: none !important;
+}
+
 .hud-badge {
   display: inline-flex;
   align-items: center;
@@ -294,24 +336,6 @@ h1, h2, h3 {
 .badge-text-desktop { display: inline; }
 .badge-compact { display: inline; }
 
-/* Sacrificios (vidas) */
-.lives-badge {
-  background: rgba(48, 30, 35, 0.94);
-  border: 1px solid rgba(239, 82, 97, 0.55);
-  color: var(--text);
-  gap: 7px;
-  padding: 5px 12px;
-}
-.lives-indicator {
-  display: inline-flex;
-  gap: 3px;
-  font-size: 0.95rem;
-  line-height: 1;
-}
-.life-pip { transition: opacity 0.2s, filter 0.2s; }
-.life-pip.spent { opacity: 0.25; filter: grayscale(1); }
-
-/* Escudo de jade */
 .immunity-badge {
   background: rgba(30, 90, 80, 0.92);
   border: 1px solid rgba(125, 232, 196, 0.75);
@@ -321,7 +345,6 @@ h1, h2, h3 {
   filter: drop-shadow(0 0 3px rgba(125, 232, 196, 0.9));
 }
 
-/* Sacrificio disponible */
 .sacrifice-offering-badge {
   background: rgba(70, 22, 30, 0.94);
   border: 1px solid rgba(239, 82, 97, 0.85);
@@ -463,14 +486,12 @@ h1, h2, h3 {
 .pad-btn:active { background: var(--jade-dk); transform: scale(0.92); }
 
 /* =========================================================
-   MODALES
+   MODALES — FONDO SÓLIDO
    ========================================================= */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 8, 12, 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: #0a0e14; /* Fondo sólido oscuro */
   z-index: 70;
   display: flex;
   justify-content: center;
@@ -613,11 +634,7 @@ h1, h2, h3 {
   place-items: center;
   overflow-y: auto;
   padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
-  background:
-    radial-gradient(ellipse at 50% 38%, rgba(26, 122, 94, 0.28), transparent 52%),
-    rgba(8, 12, 15, 0.92);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: #0f1218; /* Fondo sólido */
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
@@ -742,7 +759,6 @@ h1, h2, h3 {
 
 /* =========================================================
    RESPONSIVE — MÓVIL (<= 768px)
-   Welcome unificado con proporciones correctas
    ========================================================= */
 @media (max-width: 768px) {
   .desktop-toolbar { display: none !important; }
@@ -772,21 +788,8 @@ h1, h2, h3 {
   .badge-text-mobile { display: inline; }
 
   .lives-badge {
-    gap: 2px;
-    padding: 3px 8px;
-    background: rgba(48, 30, 35, 0.94);
-    border: 1px solid rgba(239, 82, 97, 0.55);
+    display: none !important;
   }
-  .lives-badge .badge-text-desktop { display: none; }
-  .lives-badge .badge-text-mobile { display: none; }
-  .lives-indicator {
-    display: inline-flex;
-    font-size: 0.85rem;
-    gap: 1px;
-    line-height: 1;
-  }
-  .life-pip { font-size: 0.85rem; }
-  .life-pip.spent { opacity: 0.22; filter: grayscale(1); }
 
   .badges-priority-medium .hud-badge { display: none !important; }
   .badges-priority-medium .hud-badge.is-visible { display: inline-flex !important; }
@@ -796,14 +799,13 @@ h1, h2, h3 {
   .turbo-icon { font-size: 1.2rem; }
   .turbo-label { font-size: 0.5rem; }
 
-  /* ============================================================
-     WELCOME UNIFICADO EN MÓVIL — proporciones correctas
-     ============================================================ */
+  /* WELCOME UNIFICADO EN MÓVIL — MÁS ESPACIO PARA LA DEMO Y CONTENIDO */
   .welcome-screen {
     padding: max(6px, env(safe-area-inset-top)) 8px max(6px, env(safe-area-inset-bottom));
     display: flex;
     align-items: stretch;
     justify-content: stretch;
+    background: #0f1218;
   }
   .welcome-card {
     display: flex;
@@ -819,7 +821,6 @@ h1, h2, h3 {
     box-shadow: var(--shadow-card), 0 0 42px rgba(31, 154, 115, 0.14);
   }
 
-  /* DEMO — altura fluida, ocupa ~30% del alto */
   .welcome-preview {
     flex: 0 0 auto;
     width: 100%;
@@ -829,7 +830,8 @@ h1, h2, h3 {
     background: linear-gradient(180deg, rgba(13, 20, 24, 0.95), rgba(20, 28, 32, 0.95));
   }
   .welcome-demo {
-    height: clamp(160px, 26dvh, 220px);
+    /* Aumentado para aprovechar el espacio vacío */
+    height: clamp(220px, 50dvh, 400px); 
     border-radius: 0;
   }
   .preview-legend {
@@ -846,7 +848,6 @@ h1, h2, h3 {
     background: rgba(9, 16, 20, 0.75);
   }
 
-  /* TUTORIAL — ocupa el resto del alto con distribución equilibrada */
   .welcome-card > #tutorial-modal {
     flex: 1 1 auto;
     display: flex !important;
@@ -865,7 +866,6 @@ h1, h2, h3 {
     display: flex !important;
   }
 
-  /* El tutorial-card distribuye: header, contenido (crece), dots+footer (abajo) */
   .welcome-card > #tutorial-modal > .tutorial-card {
     display: flex;
     flex-direction: column;
@@ -885,7 +885,6 @@ h1, h2, h3 {
     justify-content: space-between;
   }
 
-  /* Header */
   .welcome-card > #tutorial-modal .tutorial-header {
     flex: 0 0 auto;
     gap: 8px;
@@ -906,26 +905,26 @@ h1, h2, h3 {
     font-size: 1.1rem;
   }
 
-  /* Contenido del paso — centrado pero sin huecos */
   .welcome-card > #tutorial-modal .tutorial-content {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
-    justify-content: center;
+    /* Eliminado justify-content: center para que el contenido fluya */
+    justify-content: flex-start; 
     align-items: stretch;
     min-height: 0;
     width: 100%;
-    padding: 16px 16px 8px;
+    padding: 20px 16px; /* Más padding vertical */
     overflow-y: auto;
     overscroll-behavior: contain;
-    gap: 0;
+    gap: 12px; /* Espacio entre elementos */
   }
   .welcome-card > #tutorial-modal .tutorial-step {
     display: none;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px; /* Más espacio entre elementos del paso */
     margin-block: 0;
-    justify-content: center;
+    justify-content: flex-start;
     text-align: center;
     width: 100%;
     flex: 0 0 auto;
@@ -938,22 +937,22 @@ h1, h2, h3 {
     display: none;
   }
   .welcome-card > #tutorial-modal .tutorial-lead {
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 1rem; /* Aumentado */
+    line-height: 1.5;
+    margin-bottom: 8px;
   }
   .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.8rem;
-    padding: 9px 12px;
-    line-height: 1.4;
+    font-size: 0.88rem; /* Aumentado */
+    padding: 12px 14px; /* Más padding */
+    line-height: 1.5;
     width: 100%;
     background: rgba(13, 18, 22, 0.5);
     border: 1px solid rgba(105, 211, 180, 0.12);
   }
 
-  /* Lista guardianes: 2 columnas (4 guardianes caben mejor así) */
   .welcome-card > #tutorial-modal .tutorial-guardian-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
+    gap: 8px;
     width: 100%;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
@@ -961,50 +960,48 @@ h1, h2, h3 {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 8px 4px;
-    font-size: 0.72rem;
-    line-height: 1.25;
+    padding: 10px 6px;
+    font-size: 0.78rem;
+    line-height: 1.3;
     background: rgba(13, 18, 22, 0.5);
     border: 1px solid rgba(105, 211, 180, 0.12);
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list strong {
-    margin-bottom: 2px;
-    font-size: 0.76rem;
+    margin-bottom: 3px;
+    font-size: 0.82rem;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list span {
-    font-size: 0.66rem;
+    font-size: 0.72rem;
   }
 
-  /* Step dots — pegados arriba del footer */
   .welcome-card > #tutorial-modal .step-dots {
     flex: 0 0 auto;
     margin: 0;
-    padding: 6px 0 8px;
+    padding: 8px 0 10px;
     justify-content: center;
   }
   .welcome-card > #tutorial-modal .step-dots .dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
   }
   .welcome-card > #tutorial-modal .step-dots .dot.active {
-    width: 20px;
+    width: 22px;
   }
 
-  /* Footer fijo abajo */
   .welcome-card > #tutorial-modal .tutorial-footer {
     flex: 0 0 auto;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    padding: 8px 16px 12px;
+    padding: 10px 16px 14px;
     border-top: 1px solid rgba(105, 211, 180, 0.12);
     background: rgba(13, 18, 22, 0.35);
   }
   .welcome-card > #tutorial-modal .tutorial-footer .btn {
     flex: 1;
-    padding: 11px 12px;
-    font-size: 0.86rem;
-    min-height: 44px;
+    padding: 12px 12px;
+    font-size: 0.9rem;
+    min-height: 48px;
   }
 }
 
@@ -1019,7 +1016,7 @@ h1, h2, h3 {
     max-height: calc(100dvh - max(8px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
   }
   .welcome-demo {
-    height: clamp(110px, 19dvh, 160px);
+    height: clamp(200px, 45dvh, 360px);
   }
   .preview-legend {
     padding: 4px 6px;
@@ -1039,32 +1036,32 @@ h1, h2, h3 {
     font-size: 0.92rem;
   }
   .welcome-card > #tutorial-modal .tutorial-content {
-    padding: 10px 12px;
+    padding: 16px 12px;
   }
   .welcome-card > #tutorial-modal .tutorial-lead {
-    font-size: 0.84rem;
+    font-size: 0.92rem;
   }
   .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.76rem;
-    padding: 7px 10px;
+    font-size: 0.82rem;
+    padding: 10px 12px;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
-    padding: 6px 3px;
-    font-size: 0.68rem;
+    padding: 8px 4px;
+    font-size: 0.74rem;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list strong {
-    font-size: 0.72rem;
+    font-size: 0.78rem;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list span {
-    font-size: 0.62rem;
+    font-size: 0.68rem;
   }
   .welcome-card > #tutorial-modal .tutorial-footer {
     padding: 10px 12px 12px;
   }
   .welcome-card > #tutorial-modal .tutorial-footer .btn {
-    padding: 9px 10px;
-    font-size: 0.8rem;
-    min-height: 40px;
+    padding: 10px 10px;
+    font-size: 0.84rem;
+    min-height: 44px;
   }
   .hud-game-title {
     font-size: 0.62rem;
@@ -1082,24 +1079,24 @@ h1, h2, h3 {
    ========================================================= */
 @media (max-height: 650px) and (max-width: 767px) {
   .welcome-demo {
-    height: clamp(70px, 12dvh, 100px);
+    height: clamp(80px, 18dvh, 140px);
   }
   .welcome-card > #tutorial-modal .tutorial-header {
     padding: 8px 22px 6px 12px;
   }
   .welcome-card > #tutorial-modal .tutorial-content {
-    padding: 8px 14px;
+    padding: 10px 14px;
   }
   .welcome-card > #tutorial-modal .tutorial-lead {
-    font-size: 0.8rem;
+    font-size: 0.88rem;
   }
   .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.72rem;
-    padding: 5px 8px;
+    font-size: 0.78rem;
+    padding: 8px 10px;
   }
   .welcome-card > #tutorial-modal .tutorial-guardian-list li {
-    padding: 4px 6px;
-    font-size: 0.68rem;
+    padding: 6px 8px;
+    font-size: 0.72rem;
   }
 }
 

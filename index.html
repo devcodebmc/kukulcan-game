@@ -70,24 +70,31 @@
   <!-- ============ HUD MÓVIL ============ -->
   <header id="mobile-hud" class="mobile-hud">
     <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir menú">☰</button>
+    
     <div class="hud-center-pill">
       <img src="snk.png" alt="" class="hud-mini-logo">
       <span class="hud-stat">Pts <strong id="mb-score">0</strong></span>
       <span class="hud-divider">·</span>
       <span class="hud-stat">Réc <strong id="mb-high-score">0</strong></span>
+      
+      <!-- Vidas movidas aquí -->
+      <div class="hud-lives-mobile" id="mobile-lives-indicator">
+        <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
+      </div>
     </div>
-    <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
+
+    <!-- Botones de acción fijos -->
+    <div class="hud-actions">
+      <button id="mb-pause-btn" class="hud-action-btn" aria-label="Pausa">⏸</button>
+      <button id="mb-tutorial-btn" class="hud-action-btn" aria-label="Instrucciones">❓</button>
+      <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
+    </div>
   </header>
 
   <!-- ============ BADGES DE ESTADO ============ -->
   <div class="status-badges-container" id="status-badges-container">
     <div class="badges-priority-high" id="badges-priority-high">
-      <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite" data-lives-label="3">
-        <span class="badge-text-desktop">Sacrificios</span>
-        <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
-          <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
-        </span>
-      </div>
+      <!-- El badge de vidas se eliminó de aquí -->
       <div id="immunity-badge" class="hud-badge immunity-badge hidden">
         <span class="badge-icon" aria-hidden="true">
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
