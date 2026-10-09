@@ -340,6 +340,51 @@ updateSoundUI();
 // ========================================================
 // ESCALADO ADAPTATIVO RETINA / HIGH-DPI Y MÓVILES
 // ========================================================
+function migrateEntitiesOnResize(newCols, newRows) {
+  if (!snake || snake.length === 0) return;
+
+  // 1. Reubicar y ajustar serpiente del jugador si excede los límites
+  const head = snake[0];
+  let shiftX = 0;
+  let shiftY = 0;
+  if (head.x >= newCols) shiftX = (newCols - 1) - head.x;
+  if (head.y >= newRows) shiftY = (newRows - 1) - head.y;
+
+  snake.forEach(seg => {
+    seg.x = Math.max(0, Math.min(newCols - 1, seg.x + shiftX));
+    seg.y = Math.max(0, Math.min(newRows - 1, seg.y + shiftY));
+  });
+
+  // 2. Ajustar guardianes dentro de los límites
+  enemyGuardians.forEach(guardian => {
+    if (!guardian.segments || guardian.segments.length === 0) return;
+    const gHead = guardian.segments[0];
+    let gShiftX = 0;
+    let gShiftY = 0;
+    if (gHead.x >= newCols) gShiftX = (newCols - 1) - gHead.x;
+    if (gHead.y >= newRows) gShiftY = (newRows - 1) - gHead.y;
+    guardian.segments.forEach(seg => {
+      seg.x = Math.max(0, Math.min(newCols - 1, seg.x + gShiftX));
+      seg.y = Math.max(0, Math.min(newRows - 1, seg.y + gShiftY));
+    });
+  });
+
+  // 3. Ajustar todas las ofrendas y reliquias activas
+  const clampItem = (item) => {
+    if (item.x >= newCols) item.x = Math.floor(Math.random() * newCols);
+    if (item.y >= newRows) item.y = Math.floor(Math.random() * newRows);
+  };
+  foods.forEach(clampItem);
+  bonusFoods.forEach(clampItem);
+  shieldFoods.forEach(clampItem);
+  freezeFoods.forEach(clampItem);
+  cosmicOrderFoods.forEach(clampItem);
+  sacrificeFoods.forEach(clampItem);
+  skullFoods.forEach(clampItem);
+
+  snapshotRenderPositions();
+}
+
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const width = window.innerWidth;
@@ -358,8 +403,15 @@ function resizeCanvas() {
     ctx.scale(dpr, dpr);
   }
 
-  gridCols = Math.max(14, Math.floor(width / TILE_SIZE));
-  gridRows = Math.max(14, Math.floor(height / TILE_SIZE));
+  const newCols = Math.max(14, Math.floor(width / TILE_SIZE));
+  const newRows = Math.max(14, Math.floor(height / TILE_SIZE));
+
+  if (isGameRunning && (newCols !== gridCols || newRows !== gridRows)) {
+    migrateEntitiesOnResize(newCols, newRows);
+  }
+
+  gridCols = newCols;
+  gridRows = newRows;
 
   rebuildBoardCanvas(width, height, dpr);
   if (!isGameRunning) draw();
@@ -632,9 +684,6 @@ function triggerHeadPulse(color = '#d5bd70') {
 
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
-  if (headPulse > 0) {
-    headPulse = Math.max(0, headPulse - (elapsedMs / 240));
-  }
 
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
@@ -974,24 +1023,31 @@ function gameLoopFrame(timestamp) {
       }
     } else {
       updateEffects = true;
-      updateGameTimers(elapsedMs);
+      const clampedDeltaMs = Math.min(elapsedMs, 100);
+
+      // Decaimiento visual independiente del framerate
+      if (headPulse > 0) {
+        headPulse = Math.max(0, headPulse - (clampedDeltaMs / 240));
+      }
+
       simulationAccumulator = Math.min(
-        simulationAccumulator + elapsedMs,
-        getCurrentSpeed() * 5
+        simulationAccumulator + clampedDeltaMs,
+        getCurrentSpeed() * 3
       );
 
       let ticks = 0;
+      const stepDuration = getCurrentSpeed();
       while (
         isGameRunning &&
         !isPaused &&
         countdownEndsAt === null &&
-        ticks < 5 &&
-        simulationAccumulator >= getCurrentSpeed()
+        ticks < 4 &&
+        simulationAccumulator >= stepDuration
       ) {
-        const tickDuration = getCurrentSpeed();
+        updateGameTimers(stepDuration);
         snapshotRenderPositions();
         gameUpdate();
-        simulationAccumulator -= tickDuration;
+        simulationAccumulator -= stepDuration;
         ticks++;
       }
       renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
@@ -1364,6 +1420,8 @@ function updateEnemySnakeAI() {
   const difficulty = difficultySelect.value;
   const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
 
+  const reservedCells = new Set();
+
   for (const guardian of [...enemyGuardians]) {
     if (gameTime >= guardian.expiresAt) {
       destroyEnemySnake(guardian.id);
@@ -1388,22 +1446,66 @@ function updateEnemySnakeAI() {
       dy = -dy;
     }
 
-    const candidates = Math.abs(dx) >= Math.abs(dy)
+    const rawCandidates = Math.abs(dx) >= Math.abs(dy)
       ? [{ x: Math.sign(dx) || 1, y: 0 }, { x: 0, y: Math.sign(dy) || 1 }]
       : [{ x: 0, y: Math.sign(dy) || 1 }, { x: Math.sign(dx) || 1, y: 0 }];
-    candidates.push({ x: -candidates[0].x, y: -candidates[0].y });
-    candidates.push({ x: -candidates[1].x, y: -candidates[1].y });
+    rawCandidates.push({ x: -rawCandidates[0].x, y: -rawCandidates[0].y });
+    rawCandidates.push({ x: -rawCandidates[1].x, y: -rawCandidates[1].y });
 
-    const guardianDirection = candidates.find(candidate =>
+    // Filtrar giros imposibles de 180° sobre el propio cuello
+    const legalCandidates = rawCandidates.filter(candidate =>
       !((candidate.x !== 0 && candidate.x === -guardian.direction.x) ||
         (candidate.y !== 0 && candidate.y === -guardian.direction.y))
-    ) || guardian.direction;
-    guardian.direction = guardianDirection;
+    );
+
+    // Evaluar colisiones con otros guardianes, reservas y cuerpo propio
+    let bestDirection = legalCandidates[0] || guardian.direction;
+    let foundClearPath = false;
+
+    for (const candidate of legalCandidates) {
+      const candX = (enemyHead.x + candidate.x + gridCols) % gridCols;
+      const candY = (enemyHead.y + candidate.y + gridRows) % gridRows;
+      const cellKey = `${candX},${candY}`;
+
+      const cellReserved = reservedCells.has(cellKey);
+      const hitsOtherGuardian = enemyGuardians.some(other =>
+        other.id !== guardian.id &&
+        other.segments.some(seg => seg.x === candX && seg.y === candY)
+      );
+      const hitsSelfBody = guardian.segments.slice(0, -1).some(seg =>
+        seg.x === candX && seg.y === candY
+      );
+
+      // Si el jugador está protegido, el guardián debe evitar chocar con él
+      const hitsProtectedPlayer = hasGuardianProtection() && snake.some(seg =>
+        seg.x === candX && seg.y === candY
+      );
+
+      if (!cellReserved && !hitsOtherGuardian && !hitsSelfBody && !hitsProtectedPlayer) {
+        bestDirection = candidate;
+        foundClearPath = true;
+        break;
+      }
+    }
+
+    if (!foundClearPath && legalCandidates.length > 0) {
+      // Si todos tienen algún conflicto, escoger el que al menos no se monte en otra cabeza reservada
+      const unreserved = legalCandidates.find(cand => {
+        const cx = (enemyHead.x + cand.x + gridCols) % gridCols;
+        const cy = (enemyHead.y + cand.y + gridRows) % gridRows;
+        return !reservedCells.has(`${cx},${cy}`);
+      });
+      if (unreserved) bestDirection = unreserved;
+    }
+
+    guardian.direction = bestDirection;
 
     const newEnemyHead = {
       x: (enemyHead.x + guardian.direction.x + gridCols) % gridCols,
       y: (enemyHead.y + guardian.direction.y + gridRows) % gridRows
     };
+
+    reservedCells.add(`${newEnemyHead.x},${newEnemyHead.y}`);
 
     const touchesPlayer = snake.some(segment =>
       segment.x === newEnemyHead.x && segment.y === newEnemyHead.y
@@ -1754,8 +1856,12 @@ function gameUpdate() {
     sacrificeFoods.some(food => food.x === head.x && food.y === head.y);
   const bodyToCheck = willGrow ? snake : snake.slice(0, -1);
   if (bodyToCheck.some(segment => segment.x === head.x && segment.y === head.y)) {
-    loseLife('Kukulcán se enredó con su propio cuerpo.');
-    return;
+    if (gameTime < respawnProtectedUntil) {
+      // Gracia de renacer: no penalizar colisión temporal
+    } else {
+      loseLife('Kukulcán se enredó con su propio cuerpo.');
+      return;
+    }
   }
 
   const skullIdx = skullFoods.findIndex(food => food.x === head.x && food.y === head.y);
@@ -1765,8 +1871,13 @@ function gameUpdate() {
     skullFoodBadge.classList.add('hidden');
     nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
     screenShake = 8;
-    loseLife('¡La Calavera maldita te arrebató un sacrificio!');
-    return;
+    if (gameTime < respawnProtectedUntil || isImmune) {
+      triggerHeadPulse('#8be7ff');
+      spawnFloatingText('🛡️ ¡Calavera repelida!', head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#8be7ff');
+    } else {
+      loseLife('¡La Calavera maldita te arrebató un sacrificio!');
+      return;
+    }
   }
 
   const hitGuardian = enemyGuardians.find(guardian =>
@@ -1951,7 +2062,9 @@ function updateLivesUI() {
 // RENDERIZADO EN EL CANVAS
 // ========================================================
 function interpolateGridPosition(current, previous, progress) {
-  if (!previous || progress >= 1) return current;
+  if (!previous || progress >= 1) {
+    return { x: current.x, y: current.y };
+  }
   let dx = current.x - previous.x;
   let dy = current.y - previous.y;
   if (dx > gridCols / 2) dx -= gridCols;
@@ -2243,13 +2356,14 @@ function draw(interpolation = 1, updateEffects = false) {
         previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1],
         interpolation
       );
-      renderSegment.x += wobbleX / TILE_SIZE;
-      renderSegment.y += wobbleY / TILE_SIZE;
+
+      const drawPxX = renderSegment.x * TILE_SIZE + 1 + wobbleX;
+      const drawPxY = renderSegment.y * TILE_SIZE + 1 + wobbleY;
 
       roundRect(
         ctx,
-        renderSegment.x * TILE_SIZE + 1,
-        renderSegment.y * TILE_SIZE + 1,
+        drawPxX,
+        drawPxY,
         TILE_SIZE - 2,
         TILE_SIZE - 2,
         isHead ? 8 : 4
@@ -2728,6 +2842,8 @@ function togglePause() {
     isPaused = true;
   } else {
     isPaused = false;
+    lastFrameTimestamp = performance.now();
+    simulationAccumulator = 0;
     startCountdown();
   }
   dtPauseBtn.textContent = isPaused ? '▶ Reanudar' : '⏸ Pausa';
@@ -2862,7 +2978,7 @@ function closeTutorial() {
   } else if (tutorialDrawerWasVisible) {
     drawerMenu.classList.remove('hidden');
   }
-  if (tutorialModal.parentElement !== welcomeCard) {
+  if (tutorialOpenedFromWelcome && tutorialModal.parentElement !== welcomeCard) {
     welcomeCard.insertBefore(tutorialModal, welcomeStartBtn);
   }
   if (tutorialOpenedFromWelcome) {
@@ -3487,10 +3603,19 @@ drawerDifficulty.addEventListener('change', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && isGameRunning && !isPaused) togglePause();
+  if (document.hidden && isGameRunning && !isPaused) {
+    togglePause();
+  } else if (!document.hidden && isGameRunning) {
+    lastFrameTimestamp = performance.now();
+  }
 });
 window.addEventListener('blur', () => {
   if (isGameRunning && !isPaused) togglePause();
+});
+window.addEventListener('focus', () => {
+  if (isGameRunning) {
+    lastFrameTimestamp = performance.now();
+  }
 });
 
 // Controles virtuales D-Pad
