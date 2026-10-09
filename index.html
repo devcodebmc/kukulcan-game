@@ -3,62 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#11131b">
+  <meta name="theme-color" content="#0f1218">
   <meta name="description" content="La Travesía de Kukulcán: una aventura de serpientes, jade y maíz inspirada en la mitología maya.">
   <title>La Travesía de Kukulcán</title>
-  <!-- Favicon e iconos con snk.png -->
   <link rel="icon" type="image/png" href="snk.png">
   <link rel="apple-touch-icon" href="snk.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Canvas de juego a pantalla completa -->
-  <canvas id="gameCanvas"></canvas>
+  <canvas id="gameCanvas" aria-label="Tablero de juego"></canvas>
   <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive" aria-atomic="true"></div>
 
-  <section id="welcome-screen" class="welcome-screen" aria-label="Demostración del juego e instrucciones">
+  <!-- ============ PANTALLA DE BIENVENIDA ============ -->
+  <section id="welcome-screen" class="welcome-screen" aria-label="Instrucciones del juego">
     <div class="welcome-card">
       <div class="welcome-preview">
-        <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego: Kukulcán recoge ofrendas, crece y evita a un guardián"></canvas>
-        <div class="preview-legend" aria-label="El corazón indica tus vidas; la ofrenda recupera una; la calavera quita una; el sello elimina guardianes">
+        <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego"></canvas>
+        <div class="preview-legend" aria-label="Leyenda de iconos">
           <span class="preview-legend-item">🫀 Vidas</span>
-          <span class="preview-legend-item">🗡️ Recupera 1</span>
+          <span class="preview-legend-item">🫀 Recupera 1</span>
           <span class="preview-legend-item">☠️ Pierdes 1</span>
-          <span class="preview-legend-item">🌀 Elimina guardianes</span>
+          <span class="preview-legend-item">💎 Jade</span>
+          <span class="preview-legend-item">❄️ Hielo</span>
+          <span class="preview-legend-item">🌀 Sello</span>
         </div>
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
       </div>
-      <button id="welcome-start-btn" class="btn btn-outline welcome-start-btn hidden">📖 Mostrar instrucciones</button>
+      <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">📖 Ver instrucciones</button>
     </div>
   </section>
 
-  <!-- ========================================== -->
-  <!-- TOOLBAR COMPLETO PARA PANTALLAS GRANDES (PC/TABLET) -->
-  <!-- ========================================== -->
+  <!-- ============ TOOLBAR DESKTOP ============ -->
   <header id="desktop-toolbar" class="desktop-toolbar">
     <div class="toolbar-left">
-      <img src="snk.png" alt="Serpiente emplumada" class="brand-logo">
+      <img src="snk.png" alt="" class="brand-logo">
       <h1 class="brand-title">La Travesía de Kukulcán</h1>
     </div>
 
     <div class="toolbar-center">
-      <div class="stat-pill">
-        <span class="stat-label">Puntos:</span>
-        <span id="dt-score" class="stat-value">0</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">Récord:</span>
-        <span id="dt-high-score" class="stat-value">0</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">Longitud:</span>
-        <span id="dt-length" class="stat-value">3</span>
-      </div>
+      <div class="stat-pill"><span class="stat-label">Puntos</span><span id="dt-score" class="stat-value">0</span></div>
+      <div class="stat-pill"><span class="stat-label">Récord</span><span id="dt-high-score" class="stat-value">0</span></div>
+      <div class="stat-pill"><span class="stat-label">Longitud</span><span id="dt-length" class="stat-value">3</span></div>
     </div>
 
     <div class="toolbar-right">
       <div class="select-box">
-        <label for="difficulty-select">Dificultad:</label>
+        <label for="difficulty-select">Dificultad</label>
         <select id="difficulty-select" class="styled-select">
           <option value="easy">Fácil</option>
           <option value="medium" selected>Medio</option>
@@ -66,8 +59,7 @@
           <option value="extreme">Pesadilla</option>
         </select>
       </div>
-
-      <button id="dt-sound-btn" class="icon-btn" title="Silenciar / Activar sonido" aria-label="Sonido">🔊</button>
+      <button id="dt-sound-btn" class="icon-btn" title="Sonido" aria-label="Sonido">🔊</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
       <button id="dt-stats-btn" class="icon-btn" title="Estadísticas" aria-label="Estadísticas">📊</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
@@ -75,86 +67,88 @@
     </div>
   </header>
 
-  <!-- ========================================== -->
-  <!-- HUD MINIMALISTA PARA MÓVILES (PANTALLA LIMPIA) -->
-  <!-- ========================================== -->
+  <!-- ============ HUD MÓVIL ============ -->
   <header id="mobile-hud" class="mobile-hud">
-    <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir Menú">☰</button>
-
+    <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir menú">☰</button>
     <div class="hud-center-pill">
-      <img src="snk.png" alt="Serpiente emplumada" class="hud-mini-logo">
-      <span class="hud-game-title">Travesía de Kukulcán</span>
-      <span class="hud-stat">Puntos: <strong id="mb-score">0</strong></span>
-      <span class="hud-divider">|</span>
-      <span class="hud-stat">Récord: <strong id="mb-high-score">0</strong></span>
+      <img src="snk.png" alt="" class="hud-mini-logo">
+      <span class="hud-stat">Pts <strong id="mb-score">0</strong></span>
+      <span class="hud-divider">·</span>
+      <span class="hud-stat">Réc <strong id="mb-high-score">0</strong></span>
     </div>
-
     <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
   </header>
 
-  <!-- Insignias de Estado en Partida (con prioridad) -->
+  <!-- ============ BADGES DE ESTADO ============ -->
   <div class="status-badges-container" id="status-badges-container">
-    <!-- PRIORIDAD ALTA: siempre visibles -->
     <div class="badges-priority-high" id="badges-priority-high">
-      <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite">
-        <span class="badge-icon">🫀</span>
+      <div id="lives-badge" class="hud-badge lives-badge" role="status" aria-live="polite" data-lives-label="3">
+        <span class="badge-text-desktop">Sacrificios</span>
         <span id="lives-indicator" class="lives-indicator" aria-hidden="true">
           <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
         </span>
-        <span class="badge-text-mobile">Vidas</span>
       </div>
       <div id="immunity-badge" class="hud-badge immunity-badge hidden">
-        <span class="badge-icon">🛡️</span>
+        <span class="badge-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <circle cx="10" cy="10" r="9" fill="none" stroke="#7de8c4" stroke-width="1.6"/>
+            <circle cx="10" cy="10" r="6.5" fill="#1a7a5e"/>
+            <path d="M10 5 L13.5 10 L10 15 L6.5 10 Z" fill="none" stroke="#fff0b0" stroke-width="1.4"/>
+          </svg>
+        </span>
+        <span class="badge-text-desktop">Escudo de jade</span>
+        <span class="badge-text-mobile">Jade</span>
         <span class="badge-compact"><span id="immunity-timer">10</span>s</span>
       </div>
       <div id="respawn-badge" class="hud-badge respawn-badge hidden">
         <span class="badge-icon">🪶</span>
+        <span class="badge-text-desktop">Protección de plumas</span>
+        <span class="badge-text-mobile">Protegido</span>
         <span class="badge-compact"><span id="respawn-timer">3</span>s</span>
       </div>
       <div id="freeze-badge" class="hud-badge freeze-badge hidden">
         <span class="badge-icon">❄️</span>
+        <span class="badge-text-desktop">Guardianes congelados</span>
+        <span class="badge-text-mobile">Congelados</span>
         <span class="badge-compact"><span id="freeze-timer">3</span>s</span>
       </div>
     </div>
-
-    <!-- PRIORIDAD MEDIA: rotan si hay muchas -->
     <div class="badges-priority-medium" id="badges-priority-medium">
       <div id="rain-badge" class="hud-badge rain-badge hidden">
         <span class="badge-icon">🌧️</span>
-        <span class="badge-text-desktop">Lluvia sagrada</span>
-        <span class="badge-compact"><span id="rain-timer">8</span>s · +10</span>
+        <span class="badge-text-desktop">Lluvia sagrada · maíz +20</span>
+        <span class="badge-compact"><span id="rain-timer">8</span>s</span>
       </div>
       <div id="cosmic-order-badge" class="hud-badge cosmic-order-badge hidden">
         <span class="badge-icon">🌀</span>
         <span class="badge-text-desktop">Orden cósmico</span>
+        <span class="badge-text-mobile">Orden</span>
         <span class="badge-compact"><span id="cosmic-order-timer">1</span>s</span>
       </div>
       <div id="cosmic-order-food-badge" class="hud-badge cosmic-order-badge hidden">
         <span class="badge-icon">🌀</span>
-        <span class="badge-text-desktop">Sello del orden en el templo</span>
+        <span class="badge-text-desktop">Sello del orden disponible</span>
         <span class="badge-text-mobile">Sello</span>
       </div>
       <div id="sacrifice-offering-badge" class="hud-badge sacrifice-offering-badge hidden">
-        <span class="badge-icon">🗡️</span>
-        <span class="badge-text-desktop">Ofrenda del renacer disponible</span>
-        <span class="badge-text-mobile">Ofrenda</span>
+        <span class="badge-icon">🫀</span>
+        <span class="badge-text-desktop">Sacrificio disponible</span>
+        <span class="badge-text-mobile">Sacrificio</span>
       </div>
       <div id="skull-food-badge" class="hud-badge skull-food-badge hidden">
         <span class="badge-icon">☠️</span>
         <span class="badge-text-desktop">Calavera maldita en el templo</span>
-        <span class="badge-text-mobile">Calavera</span>
+        <span class="badge-text-mobile">Muerte</span>
       </div>
       <div id="threat-badge" class="hud-badge threat-badge hidden">
-        <span class="badge-icon">◆</span>
+        <span class="badge-icon" id="threat-dot" aria-hidden="true"></span>
         <span class="badge-text-desktop">Guardián al acecho</span>
         <span class="badge-text-mobile">Guardián</span>
       </div>
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- FURIA DE KUKULCÁN -->
-  <!-- ========================================== -->
+  <!-- ============ TURBO ============ -->
   <div class="turbo-container">
     <button id="btn-turbo" class="turbo-btn" aria-label="Activar Furia de Kukulcán">
       <span id="turbo-icon" class="turbo-icon">🔥</span>
@@ -163,7 +157,7 @@
     </button>
   </div>
 
-  <!-- Cruceta táctil opcional para móviles -->
+  <!-- ============ CRUCETA TÁCTIL ============ -->
   <div id="touch-controls" class="touch-controls hidden">
     <button id="btn-up" class="pad-btn" aria-label="Arriba">▲</button>
     <div class="pad-row">
@@ -174,115 +168,87 @@
     <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MENÚ HAMBURGUESA DESPLEGABLE EN MÓVILES -->
-  <!-- ========================================== -->
+  <!-- ============ DRAWER MÓVIL ============ -->
   <div id="drawer-menu" class="modal-backdrop hidden">
     <div class="drawer-card">
       <div class="drawer-header">
         <div class="drawer-brand">
-          <img src="snk.png" alt="Serpiente emplumada" class="drawer-logo">
-              <h2>Templo de Kukulcán</h2>
+          <img src="snk.png" alt="" class="drawer-logo">
+          <h2>Templo de Kukulcán</h2>
         </div>
         <button id="close-drawer-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </div>
-
       <div class="drawer-body">
         <div class="stat-summary-box">
-          <div class="summary-col">
-            <span class="sum-lbl">Puntos</span>
-            <span id="drawer-score" class="sum-val">0</span>
-          </div>
-          <div class="summary-col">
-            <span class="sum-lbl">Récord</span>
-            <span id="drawer-high-score" class="sum-val">0</span>
-          </div>
+          <div class="summary-col"><span class="sum-lbl">Puntos</span><span id="drawer-score" class="sum-val">0</span></div>
+          <div class="summary-col"><span class="sum-lbl">Récord</span><span id="drawer-high-score" class="sum-val">0</span></div>
         </div>
-
         <div class="form-group">
-          <label for="drawer-difficulty">⚡ Dificultad / Velocidad:</label>
+          <label for="drawer-difficulty">⚡ Dificultad</label>
           <select id="drawer-difficulty" class="styled-select">
-            <option value="easy">Fácil (Tranquilo)</option>
-            <option value="medium" selected>Medio (Normal)</option>
-            <option value="hard">Difícil (Rápido)</option>
-            <option value="extreme">Pesadilla (Extremo)</option>
+            <option value="easy">Fácil</option>
+            <option value="medium" selected>Medio</option>
+            <option value="hard">Difícil</option>
+            <option value="extreme">Pesadilla</option>
           </select>
         </div>
-
         <div class="toggle-row">
-          <label for="drawer-dpad-toggle">Cruceta táctil en pantalla:</label>
+          <label for="drawer-dpad-toggle">Cruceta táctil</label>
           <input type="checkbox" id="drawer-dpad-toggle" class="styled-checkbox">
         </div>
-
         <div class="toggle-row">
-          <label for="drawer-sound-toggle">Sonido y música de suspenso:</label>
+          <label for="drawer-sound-toggle">Sonido y música</label>
           <input type="checkbox" id="drawer-sound-toggle" class="styled-checkbox" checked>
         </div>
-
         <div class="drawer-actions">
-          <button id="drawer-resume-btn" class="btn btn-primary">▶ Continuar Jugando</button>
-          <button id="drawer-restart-btn" class="btn btn-secondary">🔄 Reiniciar Partida</button>
+          <button id="drawer-resume-btn" class="btn btn-primary">▶ Continuar</button>
+          <button id="drawer-restart-btn" class="btn btn-secondary">🔄 Reiniciar</button>
           <button id="drawer-stats-btn" class="btn btn-outline">📊 Estadísticas</button>
-          <button id="drawer-tutorial-btn" class="btn btn-outline">❓ Ver Tutorial Paso a Paso</button>
+          <button id="drawer-tutorial-btn" class="btn btn-outline">❓ Tutorial</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- TUTORIAL INTERACTIVO PASO A PASO (ONBOARDING) -->
-  <!-- ========================================== -->
+  <!-- ============ TUTORIAL ============ -->
   <div id="tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-step-title">
     <div class="tutorial-card">
       <div class="tutorial-header">
-        <img src="snk.png" alt="Serpiente emplumada" class="tutorial-logo">
+        <img src="snk.png" alt="" class="tutorial-logo">
         <h2 id="tutorial-step-title">La Travesía de Kukulcán</h2>
-        <button id="close-tutorial-btn" class="close-btn tutorial-close-btn" aria-label="Cerrar instrucciones">✕</button>
+        <button id="close-tutorial-btn" class="close-btn tutorial-close-btn" aria-label="Cerrar">✕</button>
       </div>
-
       <div class="tutorial-content">
-        <!-- Paso 1 -->
         <div id="step-1" class="tutorial-step active">
           <div class="tutorial-icon-banner">🪶 🐍</div>
-          <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
+          <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa <strong>Flechas / WASD</strong>.</p>
           <p class="tutorial-tip">🌽 Recoge ofrendas para crecer y sumar puntos. Cruza los bordes para viajar entre la tierra y el cielo.</p>
         </div>
-
-        <!-- Paso 2 -->
         <div id="step-2" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌽 🍫 🛡️</div>
-          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 el maíz y 🍫 el cacao te hacen crecer y suman puntos. Durante la 🌧️ lluvia sagrada, recoge las mazorcas al aterrizar para ganar <strong>+10 extra</strong>.</p>
-          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> te protege <strong>10 s</strong>; aprovecha el escudo para embestir y vencer guardianes.</p>
+          <div class="tutorial-icon-banner">🌽 🍫 💎 ❄️</div>
+          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 maíz y 🍫 cacao suman +10. Con 🌧️ lluvia sagrada, las mazorcas dan <strong>+20</strong>.</p>
+          <p class="tutorial-tip">💎 <strong>Jade:</strong> 10s de escudo. Kukulcán escupe fuego y su lengua bífida brilla. Embiste guardianes.</p>
+          <p class="tutorial-tip">❄️ <strong>Hielo:</strong> congela guardianes 3s. Aprovéchalo para destruirlos sin escudo.</p>
         </div>
-
-        <!-- Paso 3 -->
         <div id="step-3" class="tutorial-step">
-          <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
+          <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 🦇</div>
           <ul class="tutorial-guardian-list">
-            <li><strong>Cazador</strong><span>te persigue</span></li>
-            <li><strong>Vidente</strong><span>anticipa tu rumbo</span></li>
-            <li><strong>Flanqueador</strong><span>intenta rodearte</span></li>
+            <li><strong>Cazador</strong><span>Rojo · persigue directo</span></li>
+            <li><strong>Vidente</strong><span>Violeta · anticipa tu rumbo</span></li>
+            <li><strong>Flanqueador</strong><span>Naranja · intenta rodearte</span></li>
+            <li><strong>Xibalbá</strong><span>Negro · embosca desde el inframundo</span></li>
           </ul>
-          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. Reapareces protegido; 🗡️ la ofrenda recupera uno (máx. 3).</p>
+          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. 🫀 El <strong>sacrificio</strong> en el templo recupera uno (máx. 3).</p>
         </div>
-
-        <!-- Paso 4 -->
         <div id="step-4" class="tutorial-step">
           <div class="tutorial-icon-banner">🌀 🔥 ❄️</div>
-          <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello dentro de <strong>15 s</strong>. Tras el aviso, elimina guardianes y da <strong>+50 puntos por cada uno</strong>.</p>
-          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela a los guardianes para embestirlos. Ambas duran <strong>3 s</strong>.</p>
+          <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello en <strong>15s</strong>. Tras el aviso, elimina guardianes: <strong>+50 c/u</strong>.</p>
+          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Hielo:</strong> congela guardianes 3s. Ambas duran <strong>3s</strong>.</p>
         </div>
       </div>
-
-      <!-- Indicadores de puntos -->
       <div class="step-dots">
-        <span class="dot active"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
+        <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </div>
-
-      <!-- Botones de Navegación del Tutorial -->
       <div class="tutorial-footer">
         <button id="tut-prev-btn" class="btn btn-outline hidden">Anterior</button>
         <button id="tut-next-btn" class="btn btn-primary">Siguiente ➔</button>
@@ -291,12 +257,10 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- MODAL DE GAME OVER -->
-  <!-- ========================================== -->
+  <!-- ============ GAME OVER ============ -->
   <div id="game-overlay" class="modal-backdrop hidden">
     <div class="modal-card">
-      <img src="snk.png" alt="Serpiente emplumada" class="modal-gameover-logo">
+      <img src="snk.png" alt="" class="modal-gameover-logo">
       <h2 id="overlay-title">La travesía termina</h2>
       <p id="overlay-reason" class="death-reason">Has chocado con tu propio cuerpo</p>
       <div class="final-stats">
@@ -307,53 +271,26 @@
     </div>
   </div>
 
+  <!-- ============ ESTADÍSTICAS ============ -->
   <div id="statistics-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="statistics-title">
     <section class="statistics-card">
       <header class="statistics-header">
         <h2 id="statistics-title">📊 Crónicas de Kukulcán</h2>
-        <button id="close-statistics-btn" class="close-btn" aria-label="Cerrar estadísticas">✕</button>
+        <button id="close-statistics-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </header>
-      <p class="statistics-description">Tus mejores registros guardados en este navegador, separados por dificultad.</p>
+      <p class="statistics-description">Tus mejores registros guardados en este navegador.</p>
       <div class="statistics-table-wrap">
         <table class="statistics-table">
           <thead>
             <tr>
-              <th scope="col">Dificultad</th>
-              <th scope="col">Partidas</th>
-              <th scope="col">Mejor puntuación</th>
-              <th scope="col">Supervivencia</th>
-              <th scope="col">Guardianes vencidos</th>
+              <th scope="col">Dificultad</th><th scope="col">Partidas</th><th scope="col">Mejor</th><th scope="col">Supervivencia</th><th scope="col">Guardianes</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <th scope="row">Fácil</th>
-              <td data-stat="easy" data-field="gamesPlayed">0</td>
-              <td data-stat="easy" data-field="bestScore">0</td>
-              <td data-stat="easy" data-field="bestSurvivalMs">0 s</td>
-              <td data-stat="easy" data-field="guardiansDefeated">0</td>
-            </tr>
-            <tr>
-              <th scope="row">Medio</th>
-              <td data-stat="medium" data-field="gamesPlayed">0</td>
-              <td data-stat="medium" data-field="bestScore">0</td>
-              <td data-stat="medium" data-field="bestSurvivalMs">0 s</td>
-              <td data-stat="medium" data-field="guardiansDefeated">0</td>
-            </tr>
-            <tr>
-              <th scope="row">Difícil</th>
-              <td data-stat="hard" data-field="gamesPlayed">0</td>
-              <td data-stat="hard" data-field="bestScore">0</td>
-              <td data-stat="hard" data-field="bestSurvivalMs">0 s</td>
-              <td data-stat="hard" data-field="guardiansDefeated">0</td>
-            </tr>
-            <tr>
-              <th scope="row">Pesadilla</th>
-              <td data-stat="extreme" data-field="gamesPlayed">0</td>
-              <td data-stat="extreme" data-field="bestScore">0</td>
-              <td data-stat="extreme" data-field="bestSurvivalMs">0 s</td>
-              <td data-stat="extreme" data-field="guardiansDefeated">0</td>
-            </tr>
+            <tr><th scope="row">Fácil</th><td data-stat="easy" data-field="gamesPlayed">0</td><td data-stat="easy" data-field="bestScore">0</td><td data-stat="easy" data-field="bestSurvivalMs">0 s</td><td data-stat="easy" data-field="guardiansDefeated">0</td></tr>
+            <tr><th scope="row">Medio</th><td data-stat="medium" data-field="gamesPlayed">0</td><td data-stat="medium" data-field="bestScore">0</td><td data-stat="medium" data-field="bestSurvivalMs">0 s</td><td data-stat="medium" data-field="guardiansDefeated">0</td></tr>
+            <tr><th scope="row">Difícil</th><td data-stat="hard" data-field="gamesPlayed">0</td><td data-stat="hard" data-field="bestScore">0</td><td data-stat="hard" data-field="bestSurvivalMs">0 s</td><td data-stat="hard" data-field="guardiansDefeated">0</td></tr>
+            <tr><th scope="row">Pesadilla</th><td data-stat="extreme" data-field="gamesPlayed">0</td><td data-stat="extreme" data-field="bestScore">0</td><td data-stat="extreme" data-field="bestSurvivalMs">0 s</td><td data-stat="extreme" data-field="guardiansDefeated">0</td></tr>
           </tbody>
         </table>
       </div>
