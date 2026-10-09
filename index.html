@@ -219,34 +219,91 @@
       <div class="tutorial-content">
         <!-- Paso 1 -->
         <div id="step-1" class="tutorial-step active">
-          <div class="tutorial-icon-banner">🪶 🐍</div>
-          <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa las <strong>Flechas / WASD</strong> para recorrer el templo.</p>
-          <p class="tutorial-tip">🌽 Recoge ofrendas para crecer y sumar puntos. Cruza los bordes para viajar entre la tierra y el cielo.</p>
+          <div class="tutorial-icon-banner">🪶 🐍 🌌</div>
+          <p class="tutorial-lead">🐍 <strong>Guía a la Serpiente Emplumada:</strong> desliza en pantalla o usa <strong>Flechas / WASD</strong>.</p>
+          <div class="tutorial-cards-row">
+            <div class="tutorial-mini-card">
+              <span class="mini-glyph">🌌</span>
+              <div class="mini-card-text">
+                <strong>Horizontes Infinitos</strong>
+                <p>Cruza los bordes del templo libremente: viajas entre el cielo y la tierra sin chocar con muros.</p>
+              </div>
+            </div>
+            <div class="tutorial-mini-card">
+              <span class="mini-glyph">⚡</span>
+              <div class="mini-card-text">
+                <strong>Ritmo Arcade</strong>
+                <p>Conforme devoras ofrendas, Kukulcán crece en tamaño, sumando más puntos y adrenalina.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Paso 2 -->
         <div id="step-2" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌽 🍫 🛡️</div>
-          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 el maíz y 🍫 el cacao te hacen crecer y suman puntos. Durante la 🌧️ lluvia sagrada, recoge las mazorcas al aterrizar para ganar <strong>+10 extra</strong>.</p>
-          <p class="tutorial-tip">🛡️ <strong>Jade:</strong> te protege <strong>10 s</strong>; aprovecha el escudo para embestir y vencer guardianes.</p>
+          <div class="tutorial-icon-banner">🌽 🍫 🛡️ 🌧️</div>
+          <p class="tutorial-lead">Recoge las ofrendas ceremoniales esparcidas por la piedra sagrada:</p>
+          <div class="tutorial-offerings-grid">
+            <div class="offering-badge-card">
+              <span class="badge-icon">🌽</span>
+              <strong>Maíz Sagrado</strong>
+              <small>+10 pts · (+20 extra durante la 🌧️ Lluvia Sagrada)</small>
+            </div>
+            <div class="offering-badge-card">
+              <span class="badge-icon">🍫</span>
+              <strong>Cacao Ritual</strong>
+              <small>Crece en longitud y gana favores divinos</small>
+            </div>
+            <div class="offering-badge-card">
+              <span class="badge-icon">🛡️</span>
+              <strong>Orbe de Jade</strong>
+              <small><strong>10s de Escudo:</strong> embiste y destruye guardianes</small>
+            </div>
+          </div>
         </div>
 
         <!-- Paso 3 -->
         <div id="step-3" class="tutorial-step">
-          <div class="tutorial-icon-banner">🪶 🛡️ 🔴</div>
+          <div class="tutorial-icon-banner">🔴 🟣 🟠 🫀</div>
           <ul class="tutorial-guardian-list">
-            <li><strong>Cazador</strong><span>te persigue</span></li>
-            <li><strong>Vidente</strong><span>anticipa tu rumbo</span></li>
-            <li><strong>Flanqueador</strong><span>intenta rodearte</span></li>
+            <li class="guardian-item hunter-item">
+              <strong>🔴 Cazador</strong>
+              <span>Persigue tu cabeza de frente</span>
+            </li>
+            <li class="guardian-item seer-item">
+              <strong>🟣 Vidente</strong>
+              <span>Anticipa tu rumbo e intercepta</span>
+            </li>
+            <li class="guardian-item flanker-item">
+              <strong>🟠 Flanqueador</strong>
+              <span>Rodea tus flancos para cerrarte</span>
+            </li>
           </ul>
-          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. Reapareces protegido; 🗡️ la ofrenda recupera uno (máx. 3).</p>
+          <div class="tutorial-tip lives-tutorial-tip">
+            🫀 <strong>3 Sacrificios (Vidas):</strong> Choques y ☠️ Calaveras restan 1. Reapareces con protección temporal; la 🗡️ Ofrenda restaura 1 (máx. 3).
+          </div>
         </div>
 
         <!-- Paso 4 -->
         <div id="step-4" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌀 🔥 ❄️</div>
-          <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello dentro de <strong>15 s</strong>. Tras el aviso, elimina guardianes y da <strong>+50 puntos por cada uno</strong>.</p>
-          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Esencia helada:</strong> congela a los guardianes para embestirlos. Ambas duran <strong>3 s</strong>.</p>
+          <div class="tutorial-icon-banner">🔥 ❄️ 🌀</div>
+          <div class="tutorial-powers-grid">
+            <div class="power-badge-card">
+              <span class="badge-icon">🔥</span>
+              <strong>Furia de Kukulcán</strong>
+              <small>Turbo veloz de 3s con rastro solar (botón o Espacio / Shift). Requiere recarga.</small>
+            </div>
+            <div class="power-badge-card">
+              <span class="badge-icon">❄️</span>
+              <strong>Esencia Helada</strong>
+              <small>Paraliza a todos los guardianes durante 3s: ¡aprovecha para embestirlos!</small>
+            </div>
+            <div class="power-badge-card">
+              <span class="badge-icon">🌀</span>
+              <strong>Orden Cósmico</strong>
+              <small>Recoge el sello sagrado: purifica y elimina guardianes (+50 pts cada uno).</small>
+            </div>
+          </div>
         </div>
       </div>
 

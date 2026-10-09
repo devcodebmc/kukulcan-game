@@ -99,10 +99,10 @@ let gridCols = 30;
 let gridRows = 20;
 
 const SPEEDS = {
-  easy: 195,
-  medium: 145,
-  hard: 105,
-  extreme: 75
+  easy: 185,
+  medium: 138,
+  hard: 102,
+  extreme: 74
 };
 const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
 const DIFFICULTY_NAMES = {
@@ -424,9 +424,19 @@ function rebuildBoardCanvas(width = window.innerWidth, height = window.innerHeig
   boardContext = boardCanvas.getContext('2d');
   boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  boardContext.fillStyle = '#141720';
+  // 1. Fondo ceremonial con vignette de templo nocturno
+  const grad = boardContext.createRadialGradient(
+    width / 2, height / 2, Math.min(width, height) * 0.15,
+    width / 2, height / 2, Math.max(width, height) * 0.78
+  );
+  grad.addColorStop(0, '#171c28');
+  grad.addColorStop(0.55, '#10131d');
+  grad.addColorStop(1, '#080a0f');
+  boardContext.fillStyle = grad;
   boardContext.fillRect(0, 0, width, height);
-  boardContext.strokeStyle = 'rgba(144, 153, 177, 0.16)';
+
+  // 2. Cuadrícula de piedra ceremonial
+  boardContext.strokeStyle = 'rgba(74, 185, 145, 0.09)';
   boardContext.lineWidth = 1;
   const offsetX = (width % TILE_SIZE) / 2;
   const offsetY = (height % TILE_SIZE) / 2;
@@ -444,18 +454,25 @@ function rebuildBoardCanvas(width = window.innerWidth, height = window.innerHeig
     boardContext.stroke();
   }
 
-  boardContext.fillStyle = 'rgba(198, 164, 85, 0.1)';
-  for (let x = offsetX + TILE_SIZE; x <= width; x += TILE_SIZE * 4) {
-    for (let y = offsetY + TILE_SIZE; y <= height; y += TILE_SIZE * 4) {
+  // 3. Glifos solares en intersecciones de cuadrícula
+  boardContext.fillStyle = 'rgba(213, 168, 79, 0.15)';
+  const glyphStep = TILE_SIZE * 4;
+  for (let x = offsetX + TILE_SIZE * 2; x <= width; x += glyphStep) {
+    for (let y = offsetY + TILE_SIZE * 2; y <= height; y += glyphStep) {
       boardContext.beginPath();
-      boardContext.moveTo(x, y - 2);
-      boardContext.lineTo(x + 2, y);
-      boardContext.lineTo(x, y + 2);
-      boardContext.lineTo(x - 2, y);
+      boardContext.moveTo(x, y - 3);
+      boardContext.lineTo(x + 3, y);
+      boardContext.lineTo(x, y + 3);
+      boardContext.lineTo(x - 3, y);
       boardContext.closePath();
       boardContext.fill();
     }
   }
+
+  // 4. Borde perimetral ceremonial del templo
+  boardContext.strokeStyle = 'rgba(213, 168, 79, 0.28)';
+  boardContext.lineWidth = 2;
+  boardContext.strokeRect(offsetX + 1, offsetY + 1, (gridCols * TILE_SIZE) - 2, (gridRows * TILE_SIZE) - 2);
 }
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
@@ -978,17 +995,36 @@ function resolveCosmicOrder() {
   scheduleEnemySpawn();
 }
 
+function updateCountdownDisplay(val) {
+  const glyphs = {
+    3: { glyph: "🪶 K'IN", label: 'EL SOL SE ALZA' },
+    2: { glyph: '⚡ WITZ', label: 'LA MONTAÑA RUGE' },
+    1: { glyph: "🔥 IK'", label: 'EL VIENTO ENCIENDE' }
+  };
+  const data = glyphs[val] || { glyph: '◆', label: 'PREPÁRATE' };
+  countdownOverlay.innerHTML = `
+    <div class="countdown-solar-disk">
+      <span class="countdown-number">${val}</span>
+      <span class="countdown-glyph">${data.glyph}</span>
+      <span class="countdown-sub">${data.label}</span>
+    </div>
+  `;
+  if (!isMuted) {
+    playTone(320 + (4 - val) * 110, 140, 0.18, 'triangle');
+  }
+}
+
 function startCountdown() {
   countdownEndsAt = performance.now() + 3000;
   countdownValue = 3;
-  countdownOverlay.textContent = String(countdownValue);
+  updateCountdownDisplay(3);
   countdownOverlay.classList.remove('hidden');
 }
 
 function cancelCountdown() {
   countdownEndsAt = null;
   countdownValue = 0;
-  countdownOverlay.textContent = '';
+  countdownOverlay.innerHTML = '';
   countdownOverlay.classList.add('hidden');
 }
 
@@ -1012,9 +1048,10 @@ function gameLoopFrame(timestamp) {
       const nextValue = Math.ceil(remainingMs / 1000);
       if (nextValue > 0 && nextValue !== countdownValue) {
         countdownValue = nextValue;
-        countdownOverlay.textContent = String(countdownValue);
+        updateCountdownDisplay(countdownValue);
       }
       if (remainingMs === 0) {
+        if (!isMuted) playTone(784, 250, 0.22, 'sine');
         cancelCountdown();
         simulationAccumulator = 0;
         snapshotRenderPositions();
@@ -2517,9 +2554,8 @@ function draw(interpolation = 1, updateEffects = false) {
     }
 
     if (isHead && !isBlinking) {
-      ctx.fillStyle = '#141720';
       const eyeOffset = 5;
-      const eyeSize = 3.5;
+      const eyeSize = Math.max(3.5, TILE_SIZE * 0.18);
       let eye1X = renderSegment.x * TILE_SIZE + eyeOffset;
       let eye1Y = renderSegment.y * TILE_SIZE + eyeOffset;
       let eye2X = renderSegment.x * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
@@ -2534,8 +2570,14 @@ function draw(interpolation = 1, updateEffects = false) {
         eye2Y = renderSegment.y * TILE_SIZE + TILE_SIZE - eyeOffset - eyeSize;
       }
 
+      ctx.fillStyle = isPlayerProtected ? '#fef08a' : '#6ee7b7';
       ctx.fillRect(eye1X, eye1Y, eyeSize, eyeSize);
       ctx.fillRect(eye2X, eye2Y, eyeSize, eyeSize);
+
+      ctx.fillStyle = '#061712';
+      const pupilWidth = Math.max(1, eyeSize * 0.36);
+      ctx.fillRect(eye1X + (eyeSize - pupilWidth) / 2, eye1Y, pupilWidth, eyeSize);
+      ctx.fillRect(eye2X + (eyeSize - pupilWidth) / 2, eye2Y, pupilWidth, eyeSize);
     }
   });
 
@@ -2799,8 +2841,8 @@ function drawFeatherCrest(segment, dir, color) {
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const baseSpeed = SPEEDS[sel] || SPEEDS.medium;
-  const lengthPenalty = Math.max(0, snake.length - 3) * 2.4;
-  const adaptiveSpeed = Math.max(baseSpeed * 0.72, baseSpeed - lengthPenalty);
+  const lengthPenalty = Math.min(baseSpeed * 0.32, Math.max(0, snake.length - 3) * 1.8);
+  const adaptiveSpeed = Math.max(baseSpeed * 0.68, baseSpeed - lengthPenalty);
   return isTurbo ? adaptiveSpeed * 0.58 : adaptiveSpeed;
 }
 
