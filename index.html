@@ -8,6 +8,11 @@
   <title>La Travesía de Kukulcán</title>
   <link rel="icon" type="image/png" href="snk.png">
   <link rel="apple-touch-icon" href="snk.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kukulcán">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet">
@@ -17,17 +22,15 @@
   <canvas id="gameCanvas" aria-label="Tablero de juego"></canvas>
   <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive" aria-atomic="true"></div>
 
-  <!-- ============ PANTALLA DE BIENVENIDA ============ -->
   <section id="welcome-screen" class="welcome-screen" aria-label="Instrucciones del juego">
     <div class="welcome-card">
       <div class="welcome-preview">
         <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego"></canvas>
         <div class="preview-legend" aria-label="Leyenda de iconos">
           <span class="preview-legend-item">🫀 Vidas</span>
-          <span class="preview-legend-item">🫀 Recupera 1</span>
-          <span class="preview-legend-item">☠️ Pierdes 1</span>
-          <span class="preview-legend-item">💎 Jade</span>
-          <span class="preview-legend-item">❄️ Hielo</span>
+          <span class="preview-legend-item">💎 Tierra</span>
+          <span class="preview-legend-item">❄️ Agua</span>
+          <span class="preview-legend-item">💨 Aire</span>
           <span class="preview-legend-item">🌀 Sello</span>
         </div>
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
@@ -36,7 +39,6 @@
     </div>
   </section>
 
-  <!-- ============ TOOLBAR DESKTOP ============ -->
   <header id="desktop-toolbar" class="desktop-toolbar">
     <div class="toolbar-left">
       <img src="snk.png" alt="" class="brand-logo">
@@ -44,13 +46,29 @@
     </div>
 
     <div class="toolbar-center">
-      <div class="stat-pill"><span class="stat-label">Puntos</span><span id="dt-score" class="stat-value">0</span></div>
-      <div class="stat-pill"><span class="stat-label">Récord</span><span id="dt-high-score" class="stat-value">0</span></div>
-      <div class="stat-pill"><span class="stat-label">Longitud</span><span id="dt-length" class="stat-value">3</span></div>
+      <div class="stat-pill"><span class="stat-label">PUNTOS</span><span id="dt-score" class="stat-value">0</span></div>
+      <div class="stat-pill"><span class="stat-label">RÉCORD</span><span id="dt-high-score" class="stat-value">0</span></div>
+      <div class="stat-pill"><span class="stat-label">LONGITUD</span><span id="dt-length" class="stat-value">3</span></div>
+      <div class="lives-fixed-container" id="lives-fixed-container" role="status" aria-label="Sacrificios restantes">
+        <span class="lives-label">SACRIFICIOS</span>
+        <div class="lives-pips" id="lives-fixed-pips">
+          <span class="life-pip" data-index="0">🫀</span>
+          <span class="life-pip" data-index="1">🫀</span>
+          <span class="life-pip" data-index="2">🫀</span>
+        </div>
+      </div>
     </div>
 
     <div class="toolbar-right">
       <div class="select-box">
+        <label for="game-mode-select">Modo</label>
+        <select id="game-mode-select" class="styled-select">
+          <option value="classic" selected>Clásico</option>
+          <option value="hunt">Cacería</option>
+          <option value="survival">Supervivencia</option>
+        </select>
+      </div>
+      <div class="select-box" id="difficulty-selector-box">
         <label for="difficulty-select">Dificultad</label>
         <select id="difficulty-select" class="styled-select">
           <option value="easy">Fácil</option>
@@ -67,23 +85,20 @@
     </div>
   </header>
 
-  <!-- ============ HUD MÓVIL ============ -->
   <header id="mobile-hud" class="mobile-hud">
     <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir menú">☰</button>
-    
     <div class="hud-center-pill">
       <img src="snk.png" alt="" class="hud-mini-logo">
       <span class="hud-stat">Pts <strong id="mb-score">0</strong></span>
       <span class="hud-divider">·</span>
       <span class="hud-stat">Réc <strong id="mb-high-score">0</strong></span>
-      
-      <!-- Vidas movidas aquí -->
-      <div class="hud-lives-mobile" id="mobile-lives-indicator">
-        <span class="life-pip">🫀</span><span class="life-pip">🫀</span><span class="life-pip">🫀</span>
+      <span class="hud-divider">·</span>
+      <div class="lives-pips" id="lives-mobile-pips">
+        <span class="life-pip" data-index="0">🫀</span>
+        <span class="life-pip" data-index="1">🫀</span>
+        <span class="life-pip" data-index="2">🫀</span>
       </div>
     </div>
-
-    <!-- Botones de acción fijos -->
     <div class="hud-actions">
       <button id="mb-pause-btn" class="hud-action-btn" aria-label="Pausa">⏸</button>
       <button id="mb-tutorial-btn" class="hud-action-btn" aria-label="Instrucciones">❓</button>
@@ -91,10 +106,20 @@
     </div>
   </header>
 
-  <!-- ============ BADGES DE ESTADO ============ -->
   <div class="status-badges-container" id="status-badges-container">
     <div class="badges-priority-high" id="badges-priority-high">
-      <!-- El badge de vidas se eliminó de aquí -->
+      <div id="furia-badge" class="hud-badge furia-badge hidden">
+        <span class="badge-icon">🔥</span>
+        <span class="badge-text-desktop">🔥 FURIA — incinera guardianes</span>
+        <span class="badge-text-mobile">🔥 FURIA</span>
+        <span class="badge-compact"><span id="furia-timer">3</span>s</span>
+      </div>
+      <div id="air-badge" class="hud-badge air-badge hidden">
+        <span class="badge-icon">💨</span>
+        <span class="badge-text-desktop">💨 Viento veloz</span>
+        <span class="badge-text-mobile">💨 Viento</span>
+        <span class="badge-compact"><span id="air-timer">2</span>s</span>
+      </div>
       <div id="immunity-badge" class="hud-badge immunity-badge hidden">
         <span class="badge-icon" aria-hidden="true">
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
@@ -103,8 +128,8 @@
             <path d="M10 5 L13.5 10 L10 15 L6.5 10 Z" fill="none" stroke="#fff0b0" stroke-width="1.4"/>
           </svg>
         </span>
-        <span class="badge-text-desktop">Escudo de jade</span>
-        <span class="badge-text-mobile">Jade</span>
+        <span class="badge-text-desktop">💎 Escudo de jade</span>
+        <span class="badge-text-mobile">💎 Jade</span>
         <span class="badge-compact"><span id="immunity-timer">10</span>s</span>
       </div>
       <div id="respawn-badge" class="hud-badge respawn-badge hidden">
@@ -155,16 +180,14 @@
     </div>
   </div>
 
-  <!-- ============ TURBO ============ -->
   <div class="turbo-container">
-    <button id="btn-turbo" class="turbo-btn" aria-label="Activar Furia de Kukulcán">
+    <button id="btn-turbo" class="turbo-btn" aria-label="Activar Furia del Fuego">
       <span id="turbo-icon" class="turbo-icon">🔥</span>
       <span id="turbo-label" class="turbo-label">FURIA</span>
       <div id="turbo-cooldown-bar" class="turbo-progress"></div>
     </button>
   </div>
 
-  <!-- ============ CRUCETA TÁCTIL ============ -->
   <div id="touch-controls" class="touch-controls hidden">
     <button id="btn-up" class="pad-btn" aria-label="Arriba">▲</button>
     <div class="pad-row">
@@ -175,7 +198,6 @@
     <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
   </div>
 
-  <!-- ============ DRAWER MÓVIL ============ -->
   <div id="drawer-menu" class="modal-backdrop hidden">
     <div class="drawer-card">
       <div class="drawer-header">
@@ -189,6 +211,14 @@
         <div class="stat-summary-box">
           <div class="summary-col"><span class="sum-lbl">Puntos</span><span id="drawer-score" class="sum-val">0</span></div>
           <div class="summary-col"><span class="sum-lbl">Récord</span><span id="drawer-high-score" class="sum-val">0</span></div>
+        </div>
+        <div class="form-group">
+          <label for="drawer-game-mode">🎮 Modo de Juego</label>
+          <select id="drawer-game-mode" class="styled-select">
+            <option value="classic">Clásico</option>
+            <option value="hunt">Cacería</option>
+            <option value="survival">Supervivencia</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="drawer-difficulty">⚡ Dificultad</label>
@@ -217,7 +247,6 @@
     </div>
   </div>
 
-  <!-- ============ TUTORIAL ============ -->
   <div id="tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-step-title">
     <div class="tutorial-card">
       <div class="tutorial-header">
@@ -229,32 +258,41 @@
         <div id="step-1" class="tutorial-step active">
           <div class="tutorial-icon-banner">🪶 🐍</div>
           <p class="tutorial-lead">🐍 <strong>Guía a Kukulcán:</strong> desliza el dedo o usa <strong>Flechas / WASD</strong>.</p>
-          <p class="tutorial-tip">🌽 Recoge ofrendas para crecer y sumar puntos. Cruza los bordes para viajar entre la tierra y el cielo.</p>
+          <p class="tutorial-tip">🌽 Recoge ofrendas para crecer. Cruza los bordes para viajar entre la tierra y el cielo.</p>
         </div>
         <div id="step-2" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌽 🍫 💎 ❄️</div>
-          <p class="tutorial-lead"><strong>Ofrendas:</strong> 🌽 maíz y 🍫 cacao suman +10. Con 🌧️ lluvia sagrada, las mazorcas dan <strong>+20</strong>.</p>
-          <p class="tutorial-tip">💎 <strong>Jade:</strong> 10s de escudo. Kukulcán escupe fuego y su lengua bífida brilla. Embiste guardianes.</p>
-          <p class="tutorial-tip">❄️ <strong>Hielo:</strong> congela guardianes 3s. Aprovéchalo para destruirlos sin escudo.</p>
+          <div class="tutorial-icon-banner">🌽 💎 ❄️ 💨</div>
+          <p class="tutorial-lead"><strong>Los elementos sagrados:</strong></p>
+          <p class="tutorial-tip">💎 <strong>Jade:</strong> escudo que repele guardianes.</p>
+          <p class="tutorial-tip">❄️ <strong>Hielo:</strong> congela guardianes unos segundos.</p>
+          <p class="tutorial-tip">💨 <strong>Viento:</strong> impulso veloz y +15 puntos.</p>
         </div>
         <div id="step-3" class="tutorial-step">
-          <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 🦇</div>
+          <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 ⚡</div>
           <ul class="tutorial-guardian-list">
             <li><strong>Cazador</strong><span>Rojo · persigue directo</span></li>
             <li><strong>Vidente</strong><span>Violeta · anticipa tu rumbo</span></li>
             <li><strong>Flanqueador</strong><span>Naranja · intenta rodearte</span></li>
-            <li><strong>Xibalbá</strong><span>Negro · embosca desde el inframundo</span></li>
+            <li><strong>Chaac</strong><span>Dios de la lluvia · hacha de rayo</span></li>
           </ul>
-          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>: guardianes, enredos y ☠️ calaveras quitan uno. 🫀 El <strong>sacrificio</strong> en el templo recupera uno (máx. 3).</p>
+          <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>. 🫀 El <strong>sacrificio</strong> en el templo recupera uno.</p>
         </div>
         <div id="step-4" class="tutorial-step">
-          <div class="tutorial-icon-banner">🌀 🔥 ❄️</div>
+          <div class="tutorial-icon-banner">🔥 🌀 ❄️</div>
+          <p class="tutorial-tip">🔥 <strong>FURIA:</strong> pulsa el botón (o <strong>Espacio / Shift</strong>). Kukulcán gana velocidad y <strong>destruye guardianes al tocarlos</strong>. ¡Se recarga más lento!</p>
           <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello en <strong>15s</strong>. Tras el aviso, elimina guardianes: <strong>+50 c/u</strong>.</p>
-          <p class="tutorial-tip">🔥 <strong>Furia:</strong> botón o <strong>Espacio / Shift</strong>. ❄️ <strong>Hielo:</strong> congela guardianes 3s. Ambas duran <strong>3s</strong>.</p>
+          <p class="tutorial-tip">💨 Con <strong>Viento</strong>, esquiva con velocidad. ❄️ Con <strong>Hielo</strong>, congela y destruye sin escudo.</p>
+        </div>
+        <div id="step-5" class="tutorial-step">
+          <div class="tutorial-icon-banner">🎮</div>
+          <p class="tutorial-lead"><strong>Modalidades de Juego:</strong></p>
+          <p class="tutorial-tip">⚔️ <strong>Clásico:</strong> La experiencia original. La dificultad que elijas se aplica aquí.</p>
+          <p class="tutorial-tip">🎯 <strong>Cacería:</strong> Los guardianes aparecen más rápido y dan más puntos. ¡La agresividad es la clave!</p>
+          <p class="tutorial-tip">🛡️ <strong>Supervivencia:</strong> Sin ítems de jade ni sacrificios. ¡Sobrevive con una sola vida el mayor tiempo posible!</p>
         </div>
       </div>
       <div class="step-dots">
-        <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </div>
       <div class="tutorial-footer">
         <button id="tut-prev-btn" class="btn btn-outline hidden">Anterior</button>
@@ -264,7 +302,6 @@
     </div>
   </div>
 
-  <!-- ============ GAME OVER ============ -->
   <div id="game-overlay" class="modal-backdrop hidden">
     <div class="modal-card">
       <img src="snk.png" alt="" class="modal-gameover-logo">
@@ -278,7 +315,6 @@
     </div>
   </div>
 
-  <!-- ============ ESTADÍSTICAS ============ -->
   <div id="statistics-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="statistics-title">
     <section class="statistics-card">
       <header class="statistics-header">

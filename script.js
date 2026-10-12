@@ -1,6 +1,32 @@
 // ========================================================
-// LA TRAVESÍA DE KUKULCÁN — script.js (corregido)
+// LA TRAVESÍA DE KUKULCÁN — script.js
 // ========================================================
+
+// ========================================================
+// 0. PWA — REGISTRO DEL SERVICE WORKER
+// ========================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        console.log('SW registrado:', reg.scope);
+        reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  console.log('Nueva versión disponible. Recargando...');
+                  window.location.reload();
+                }
+              }
+            };
+          }
+        };
+      })
+      .catch(err => console.warn('SW no registrado:', err));
+  });
+}
 
 // ========================================================
 // 1. REFERENCIAS AL DOM
@@ -17,6 +43,8 @@ const dtStartBtn = document.getElementById('dt-start-btn');
 const dtPauseBtn = document.getElementById('dt-pause-btn');
 const dtStatsBtn = document.getElementById('dt-stats-btn');
 const difficultySelect = document.getElementById('difficulty-select');
+const gameModeSelect = document.getElementById('game-mode-select');
+const difficultySelectorBox = document.getElementById('difficulty-selector-box');
 
 const welcomeScreen = document.getElementById('welcome-screen');
 const welcomeStartBtn = document.getElementById('welcome-start-btn');
@@ -30,14 +58,20 @@ const mbHighScore = document.getElementById('mb-high-score');
 const mbSoundBtn = document.getElementById('mb-sound-btn');
 const mbPauseBtn = document.getElementById('mb-pause-btn');
 const mbTutorialBtn = document.getElementById('mb-tutorial-btn');
-const mobileLivesIndicator = document.getElementById('mobile-lives-indicator');
-const mobileLifePips = mobileLivesIndicator ? mobileLivesIndicator.querySelectorAll('.life-pip') : [];
+
+// === Indicador de vidas ===
+const livesFixedContainer = document.getElementById('lives-fixed-container');
+const livesFixedPips = document.getElementById('lives-fixed-pips');
+const livesFixedPipEls = livesFixedPips ? livesFixedPips.querySelectorAll('.life-pip') : [];
+const livesMobilePips = document.getElementById('lives-mobile-pips');
+const livesMobilePipEls = livesMobilePips ? livesMobilePips.querySelectorAll('.life-pip') : [];
 
 const drawerMenu = document.getElementById('drawer-menu');
 const closeDrawerBtn = document.getElementById('close-drawer-btn');
 const drawerScore = document.getElementById('drawer-score');
 const drawerHighScore = document.getElementById('drawer-high-score');
 const drawerDifficulty = document.getElementById('drawer-difficulty');
+const drawerGameMode = document.getElementById('drawer-game-mode');
 const drawerDpadToggle = document.getElementById('drawer-dpad-toggle');
 const drawerSoundToggle = document.getElementById('drawer-sound-toggle');
 const drawerResumeBtn = document.getElementById('drawer-resume-btn');
@@ -45,11 +79,6 @@ const drawerRestartBtn = document.getElementById('drawer-restart-btn');
 const drawerTutorialBtn = document.getElementById('drawer-tutorial-btn');
 const drawerStatsBtn = document.getElementById('drawer-stats-btn');
 
-// Badges de estado (el de vidas ya no está en el DOM visible, pero lo mantenemos por si acaso)
-const livesBadge = document.getElementById('lives-badge'); 
-const livesIndicator = document.getElementById('lives-indicator');
-const lifePips = livesIndicator ? livesIndicator.querySelectorAll('.life-pip') : [];
-const livesCount = document.getElementById('lives-count');
 const immunityTimerSpan = document.getElementById('immunity-timer');
 const respawnBadge = document.getElementById('respawn-badge');
 const respawnTimerSpan = document.getElementById('respawn-timer');
@@ -63,6 +92,12 @@ const cosmicOrderTimerSpan = document.getElementById('cosmic-order-timer');
 const skullFoodBadge = document.getElementById('skull-food-badge');
 const sacrificeOfferingBadge = document.getElementById('sacrifice-offering-badge');
 const threatBadge = document.getElementById('threat-badge');
+
+// === NUEVO: badges de FURIA y AIRE ===
+const furiaBadge = document.getElementById('furia-badge');
+const furiaTimerSpan = document.getElementById('furia-timer');
+const airBadge = document.getElementById('air-badge');
+const airTimerSpan = document.getElementById('air-timer');
 
 const btnTurbo = document.getElementById('btn-turbo');
 const turboIcon = document.getElementById('turbo-icon');
@@ -104,10 +139,12 @@ const BadgeManager = (() => {
     'cosmicOrder', 'rain', 'sacrificeOffering',
     'cosmicOrderFood', 'skullFood', 'threat'
   ];
-  const highOrder = ['immunity', 'freeze', 'respawn']; // 'lives' ya no está aquí
+  const highOrder = ['furia', 'air', 'immunity', 'freeze', 'respawn'];
 
   const refs = {
     immunity: document.getElementById('immunity-badge'),
+    furia: furiaBadge,
+    air: airBadge,
     respawn: respawnBadge,
     freeze: freezeBadge,
     rain: rainBadge,
@@ -119,15 +156,10 @@ const BadgeManager = (() => {
   };
 
   const logical = {
-    immunity: false,
-    respawn: false,
-    freeze: false,
-    rain: false,
-    cosmicOrder: false,
-    cosmicOrderFood: false,
-    sacrificeOffering: false,
-    skullFood: false,
-    threat: false
+    immunity: false, furia: false, air: false,
+    respawn: false, freeze: false, rain: false,
+    cosmicOrder: false, cosmicOrderFood: false, sacrificeOffering: false,
+    skullFood: false, threat: false
   };
 
   function setVisible(key, visible) {
@@ -189,24 +221,209 @@ const SPEEDS = { easy: 200, medium: 150, hard: 110, extreme: 80 };
 const MAX_LIVES = 3;
 const RESPAWN_PROTECTION_MS = 2500;
 
-const TURBO_DURATION_MS = 3000;
-const TURBO_COOLDOWN_MS = 5000;
+const FURIA_DURATION_MS = 3000;
+const FURIA_COOLDOWN_MS = 8500;
+const FURIA_GUARDIAN_REWARD = 200;
 
-const GUARDIAN_TARGETS = { easy: 1, medium: 2, hard: 3, extreme: 4 };
-const GUARDIAN_FIRST_SPAWN_MS = { easy: 16000, medium: 14000, hard: 12000, extreme: 10000 };
-const GUARDIAN_NEXT_SPAWN_MS = { easy: 20000, medium: 15000, hard: 11000, extreme: 8000 };
-const GUARDIAN_LIFETIME_MS = { easy: 24000, medium: 30000, hard: 36000, extreme: 40000 };
-const JADE_RESPAWN_DELAY_MS = { easy: 18000, medium: 14000, hard: 11000, extreme: 8000 };
+const AIR_FIRST_SPAWN_MS = 20000;
+const AIR_RESPAWN_DELAY_MS = 28000;
+const AIR_BOOST_DURATION_MS = 3000;
+const AIR_BOOST_MULTIPLIER = 0.68;
+const AIR_SCORE = 15;
+const AIR_FURIA_RECHARGE_BONUS_MS = 2000;
+
+const DIFFICULTY_PROFILES = {
+  easy: {
+    guardianTargets: 1,
+    guardianFirstSpawnMs: 18000,
+    guardianNextSpawnMs: 22000,
+    guardianLifetimeMs: 999999,
+    jadeRespawnMs: 20000,
+    freezeRespawnMs: 24000,
+    freezeDurationMs: 4000,
+    jadeImmunityMs: 12000,
+    guardianMoveInterval: 5,
+    guardianLead: 1,
+    flankerOrbitSpeed: 16,
+    cosmicFirstMs: 40000,
+    cosmicIntervalMs: 55000,
+    sacrificeFirstMs: 28000,
+    skullFirstMs: 26000,
+    rainFirstMs: 28000,
+    rainIntervalMs: 50000,
+    chaacUnlockMs: 999999,
+    chaacCooldownMs: 999999,
+    chaacLifetimeMs: 999999,
+    chaacTeleportMs: 4000,
+    guardianReward: 80,
+    bossReward: 0,
+    turboDurationMs: 3500,
+    turboCooldownMs: 4500
+  },
+  medium: {
+    guardianTargets: 2,
+    guardianFirstSpawnMs: 14000,
+    guardianNextSpawnMs: 16000,
+    guardianLifetimeMs: 999999,
+    jadeRespawnMs: 14000,
+    freezeRespawnMs: 22000,
+    freezeDurationMs: 3000,
+    jadeImmunityMs: 10000,
+    guardianMoveInterval: 4,
+    guardianLead: 3,
+    flankerOrbitSpeed: 12,
+    cosmicFirstMs: 30000,
+    cosmicIntervalMs: 45000,
+    sacrificeFirstMs: 30000,
+    skullFirstMs: 20000,
+    rainFirstMs: 22000,
+    rainIntervalMs: 42000,
+    chaacUnlockMs: 999999,
+    chaacCooldownMs: 999999,
+    chaacLifetimeMs: 999999,
+    chaacTeleportMs: 3200,
+    guardianReward: 100,
+    bossReward: 0,
+    turboDurationMs: 3000,
+    turboCooldownMs: 5000
+  },
+  hard: {
+    guardianTargets: 3,
+    guardianFirstSpawnMs: 11000,
+    guardianNextSpawnMs: 11000,
+    guardianLifetimeMs: 999999,
+    jadeRespawnMs: 11000,
+    freezeRespawnMs: 20000,
+    freezeDurationMs: 2500,
+    jadeImmunityMs: 8000,
+    guardianMoveInterval: 3,
+    guardianLead: 4,
+    flankerOrbitSpeed: 9,
+    cosmicFirstMs: 25000,
+    cosmicIntervalMs: 38000,
+    sacrificeFirstMs: 32000,
+    skullFirstMs: 18000,
+    rainFirstMs: 18000,
+    rainIntervalMs: 38000,
+    chaacUnlockMs: 45000,
+    chaacCooldownMs: 60000,
+    chaacLifetimeMs: 999999,
+    chaacTeleportMs: 3000,
+    guardianReward: 120,
+    bossReward: 250,
+    turboDurationMs: 2800,
+    turboCooldownMs: 5200
+  },
+  extreme: {
+    guardianTargets: 4,
+    guardianFirstSpawnMs: 9000,
+    guardianNextSpawnMs: 8000,
+    guardianLifetimeMs: 999999,
+    jadeRespawnMs: 8000,
+    freezeRespawnMs: 18000,
+    freezeDurationMs: 2000,
+    jadeImmunityMs: 6000,
+    guardianMoveInterval: 2,
+    guardianLead: 5,
+    flankerOrbitSpeed: 7,
+    cosmicFirstMs: 20000,
+    cosmicIntervalMs: 32000,
+    sacrificeFirstMs: 36000,
+    skullFirstMs: 15000,
+    rainFirstMs: 15000,
+    rainIntervalMs: 32000,
+    chaacUnlockMs: 35000,
+    chaacCooldownMs: 45000,
+    chaacLifetimeMs: 999999,
+    chaacTeleportMs: 2600,
+    guardianReward: 150,
+    bossReward: 350,
+    turboDurationMs: 2500,
+    turboCooldownMs: 5500
+  }
+};
+
+// === MODOS DE JUEGO ===
+const GAME_MODES = {
+  classic: {
+    name: 'Clásico',
+    icon: '⚔️',
+    guardianSpawnRate: 1.0,
+    guardianRewardMultiplier: 1.0,
+    itemsEnabled: true,
+    livesEnabled: true,
+  },
+  hunt: {
+    name: 'Cacería',
+    icon: '🎯',
+    guardianSpawnRate: 0.6,
+    guardianRewardMultiplier: 1.5,
+    itemsEnabled: true,
+    livesEnabled: true,
+  },
+  survival: {
+    name: 'Supervivencia',
+    icon: '🛡️',
+    guardianSpawnRate: 1.2,
+    guardianRewardMultiplier: 1.0,
+    itemsEnabled: false,
+    livesEnabled: false,
+  }
+};
+
+function getDifficultyProfile() {
+  const baseProfile = DIFFICULTY_PROFILES[difficultySelect.value] || DIFFICULTY_PROFILES.medium;
+  const mode = GAME_MODES[gameModeSelect.value] || GAME_MODES.classic;
+
+  const profile = { ...baseProfile };
+
+  // La dificultad solo afecta al modo Clásico.
+  // Para otros modos, usamos una dificultad base 'medium' y aplicamos los modificadores del modo.
+  if (gameModeSelect.value !== 'classic') {
+    const mediumBase = DIFFICULTY_PROFILES.medium;
+    profile.guardianTargets = mediumBase.guardianTargets;
+    profile.guardianFirstSpawnMs = mediumBase.guardianFirstSpawnMs * mode.guardianSpawnRate;
+    profile.guardianNextSpawnMs = mediumBase.guardianNextSpawnMs * mode.guardianSpawnRate;
+    profile.guardianMoveInterval = mediumBase.guardianMoveInterval;
+    profile.guardianReward = mediumBase.guardianReward * mode.guardianRewardMultiplier;
+    profile.bossReward = mediumBase.bossReward * mode.guardianRewardMultiplier;
+    // ... otros parámetros que quieras que sean fijos para modos no clásicos
+  } else {
+    // Modo Clásico: la dificultad se aplica directamente
+    profile.guardianFirstSpawnMs *= mode.guardianSpawnRate;
+    profile.guardianNextSpawnMs *= mode.guardianSpawnRate;
+    profile.guardianReward *= mode.guardianRewardMultiplier;
+    profile.bossReward *= mode.guardianRewardMultiplier;
+  }
+
+  return profile;
+}
+
+const GUARDIAN_TARGETS = Object.fromEntries(
+  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianTargets])
+);
+const GUARDIAN_FIRST_SPAWN_MS = Object.fromEntries(
+  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianFirstSpawnMs])
+);
+const GUARDIAN_NEXT_SPAWN_MS = Object.fromEntries(
+  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianNextSpawnMs])
+);
+const GUARDIAN_LIFETIME_MS = Object.fromEntries(
+  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianLifetimeMs])
+);
+const JADE_RESPAWN_DELAY_MS = Object.fromEntries(
+  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.jadeRespawnMs])
+);
 const FREEZE_FIRST_SPAWN_MS = 16000;
 const FREEZE_RESPAWN_DELAY_MS = 22000;
+
 const GUARDIAN_FREEZE_DURATION_MS = 3000;
 
-// Xibalbá — guardián jefe (solo Difícil/Pesadilla)
-const XIBALBA_UNLOCK_MS = 45000;
-const XIBALBA_COOLDOWN_MS = 60000;
-const XIBALBA_LIFETIME_MS = 20000;
-const XIBALBA_TELEPORT_MS = 3200;
-const XIBALBA_RETRY_MS = 3000;
+const CHAAC_UNLOCK_MS = 45000;
+const CHAAC_COOLDOWN_MS = 60000;
+const CHAAC_LIFETIME_MS = 999999;
+const CHAAC_TELEPORT_MS = 3200;
+const CHAAC_RETRY_MS = 3000;
 
 const GUARDIAN_DEFS = [
   {
@@ -229,17 +446,20 @@ const GUARDIAN_DEFS = [
   },
   {
     behavior: 'ambusher',
-    name: 'Xibalbá',
+    name: 'Chaac',
     palette: {
-      head: '#0a0510',
-      body: '#1a0a1a',
-      crest: '#8b0000',
-      eye: '#ff1a2e',
-      wing: '#0a0208', // Más oscuro
-      wingBone: '#4a0a15', // Rojo tinto
-      glow: '#ff1a2e'
+      head: '#2a4a5e',
+      body: '#1a3346',
+      crest: '#7ad0ff',
+      eye: '#f2f7ff',
+      jade: '#4ec9a0',
+      water: '#5cc8ff',
+      lightning: '#fff2a8',
+      fang: '#f5efdc',
+      stone: '#6b7280',
+      stoneDark: '#3a4048'
     },
-    traits: { fangs: true, crestCount: 4, eyeMark: false, wings: true, isBoss: true }
+    traits: { fangs: true, crestCount: 4, eyeMark: false, isBoss: true, isChaac: true }
   }
 ];
 
@@ -268,12 +488,11 @@ const COSMIC_ORDER_FLASH_DURATION_MS = 720;
 
 const WELCOME_DEMO_TICK_MS = 260;
 
-// El tablero de la demo se calcula según el tamaño real del canvas
 let welcomeDemoCols = 22;
 let welcomeDemoRows = 8;
 let welcomeDemoRoute = [];
 let welcomeScenario = null;
-let welcomeLayout = null; // { cell, bx, by }
+let welcomeLayout = null;
 
 const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
 const DIFFICULTY_NAMES = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil', extreme: 'Pesadilla' };
@@ -307,6 +526,7 @@ let direction = { x: 1, y: 0 };
 let directionQueue = [];
 let score = 0;
 let lives = MAX_LIVES;
+let maxLives = MAX_LIVES; // <- NUEVO: vidas máximas según el modo actual
 let highScore = Math.max(0, parseInt(safeGetItem('snakeIoHighScore', '0'), 10) || 0);
 let isGameRunning = false;
 let isPaused = false;
@@ -345,11 +565,16 @@ let cosmicOrderFlashStartedAt = null;
 let enemySpawnAt = null;
 let jadeSpawnAt = null;
 let freezeSpawnAt = null;
-let nextXibalbaSpawnAt = null;
+let nextChaacSpawnAt = null;
+let isOnFire = false;
+let fireExpiresAt = 0;
 
-let isTurbo = false;
-let turboReadyAt = 0;
-let turboCooldownUntil = 0;
+let isFuria = false;
+let furiaReadyAt = 0;
+let furiaCooldownUntil = 0;
+let airFoods = [];
+let airSpawnAt = null;
+let airBoostUntil = 0;
 
 let isImmune = false;
 let immunityExpiresAt = 0;
@@ -388,14 +613,24 @@ let welcomeDemoImmuneUntil = 0;
 let welcomeDemoFlashUntil = 0;
 let welcomeDemoGuardianDefeatedUntil = 0;
 let welcomeDemoGameOverUntil = 0;
+let welcomeDemoCalloutMessages = [
+  'Muévete por la cuadrícula y busca ofrendas',
+  '¡Recoge el maíz para crecer y ganar puntos!',
+  '¡El jade te protege de los guardianes!',
+  '¡Cuidado! Los guardianes te persiguen.',
+  '¡Usa la FURIA para incinerar enemigos!'
+];
+let welcomeDemoCalloutIndex = 0;
+let welcomeDemoCalloutTimer = 0;
 
 let currentTutorialStep = 1;
-const totalTutorialSteps = 4;
+const totalTutorialSteps = 5;
 const tutorialTitles = [
   'La Travesía de Kukulcán',
   'Las ofrendas sagradas',
   'Los guardianes',
-  'Poderes y sacrificios'
+  'Poderes y sacrificios',
+  'Modalidades de Juego'
 ];
 let tutorialWasRunning = false;
 let tutorialWasPaused = false;
@@ -407,6 +642,7 @@ let statisticsWasPaused = false;
 let statisticsDrawerWasVisible = false;
 
 let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
+let gameMode = safeGetItem('snakeIoGameMode', 'classic');
 
 // ========================================================
 // 6. ESTADÍSTICAS
@@ -556,8 +792,9 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150)
 // 8. AUDIO
 // ========================================================
 let audioCtx = null;
-let suspenseTimeout = null;
-let tensionNoteIndex = 0;
+let musicTimer = null;
+let musicLayer = 0;
+let musicTick = 0;
 
 function getAudioContext() {
   try {
@@ -587,30 +824,69 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
     return o;
   } catch (e) { return null; }
 }
-function playSuspensePulse() {
-  if (!isGameRunning || isPaused || isMuted) return;
-  const growth = Math.max(0, snake.length - 3);
-  const tension = Math.min(1, growth / 22);
-  const base = (65 + tension * 45) * (isTurbo ? 1.25 : 1);
-  const intervals = enemyGuardians.length > 0 ? [1, 1.414, 1.06, 1.5] : [1, 1.06, 1.18, 1.06];
-  const f = base * intervals[tensionNoteIndex % intervals.length];
-  tensionNoteIndex++;
-  const dur = Math.max(65, (160 - tension * 80) * (isTurbo ? 0.7 : 1));
-  const vol = 0.06 + tension * 0.04;
-  playTone(f, dur, vol, 'sawtooth');
-  if (tension > 0.45 || enemyGuardians.length > 0) {
-    setTimeout(() => {
-      if (!isGameRunning || isPaused || isMuted) return;
-      playTone(f * 3.14, dur * 0.8, 0.025 + (enemyGuardians.length > 0 ? 0.03 : 0), 'sine');
-    }, dur * 0.4);
-  }
-  let next = Math.max(150, 640 - tension * 420);
-  if (enemyGuardians.length > 0) next *= 0.8;
-  if (isTurbo) next *= 0.6;
-  suspenseTimeout = setTimeout(playSuspensePulse, next);
+
+const MUSIC_LAYERS = {
+  1: { notes: [55, 65.4, 73.4], interval: 900, type: 'sine', vol: 0.05 },
+  2: { notes: [55, 65.4, 73.4, 87.3, 98], interval: 620, type: 'triangle', vol: 0.06 },
+  3: { notes: [82.4, 98, 110, 130.8, 146.8, 164.8], interval: 420, type: 'sawtooth', vol: 0.055 },
+  4: { notes: [110, 130.8, 146.8, 174.6, 196, 233, 261.6], interval: 280, type: 'square', vol: 0.05 }
+};
+
+function getDesiredMusicLayer() {
+  if (!isGameRunning || isPaused) return 0;
+  if (isFuria) return 4;
+  const guardianCount = enemyGuardians.length;
+  const snakeLength = snake.length;
+  const hasBoss = enemyGuardians.some(g => g.behavior.id === 'ambusher');
+  if (hasBoss || guardianCount >= 3 || snakeLength >= 25) return 3;
+  if (guardianCount >= 1 || snakeLength >= 15) return 2;
+  return 1;
 }
-function startSuspenseMusic() { stopSuspenseMusic(); tensionNoteIndex = 0; playSuspensePulse(); }
-function stopSuspenseMusic() { if (suspenseTimeout) { clearTimeout(suspenseTimeout); suspenseTimeout = null; } }
+
+function playMusicTick() {
+  if (!isGameRunning || isPaused || isMuted) {
+    musicTimer = setTimeout(playMusicTick, 500);
+    return;
+  }
+  const layer = MUSIC_LAYERS[musicLayer];
+  if (layer) {
+    const noteIndex = musicTick % layer.notes.length;
+    const freq = layer.notes[noteIndex];
+    playTone(freq, layer.interval * 0.85, layer.vol, layer.type);
+    if (musicLayer >= 2) {
+      setTimeout(() => {
+        if (!isGameRunning || isPaused || isMuted) return;
+        playTone(freq * 1.5, layer.interval * 0.5, layer.vol * 0.4, 'sine');
+      }, layer.interval * 0.3);
+    }
+    if (musicLayer >= 4) {
+      setTimeout(() => {
+        if (!isGameRunning || isPaused || isMuted) return;
+        playTone(freq * 1.06, layer.interval * 0.4, layer.vol * 0.3, 'sawtooth');
+      }, layer.interval * 0.5);
+    }
+  }
+  musicTick++;
+  const interval = layer ? layer.interval : 800;
+  musicTimer = setTimeout(playMusicTick, interval);
+}
+
+function startMusic() {
+  stopMusic();
+  musicTick = 0;
+  musicLayer = 1;
+  playMusicTick();
+}
+function stopMusic() {
+  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+}
+function updateMusicLayer() {
+  const desired = getDesiredMusicLayer();
+  if (desired !== musicLayer) {
+    musicLayer = desired;
+    musicTick = 0;
+  }
+}
 
 function playEatSound(type = 'normal') {
   if (isMuted) return;
@@ -634,12 +910,68 @@ function playEatSound(type = 'normal') {
     setTimeout(() => playTone(1108, 60, 0.13, 'square'), 40);
   }
 }
-function playTurboStartSound() {
+
+function playFuriaStartSound() {
   if (isMuted) return;
-  playTone(440, 60, 0.15, 'triangle');
-  setTimeout(() => playTone(659, 80, 0.18, 'triangle'), 50);
-  setTimeout(() => playTone(880, 120, 0.2, 'sine'), 110);
+  try {
+    const a = getAudioContext();
+    if (!a) return;
+    const now = a.currentTime;
+    const o1 = a.createOscillator();
+    const g1 = a.createGain();
+    o1.type = 'sawtooth';
+    o1.frequency.setValueAtTime(180, now);
+    o1.frequency.exponentialRampToValueAtTime(60, now + 0.5);
+    g1.gain.setValueAtTime(0.28, now);
+    g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    o1.connect(g1); g1.connect(a.destination);
+    o1.start(now); o1.stop(now + 0.6);
+    setTimeout(() => playTone(880, 60, 0.2, 'triangle'), 40);
+    setTimeout(() => playTone(1174, 90, 0.22, 'triangle'), 110);
+    setTimeout(() => playTone(1567, 150, 0.2, 'sine'), 200);
+  } catch (e) {}
 }
+
+function playAirSound() {
+  if (isMuted) return;
+  try {
+    const a = getAudioContext();
+    if (!a) return;
+    const now = a.currentTime;
+    const o1 = a.createOscillator();
+    const g1 = a.createGain();
+    o1.type = 'sine';
+    o1.frequency.setValueAtTime(440, now);
+    o1.frequency.exponentialRampToValueAtTime(1320, now + 0.45);
+    o1.frequency.exponentialRampToValueAtTime(660, now + 0.7);
+    g1.gain.setValueAtTime(0.0001, now);
+    g1.gain.exponentialRampToValueAtTime(0.16, now + 0.06);
+    g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
+    o1.connect(g1); g1.connect(a.destination);
+    o1.start(now); o1.stop(now + 0.75);
+    const o2 = a.createOscillator();
+    const g2 = a.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(880, now + 0.1);
+    o2.frequency.linearRampToValueAtTime(990, now + 0.35);
+    o2.frequency.linearRampToValueAtTime(770, now + 0.65);
+    g2.gain.setValueAtTime(0.0001, now + 0.1);
+    g2.gain.exponentialRampToValueAtTime(0.09, now + 0.18);
+    g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+    o2.connect(g2); g2.connect(a.destination);
+    o2.start(now + 0.1); o2.stop(now + 0.7);
+    const o3 = a.createOscillator();
+    const g3 = a.createGain();
+    o3.type = 'sawtooth';
+    o3.frequency.setValueAtTime(110, now);
+    o3.frequency.exponentialRampToValueAtTime(55, now + 0.6);
+    g3.gain.setValueAtTime(0.06, now);
+    g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+    o3.connect(g3); g3.connect(a.destination);
+    o3.start(now); o3.stop(now + 0.65);
+  } catch (e) {}
+}
+
 function playTurboReadySound() {
   if (isMuted) return;
   playTone(784, 80, 0.12, 'sine');
@@ -670,10 +1002,8 @@ function playCosmicOrderSound() {
       o.frequency.exponentialRampToValueAtTime(l.ef, now + l.d);
       g.gain.setValueAtTime(l.v, now);
       g.gain.exponentialRampToValueAtTime(0.0001, now + l.d);
-      o.connect(g);
-      g.connect(a.destination);
-      o.start(now);
-      o.stop(now + l.d);
+      o.connect(g); g.connect(a.destination);
+      o.start(now); o.stop(now + l.d);
     });
   } catch (e) {}
 }
@@ -699,42 +1029,82 @@ function toggleSound(forceState = null) {
   updateSoundUI();
   if (!isMuted && isGameRunning && !isPaused) {
     getAudioContext();
-    startSuspenseMusic();
+    startMusic();
   } else {
-    stopSuspenseMusic();
+    stopMusic();
   }
 }
 
 // ========================================================
-// 9. TURBO
+// 9. FURIA (FUEGO + VELOCIDAD)
 // ========================================================
-function triggerTurboBurst() {
-  if (isTurbo || getTurboCooldownRemaining() > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
-  isTurbo = true;
-  turboReadyAt = gameTime + TURBO_DURATION_MS;
-  turboCooldownUntil = turboReadyAt + TURBO_COOLDOWN_MS;
-  updateTurboUI();
-  playTurboStartSound();
-  vibrate(20);
-}
-function getTurboCooldownRemaining() {
-  return Math.max(0, turboCooldownUntil - gameTime);
-}
-function updateTurboUI() {
-  const cooldownRemaining = getTurboCooldownRemaining();
-  const charge = isTurbo ? 1 : cooldownRemaining > 0 ? 1 - cooldownRemaining / TURBO_COOLDOWN_MS : 1;
+function triggerFuria() {
+  if (isFuria || getFuriaCooldownRemaining() > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
+  isFuria = true;
+  furiaReadyAt = gameTime + FURIA_DURATION_MS;
+  furiaCooldownUntil = furiaReadyAt + FURIA_COOLDOWN_MS;
+  isOnFire = false;
+  fireExpiresAt = 0;
+  updateFuriaUI();
+  playFuriaStartSound();
+  vibrate([30, 20, 30]);
 
-  btnTurbo.classList.toggle('active', isTurbo);
-  btnTurbo.classList.toggle('cooldown', cooldownRemaining > 0 && !isTurbo);
-  btnTurbo.disabled = (cooldownRemaining > 0 && !isTurbo) || !isGameRunning || isPaused || countdownEndsAt !== null;
-  btnTurbo.setAttribute(
-    'aria-label',
-    isTurbo ? 'Furia activa' : cooldownRemaining > 0 ? 'Furia recargándose' : 'Activar Furia'
-  );
-  turboIcon.textContent = '🔥';
-  turboLabel.textContent = isTurbo ? 'FURIA' : cooldownRemaining > 0 ? 'RECARGA' : 'FURIA';
-  turboProgress.style.setProperty('--turbo-charge', `${Math.max(0, Math.min(1, charge)) * 100}%`);
+  const head = snake[0];
+  if (head) {
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 24; i++) {
+      const a = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
+      const sp = 2 + Math.random() * 3;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 2.5 + Math.random() * 3,
+        color: ['#ef4c24', '#ff7a24', '#ffc04d', '#fff0a3'][i % 4],
+        alpha: 1, decay: 0.022
+      });
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+      const sp = 1.5 + Math.random() * 2;
+      particles.push({
+        x: hx + (Math.random() - 0.5) * TILE_SIZE,
+        y: hy + (Math.random() - 0.5) * TILE_SIZE,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 2 + Math.random() * 2,
+        color: ['#ff6b2c', '#ffb347', '#fff0a3'][i % 3],
+        alpha: 1, decay: 0.028
+      });
+    }
+    spawnFloatingText('🔥 ¡FURIA!', hx, hy - TILE_SIZE, '#ff6b2c');
+    triggerHeadPulse('#ff6b2c');
+    screenShake = 10;
+  }
+  BadgeManager.setVisible('furia', true);
+  if (furiaTimerSpan) furiaTimerSpan.textContent = Math.ceil(FURIA_DURATION_MS / 1000);
+  updateMusicLayer();
 }
+
+function getFuriaCooldownRemaining() {
+  return Math.max(0, furiaCooldownUntil - gameTime);
+}
+
+function updateFuriaUI() {
+  const cooldownRemaining = getFuriaCooldownRemaining();
+  const charge = isFuria ? 1 : cooldownRemaining > 0 ? 1 - cooldownRemaining / FURIA_COOLDOWN_MS : 1;
+
+  btnTurbo.classList.toggle('active', isFuria);
+  btnTurbo.classList.toggle('cooldown', cooldownRemaining > 0 && !isFuria);
+  btnTurbo.disabled = (cooldownRemaining > 0 && !isFuria) || !isGameRunning || isPaused || countdownEndsAt !== null;
+  turboIcon.textContent = '🔥';
+  turboLabel.textContent = isFuria ? 'FURIA' : cooldownRemaining > 0 ? 'RECARGA' : 'FURIA';
+  btnTurbo.setAttribute('aria-label', isFuria ? 'Furia de Xiuhcóatl activa' : 'Activar Furia (Fuego + Velocidad)');
+  if (turboProgress) turboProgress.style.setProperty('--turbo-charge', `${Math.round(charge * 100)}%`);
+}
+
+// Alias para compatibilidad con código que aún llame "triggerTurboBurst"
+function triggerTurboBurst() { triggerFuria(); }
+function updateTurboUI() { updateFuriaUI(); }
 
 // ========================================================
 // 10. EFECTOS VISUALES
@@ -756,7 +1126,7 @@ function spawnFloatingText(text, x, y, color = '#4ec9a0') {
   }
   tx = Math.max(50, Math.min(window.innerWidth - 50, tx));
   ty = Math.max(35, ty);
-  floatingTexts.push({ text, x: tx, y: ty, vy: -1.3, alpha: 1, color });
+  floatingTexts.push({ text, x: tx, y: ty, vy: -1.3, alpha: 1, color, scale: 0.6, life: 0 });
 }
 function spawnWorldCrossingEffect(x, y) {
   triggerHeadPulse('#8be7ff');
@@ -772,19 +1142,44 @@ function spawnWorldCrossingEffect(x, y) {
     });
   }
 }
-function spawnTurboTrail(x, y) {
+function spawnFuriaTrail(x, y) {
   const colors = ['#ef4c24', '#ff7a24', '#ffc04d', '#fff0a3'];
   const back = Math.atan2(-direction.y, -direction.x);
   for (let i = 0; i < 3; i++) {
-    const a = back + (Math.random() - 0.5) * Math.PI;
-    const s = Math.random() * 0.8 + 0.5;
+    const a = back + (Math.random() - 0.5) * 0.8;
+    const s = Math.random() * 1.5 + 0.8;
     particles.push({
-      x: x + (Math.random() - 0.5) * 7,
-      y: y + (Math.random() - 0.5) * 7,
+      x: x + (Math.random() - 0.5) * 6,
+      y: y + (Math.random() - 0.5) * 6,
       vx: Math.cos(a) * s, vy: Math.sin(a) * s,
-      size: Math.random() * 1.8 + 2,
+      size: Math.random() * 1.8 + 1.8,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 0.9, decay: 0.045
+    });
+  }
+  if (Math.random() < 0.3) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 8,
+      y: y + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: -0.8 - Math.random() * 0.8,
+      size: 1.8 + Math.random() * 1.5,
+      color: '#fff0a3',
+      alpha: 0.85, decay: 0.03
+    });
+  }
+}
+function spawnAirTrail(x, y) {
+  const colors = ['#b3e5ff', '#d9f0ff', '#ffffff'];
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 12,
+      y: y + (Math.random() - 0.5) * 12,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: (Math.random() - 0.5) * 1.5,
+      size: Math.random() * 1.8 + 1.2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: 0.7, decay: 0.05
     });
   }
 }
@@ -799,6 +1194,19 @@ function spawnJadeTrail(x, y) {
       size: Math.random() * 1.5 + 1.5,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 0.85, decay: 0.035
+    });
+  }
+}
+function spawnEatBurst(x, y, color = '#d5bd70', count = 6) {
+  for (let i = 0; i < count; i++) {
+    const a = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const sp = 1 + Math.random() * 1.8;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      size: 1.8 + Math.random() * 1.8,
+      color: Math.random() > 0.5 ? color : '#fff8dc',
+      alpha: 1, decay: 0.035
     });
   }
 }
@@ -817,16 +1225,22 @@ function updateAndDrawParticles(updateState = true) {
 
   for (let i = floatingTexts.length - 1; i >= 0; i--) {
     const ft = floatingTexts[i];
-    if (updateState) { ft.y += ft.vy; ft.alpha -= 0.032; }
+    if (updateState) {
+      ft.y += ft.vy;
+      ft.alpha -= 0.028;
+      ft.life += 1;
+      ft.scale = Math.min(1, ft.scale + 0.15);
+    }
     if (ft.alpha <= 0) { floatingTexts.splice(i, 1); continue; }
     ctx.globalAlpha = ft.alpha;
-    ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    const fontSize = Math.round(13 * ft.scale);
+    ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const m = ctx.measureText(ft.text);
-    const w = m.width + 12;
+    const w = m.width + 14;
     ctx.fillStyle = 'rgba(20, 23, 32, 0.85)';
-    roundRect(ctx, ft.x - w / 2, ft.y - 10, w, 20, 6);
+    roundRect(ctx, ft.x - w / 2, ft.y - 11, w, 22, 7);
     ctx.fill();
     ctx.fillStyle = ft.color;
     ctx.fillText(ft.text, ft.x, ft.y);
@@ -835,7 +1249,7 @@ function updateAndDrawParticles(updateState = true) {
 }
 
 // ========================================================
-// 11. INMUNIDAD / FREEZE
+// 11. INMUNIDAD / FREEZE / FUEGO
 // ========================================================
 function activateImmunity(seconds = 10) {
   isImmune = true;
@@ -844,7 +1258,33 @@ function activateImmunity(seconds = 10) {
   BadgeManager.setVisible('immunity', true);
   startFireBreath();
   vibrate(30);
+  const head = snake[0];
+  if (head) {
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 12; i++) {
+      const a = (Math.PI * 2 * i) / 12;
+      const sp = 1.2 + Math.random() * 1.5;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 1.8 + Math.random() * 1.5,
+        color: ['#7de8c4', '#4ec9a0', '#fff0b0'][i % 3],
+        alpha: 1, decay: 0.03
+      });
+    }
+  }
+  updateMusicLayer();
 }
+
+function activateFireImmunity(seconds = 8) {
+  // No-op
+}
+function deactivateFireImmunity() {
+  isOnFire = false;
+  fireExpiresAt = 0;
+}
+
 function deactivateImmunity() {
   isImmune = false;
   immunityExpiresAt = 0;
@@ -855,19 +1295,66 @@ function hasGuardianProtection() {
   return isImmune || gameTime < respawnProtectedUntil;
 }
 function activateGuardianFreeze() {
-  guardiansFrozenUntil = gameTime + GUARDIAN_FREEZE_DURATION_MS;
+  const profile = getDifficultyProfile();
+  guardiansFrozenUntil = gameTime + profile.freezeDurationMs;
   enemyGuardians.forEach(g => { if (g.frozenAt === null) g.frozenAt = gameTime; });
-  freezeTimerSpan.textContent = String(GUARDIAN_FREEZE_DURATION_MS / 1000);
+  freezeTimerSpan.textContent = String(Math.ceil(profile.freezeDurationMs / 1000));
   BadgeManager.setVisible('freeze', true);
   vibrate(25);
+  const head = snake[0];
+  if (head) {
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 18; i++) {
+      const a = (Math.PI * 2 * i) / 18;
+      const sp = 2 + Math.random() * 2;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 1.5 + Math.random() * 1.5,
+        color: ['#8be7ff', '#d7f6ff', '#4fc3f7'][i % 3],
+        alpha: 1, decay: 0.03
+      });
+    }
+    spawnFloatingText('❄️ ¡Congelados!', hx, hy - TILE_SIZE, '#8be7ff');
+  }
+}
+
+function activateAirBoost() {
+  airBoostUntil = gameTime + AIR_BOOST_DURATION_MS;
+  if (airTimerSpan) airTimerSpan.textContent = Math.ceil(AIR_BOOST_DURATION_MS / 1000);
+  BadgeManager.setVisible('air', true);
+  vibrate(20);
+  updateMusicLayer();
+
+  const head = snake[0];
+  if (head) {
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 16; i++) {
+      const a = (Math.PI * 2 * i) / 16;
+      const sp = 2 + Math.random() * 2.5;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 2 + Math.random() * 2,
+        color: ['#b3e5ff', '#d9f0ff', '#ffffff'][i % 3],
+        alpha: 0.9, decay: 0.035
+      });
+    }
+  }
+}
+function deactivateAirBoost() {
+  airBoostUntil = 0;
+  BadgeManager.setVisible('air', false);
 }
 
 // ========================================================
 // 12. GUARDIANES
 // ========================================================
 function scheduleEnemySpawn(retryDelay = null) {
-  const difficulty = difficultySelect.value;
-  const target = GUARDIAN_TARGETS[difficulty] || GUARDIAN_TARGETS.medium;
+  const profile = getDifficultyProfile();
+  const target = profile.guardianTargets;
   const normalGuardians = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   updateGuardianBadge();
   if (!isGameRunning || normalGuardians >= target || cosmicOrderResolveAt !== null) {
@@ -876,8 +1363,8 @@ function scheduleEnemySpawn(retryDelay = null) {
   }
   if (isPaused || countdownEndsAt !== null) return;
   const delay = retryDelay ?? (hasSpawnedGuardian
-    ? (GUARDIAN_NEXT_SPAWN_MS[difficulty] || GUARDIAN_NEXT_SPAWN_MS.medium)
-    : (GUARDIAN_FIRST_SPAWN_MS[difficulty] || GUARDIAN_FIRST_SPAWN_MS.medium));
+    ? profile.guardianNextSpawnMs
+    : profile.guardianFirstSpawnMs);
   enemySpawnAt = gameTime + delay;
 }
 
@@ -887,14 +1374,15 @@ function isCellFreeForNewGuardian(x, y) {
     !bonusFoods.some(f => f.x === x && f.y === y) &&
     !shieldFoods.some(f => f.x === x && f.y === y) &&
     !freezeFoods.some(f => f.x === x && f.y === y) &&
+    !airFoods.some(f => f.x === x && f.y === y) &&
     !cosmicOrderFoods.some(f => f.x === x && f.y === y) &&
     !sacrificeFoods.some(f => f.x === x && f.y === y) &&
     !skullFoods.some(f => f.x === x && f.y === y);
 }
 
 function spawnEnemySnake() {
-  const difficulty = difficultySelect.value;
-  const target = GUARDIAN_TARGETS[difficulty] || GUARDIAN_TARGETS.medium;
+  const profile = getDifficultyProfile();
+  const target = profile.guardianTargets;
   const normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (!isGameRunning || normalCount >= target) return false;
 
@@ -926,7 +1414,7 @@ function spawnEnemySnake() {
       segments: candidate,
       direction: { x: 1, y: 0 },
       tickCounter: 0,
-      expiresAt: gameTime + (GUARDIAN_LIFETIME_MS[difficulty] || GUARDIAN_LIFETIME_MS.medium),
+      expiresAt: gameTime + profile.guardianLifetimeMs, // <- Usa el lifetime del perfil
       frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
       palette: def.palette,
       behavior: { id: def.behavior, name: def.name },
@@ -935,14 +1423,26 @@ function spawnEnemySnake() {
     enemyGuardians.push(guardian);
     hasSpawnedGuardian = true;
     updateGuardianBadge();
+    const hx = x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 10; i++) {
+      const a = (Math.PI * 2 * i) / 10;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * 2, vy: Math.sin(a) * 2,
+        size: 2, color: def.palette.head, alpha: 1, decay: 0.03
+      });
+    }
+    spawnFloatingText('⚠️ ' + def.name, hx, hy - TILE_SIZE, def.palette.head);
+    updateMusicLayer();
     return true;
   }
   return false;
 }
 
-// ==== XIBALBA — JEFE DEL INFRAMUNDO ====
-function spawnXibalba() {
+function spawnChaac() {
   const difficulty = difficultySelect.value;
+  const profile = getDifficultyProfile();
   if (difficulty !== 'hard' && difficulty !== 'extreme') return false;
   const normalGuardians = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalGuardians < 2) return false;
@@ -971,17 +1471,34 @@ function spawnXibalba() {
       segments: [{ x, y }],
       direction: { x: 1, y: 0 },
       tickCounter: 0,
-      expiresAt: gameTime + XIBALBA_LIFETIME_MS,
+      expiresAt: gameTime + profile.chaacLifetimeMs,
       frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
       palette: def.palette,
       behavior: { id: def.behavior, name: def.name },
       traits: def.traits,
-      nextTeleportAt: gameTime + XIBALBA_TELEPORT_MS,
-      teleportFlash: 0
+      nextTeleportAt: gameTime + profile.chaacTeleportMs,
+      teleportFlash: 0,
+      lightningBolts: []
     };
     enemyGuardians.push(guardian);
-    nextXibalbaSpawnAt = gameTime + XIBALBA_COOLDOWN_MS;
+    nextChaacSpawnAt = gameTime + profile.chaacCooldownMs;
     updateGuardianBadge();
+    const hx = x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1 + Math.random() * 3;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+        size: 2 + Math.random() * 2,
+        color: ['#7ad0ff', '#fff2a8', '#2a4a5e'][i % 3],
+        alpha: 1, decay: 0.022
+      });
+    }
+    spawnFloatingText('⚡ ¡CHAAC DESCIENDE!', hx, hy - TILE_SIZE, '#7ad0ff');
+    screenShake = 8;
+    updateMusicLayer();
     return true;
   }
   return false;
@@ -993,6 +1510,7 @@ function isGuardianCellOccupied(x, y) {
     bonusFoods.some(f => f.x === x && f.y === y) ||
     shieldFoods.some(f => f.x === x && f.y === y) ||
     freezeFoods.some(f => f.x === x && f.y === y) ||
+    airFoods.some(f => f.x === x && f.y === y) ||
     cosmicOrderFoods.some(f => f.x === x && f.y === y) ||
     sacrificeFoods.some(f => f.x === x && f.y === y) ||
     skullFoods.some(f => f.x === x && f.y === y) ||
@@ -1006,14 +1524,14 @@ function updateGuardianBadge() {
     return;
   }
 
-  const hasXibalba = enemyGuardians.some(g => g.behavior.id === 'ambusher');
+  const hasChaac = enemyGuardians.some(g => g.behavior.id === 'ambusher');
   const names = [...new Set(enemyGuardians.map(g => g.behavior.name))];
-  const desktopText = hasXibalba
-    ? `🦇 ¡XIBALBÁ al acecho!`
+  const desktopText = hasChaac
+    ? `⚡ ¡CHAAC al acecho!`
     : (count === 1
       ? `${names[0]} al acecho`
       : `${count} guardianes: ${names.join(' · ')}`);
-  const mobileText = hasXibalba ? '¡Xibalbá!' : (count === 1 ? names[0] : `${count} guardianes`);
+  const mobileText = hasChaac ? '¡Chaac!' : (count === 1 ? names[0] : `${count} guardianes`);
 
   const desktopSpan = threatBadge.querySelector('.badge-text-desktop');
   const mobileSpan = threatBadge.querySelector('.badge-text-mobile');
@@ -1023,7 +1541,7 @@ function updateGuardianBadge() {
   const dot = document.getElementById('threat-dot');
   if (dot) {
     const first = enemyGuardians[0];
-    const color = hasXibalba ? '#ef3340' : first.palette.head;
+    const color = hasChaac ? '#7ad0ff' : first.palette.head;
     dot.style.background = color;
     dot.style.boxShadow = `0 0 8px ${color}`;
     dot.style.color = color;
@@ -1037,15 +1555,16 @@ function updateGuardianBadge() {
 }
 
 function getGuardianTarget(g, playerHead, difficulty) {
+  const profile = getDifficultyProfile();
   if (g.behavior.id === 'interceptor') {
-    const lead = difficulty === 'easy' ? 2 : difficulty === 'medium' ? 3 : 4;
+    const lead = profile.guardianLead;
     return {
       x: (playerHead.x + direction.x * lead + gridCols) % gridCols,
       y: (playerHead.y + direction.y * lead + gridRows) % gridRows
     };
   }
   if (g.behavior.id === 'flanker') {
-    const orbit = Math.floor(g.tickCounter / 12 + g.id) % 4;
+    const orbit = Math.floor(g.tickCounter / profile.flankerOrbitSpeed + g.id) % 4;
     const offsets = [{ x: 0, y: -5 }, { x: 5, y: 0 }, { x: 0, y: 5 }, { x: -5, y: 0 }];
     const o = offsets[orbit];
     return {
@@ -1057,12 +1576,13 @@ function getGuardianTarget(g, playerHead, difficulty) {
 }
 
 function reconcileGuardianCount() {
+  const profile = getDifficultyProfile();
   const newDifficulty = difficultySelect.value;
-  const target = GUARDIAN_TARGETS[newDifficulty] || GUARDIAN_TARGETS.medium;
+  const target = profile.guardianTargets;
 
   if (newDifficulty !== 'hard' && newDifficulty !== 'extreme') {
-    const xibalba = enemyGuardians.find(g => g.behavior.id === 'ambusher');
-    if (xibalba) destroyEnemySnake(xibalba.id);
+    const chaac = enemyGuardians.find(g => g.behavior.id === 'ambusher');
+    if (chaac) destroyEnemySnake(chaac.id);
   }
 
   let normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
@@ -1098,12 +1618,12 @@ function destroyEnemySnake(id, spawnBonus = true) {
             y: s.y * TILE_SIZE + TILE_SIZE / 2,
             vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
             size: 3 + Math.random() * 2,
-            color: Math.random() > 0.5 ? '#ef3340' : '#1a0a14',
+            color: Math.random() > 0.5 ? '#7ad0ff' : '#2a4a5e',
             alpha: 1, decay: 0.02
           });
         }
       });
-      nextXibalbaSpawnAt = gameTime + XIBALBA_COOLDOWN_MS;
+      nextChaacSpawnAt = gameTime + getDifficultyProfile().chaacCooldownMs;
     }
   }
   updateGuardianBadge();
@@ -1113,13 +1633,14 @@ function destroyEnemySnake(id, spawnBonus = true) {
 function updateEnemySnakeAI() {
   if (enemyGuardians.length === 0 || guardiansFrozenUntil > gameTime || cosmicOrderResolveAt !== null) return;
   const difficulty = difficultySelect.value;
-  const moveInterval = (difficulty === 'easy' || difficulty === 'medium') ? 4 : 3;
+  const profile = getDifficultyProfile();
+  const moveInterval = profile.guardianMoveInterval;
 
   for (const g of [...enemyGuardians]) {
-    if (gameTime >= g.expiresAt) { destroyEnemySnake(g.id); continue; }
+    // ELIMINADO: if (gameTime >= g.expiresAt) { destroyEnemySnake(g.id); continue; }
+    // Ahora los guardianes son permanentes hasta que el jugador los elimine.
     g.tickCounter++;
 
-    // ==== XIBALBÁ: teletransporte y comportamiento especial ====
     if (g.behavior.id === 'ambusher') {
       if (gameTime >= g.nextTeleportAt) {
         const playerHead = snake[0];
@@ -1133,14 +1654,30 @@ function updateEnemySnakeAI() {
           const dy = Math.min(Math.abs(ty - playerHead.y), gridRows - Math.abs(ty - playerHead.y));
           const dist = dx + dy;
           if (dist >= 6 && dist <= 10 && !isGuardianCellOccupied(tx, ty)) {
+            const oldHead = g.segments[0];
+            g.lightningBolts = g.lightningBolts || [];
+            g.lightningBolts.push({ x: oldHead.x, y: oldHead.y, bornAt: gameTime });
             g.segments[0] = { x: tx, y: ty };
             g.teleportFlash = 1;
-            g.nextTeleportAt = gameTime + XIBALBA_TELEPORT_MS;
+            g.nextTeleportAt = gameTime + profile.chaacTeleportMs;
+            for (let p = 0; p < 8; p++) {
+              const a = Math.random() * Math.PI * 2;
+              particles.push({
+                x: tx * TILE_SIZE + TILE_SIZE / 2,
+                y: ty * TILE_SIZE + TILE_SIZE / 2,
+                vx: Math.cos(a) * 2, vy: Math.sin(a) * 2,
+                size: 2, color: '#7ad0ff', alpha: 1, decay: 0.04
+              });
+            }
             break;
           }
         }
       }
       if (g.teleportFlash > 0) g.teleportFlash = Math.max(0, g.teleportFlash - 0.05);
+
+      if (g.lightningBolts) {
+        g.lightningBolts = g.lightningBolts.filter(lb => gameTime - lb.bornAt < 800);
+      }
 
       const enemyHead = g.segments[0];
       const playerHead = snake[0];
@@ -1165,19 +1702,23 @@ function updateEnemySnakeAI() {
       };
       const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
       if (touches) {
-        if (hasGuardianProtection()) {
+        if (hasGuardianProtection() || isFuria) {
           screenShake = 12;
           playEnemyDefeatedSound();
           vibrate([40, 30, 40, 30, 60]);
           runGuardiansDefeated++;
-          score += 250;
-          spawnFloatingText('+250 🦇 ¡XIBALBÁ VENCIDO!', playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, '#ef3340');
+          const reward = isFuria ? FURIA_GUARDIAN_REWARD : profile.bossReward;
+          score += reward;
+          const label = isFuria
+            ? `+${reward} 🔥 ¡CHAAC INCINERADO!`
+            : `+${reward} ⚡ ¡CHAAC VENCIDO!`;
+          spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, isFuria ? '#ff6b2c' : '#7ad0ff');
           updateScoresUI();
           destroyEnemySnake(g.id);
           continue;
         } else {
           screenShake = 12;
-          loseLife('¡Xibalbá, señor del inframundo, te devoró!');
+          loseLife('¡Chaac, dios de la lluvia, te fulminó!');
           return;
         }
       }
@@ -1185,7 +1726,6 @@ function updateEnemySnakeAI() {
       g.segments.pop();
       continue;
     }
-    // ==== FIN XIBALBÁ ====
 
     const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
     if ((g.tickCounter + g.id) % interval !== 0) continue;
@@ -1218,14 +1758,22 @@ function updateEnemySnakeAI() {
 
     const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
     if (touches) {
-      if (hasGuardianProtection()) {
+      if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isOnFire) {
+        const shield = isImmune;
+        const frozen = guardiansFrozenUntil > gameTime;
+        const onFire = isOnFire;
+        const furia = isFuria;
+        const color = furia ? '#ff6b2c' : onFire ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
+        const symbol = furia ? '🔥' : onFire ? '🔥' : shield ? '💎' : frozen ? '❄️' : '🪶';
+        const reward = furia ? FURIA_GUARDIAN_REWARD : profile.guardianReward;
         screenShake = 10;
         playEnemyDefeatedSound();
         vibrate(35);
         runGuardiansDefeated++;
-        score += 100;
-        const label = isImmune ? '+100 💎 ¡GUARDIÁN VENCIDO!' : '+100 🪶 ¡GUARDIÁN VENCIDO!';
-        const color = isImmune ? '#facc15' : '#4ec9a0';
+        score += reward;
+        const label = furia
+          ? `+${reward} ${symbol} ¡INCINERADO POR LA FURIA!`
+          : `+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`;
         spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
         updateScoresUI();
         destroyEnemySnake(g.id);
@@ -1244,6 +1792,7 @@ function updateEnemySnakeAI() {
 // 13. SPAWN HELPERS
 // ========================================================
 function maybeSpawnCosmicOrderFood() {
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
   if (cosmicOrderFoods.length > 0 || enemyGuardians.length === 0) return false;
   const total = gridCols * gridRows;
   const start = Math.floor(Math.random() * total);
@@ -1259,7 +1808,8 @@ function maybeSpawnCosmicOrderFood() {
   return false;
 }
 function spawnSacrificeOffering() {
-  if (lives >= MAX_LIVES || sacrificeFoods.length > 0) return false;
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
+  if (lives >= maxLives || sacrificeFoods.length > 0) return false;
   const total = gridCols * gridRows;
   const start = Math.floor(Math.random() * total);
   for (let o = 0; o < total; o++) {
@@ -1274,6 +1824,7 @@ function spawnSacrificeOffering() {
   return false;
 }
 function spawnSkullFood() {
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
   if (skullFoods.length > 0) return false;
   const available = [];
   for (let y = 0; y < gridRows; y++) {
@@ -1293,7 +1844,9 @@ function spawnSkullFood() {
   return true;
 }
 function maybeSpawnShieldFood() {
-  const target = GUARDIAN_TARGETS[difficultySelect.value] || GUARDIAN_TARGETS.medium;
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return;
+  const profile = getDifficultyProfile();
+  const target = profile.guardianTargets;
   let attempts = 0;
   while (shieldFoods.length < target && attempts < 200) {
     attempts++;
@@ -1303,6 +1856,7 @@ function maybeSpawnShieldFood() {
   }
 }
 function maybeSpawnFreezeFood() {
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
   if (freezeFoods.length > 0) return true;
   const head = snake[0];
   for (let i = 0; i < 160; i++) {
@@ -1324,6 +1878,32 @@ function maybeSpawnFreezeFood() {
   }
   return false;
 }
+function maybeSpawnFireFood() { return true; }
+
+function maybeSpawnAirFood() {
+  if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
+  if (airFoods.length > 0) return true;
+  const head = snake[0];
+  for (let i = 0; i < 160; i++) {
+    const x = (head.x + Math.floor(Math.random() * 17) - 8 + gridCols) % gridCols;
+    const y = (head.y + Math.floor(Math.random() * 17) - 8 + gridRows) % gridRows;
+    const dx = Math.min(Math.abs(x - head.x), gridCols - Math.abs(x - head.x));
+    const dy = Math.min(Math.abs(y - head.y), gridRows - Math.abs(y - head.y));
+    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) {
+      airFoods.push({ x, y });
+      return true;
+    }
+  }
+  for (let i = 0; i < gridCols * gridRows; i++) {
+    const x = Math.floor(Math.random() * gridCols);
+    const y = Math.floor(Math.random() * gridRows);
+    if (isGuardianCellOccupied(x, y)) continue;
+    airFoods.push({ x, y });
+    return true;
+  }
+  return false;
+}
+
 function resolveCosmicOrder() {
   cosmicOrderResolveAt = null;
   BadgeManager.setVisible('cosmicOrder', false);
@@ -1370,6 +1950,7 @@ function resolveCosmicOrder() {
 
   enemySpawnAt = null;
   scheduleEnemySpawn();
+  updateMusicLayer();
 }
 
 // ========================================================
@@ -1379,8 +1960,13 @@ function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const base = SPEEDS[sel] || SPEEDS.medium;
   const lengthPenalty = Math.max(0, snake.length - 3) * 2.4;
-  const adaptive = Math.max(base * 0.72, base - lengthPenalty);
-  return isTurbo ? adaptive * 0.58 : adaptive;
+  let adaptive = Math.max(base * 0.72, base - lengthPenalty);
+  if (isFuria) {
+    adaptive *= 0.55;
+  } else if (airBoostUntil > gameTime) {
+    adaptive *= AIR_BOOST_MULTIPLIER;
+  }
+  return adaptive;
 }
 function snapshotRenderPositions() {
   previousSnakePositions = snake.map(s => ({ ...s }));
@@ -1391,13 +1977,14 @@ function snapshotRenderPositions() {
 function startCountdown() {
   countdownEndsAt = performance.now() + 3000;
   countdownValue = 3;
-  countdownOverlay.textContent = String(countdownValue);
+  const mode = GAME_MODES[gameModeSelect.value];
+  countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
   countdownOverlay.classList.remove('hidden');
 }
 function cancelCountdown() {
   countdownEndsAt = null;
   countdownValue = 0;
-  countdownOverlay.textContent = '';
+  countdownOverlay.innerHTML = '';
   countdownOverlay.classList.add('hidden');
 }
 function gameLoopFrame(timestamp) {
@@ -1417,7 +2004,8 @@ function gameLoopFrame(timestamp) {
       const next = Math.ceil(remaining / 1000);
       if (next > 0 && next !== countdownValue) {
         countdownValue = next;
-        countdownOverlay.textContent = String(countdownValue);
+        const mode = GAME_MODES[gameModeSelect.value];
+        countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
       }
       if (remaining === 0) {
         cancelCountdown();
@@ -1459,6 +2047,8 @@ function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
   if (headPulse > 0) headPulse = Math.max(0, headPulse - elapsedMs / 240);
 
+  updateMusicLayer();
+
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
       enemyGuardians.forEach(g => {
@@ -1478,6 +2068,32 @@ function updateGameTimers(elapsedMs) {
     immunityTimerSpan.textContent = sec;
     if (gameTime >= immunityExpiresAt) deactivateImmunity();
   }
+  if (isFuria) {
+    const sec = Math.max(0, Math.ceil((furiaReadyAt - gameTime) / 1000));
+    if (furiaTimerSpan) furiaTimerSpan.textContent = sec;
+    if (gameTime >= furiaReadyAt) {
+      isFuria = false;
+      BadgeManager.setVisible('furia', false);
+      updateMusicLayer();
+    }
+  }
+  if (!isFuria && furiaCooldownUntil > 0 && gameTime >= furiaCooldownUntil) {
+    furiaCooldownUntil = 0;
+    playTurboReadySound();
+  }
+  updateFuriaUI();
+
+  if (airBoostUntil > 0) {
+    const sec = Math.max(0, Math.ceil((airBoostUntil - gameTime) / 1000));
+    if (airTimerSpan) airTimerSpan.textContent = sec;
+    if (gameTime >= airBoostUntil) deactivateAirBoost();
+  }
+
+  if (airSpawnAt !== null && gameTime >= airSpawnAt) {
+    airSpawnAt = null;
+    if (!maybeSpawnAirFood()) airSpawnAt = gameTime + 2000;
+  }
+
   if (respawnProtectedUntil > 0) {
     if (gameTime >= respawnProtectedUntil) {
       respawnProtectedUntil = 0;
@@ -1486,12 +2102,6 @@ function updateGameTimers(elapsedMs) {
       respawnTimerSpan.textContent = String(Math.ceil((respawnProtectedUntil - gameTime) / 1000));
     }
   }
-  if (isTurbo && gameTime >= turboReadyAt) isTurbo = false;
-  if (!isTurbo && turboCooldownUntil > 0 && gameTime >= turboCooldownUntil) {
-    turboCooldownUntil = 0;
-    playTurboReadySound();
-  }
-  updateTurboUI();
 
   if (enemySpawnAt !== null && gameTime >= enemySpawnAt) {
     enemySpawnAt = null;
@@ -1499,50 +2109,32 @@ function updateGameTimers(elapsedMs) {
     scheduleEnemySpawn(ok ? null : 1500);
   }
 
+  const profile = getDifficultyProfile();
   const difficultyForBoss = difficultySelect.value;
   if (
     (difficultyForBoss === 'hard' || difficultyForBoss === 'extreme') &&
-    gameTime >= XIBALBA_UNLOCK_MS &&
+    gameTime >= profile.chaacUnlockMs &&
     enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length >= 2 &&
     !enemyGuardians.some(g => g.behavior.id === 'ambusher')
   ) {
-    if (!nextXibalbaSpawnAt || gameTime >= nextXibalbaSpawnAt) {
-      const spawned = spawnXibalba();
-      if (spawned) {
-        const xibalba = enemyGuardians.find(g => g.behavior.id === 'ambusher');
-        if (xibalba) {
-          const head = xibalba.segments[0];
-          for (let p = 0; p < 8; p++) {
-            const a = Math.random() * Math.PI * 2;
-            const sp = 1 + Math.random() * 2;
-            particles.push({
-              x: head.x * TILE_SIZE + TILE_SIZE / 2,
-              y: head.y * TILE_SIZE + TILE_SIZE / 2,
-              vx: Math.cos(a) * sp,
-              vy: Math.sin(a) * sp,
-              size: 2 + Math.random() * 2,
-              color: Math.random() > 0.5 ? '#ef3340' : '#8b0000',
-              alpha: 1,
-              decay: 0.025
-            });
-          }
-        }
-      } else {
-        nextXibalbaSpawnAt = gameTime + XIBALBA_RETRY_MS;
+    if (!nextChaacSpawnAt || gameTime >= nextChaacSpawnAt) {
+      const spawned = spawnChaac();
+      if (!spawned) {
+        nextChaacSpawnAt = gameTime + CHAAC_RETRY_MS;
       }
     }
   }
 
-  const xibalbaActive = enemyGuardians.find(g => g.behavior.id === 'ambusher');
-  if (xibalbaActive && Math.random() < 0.35) {
-    const head = xibalbaActive.segments[0];
+  const chaacActive = enemyGuardians.find(g => g.behavior.id === 'ambusher');
+  if (chaacActive && Math.random() < 0.35) {
+    const head = chaacActive.segments[0];
     particles.push({
       x: head.x * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * TILE_SIZE * 1.4,
       y: head.y * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * TILE_SIZE * 1.4,
       vx: (Math.random() - 0.5) * 0.4,
       vy: -0.5 - Math.random() * 0.5,
       size: 1.5 + Math.random() * 1.5,
-      color: Math.random() > 0.5 ? '#ef3340' : '#8b0000',
+      color: Math.random() > 0.5 ? '#7ad0ff' : '#fff2a8',
       alpha: 0.8,
       decay: 0.03
     });
@@ -1561,10 +2153,11 @@ function updateGameTimers(elapsedMs) {
 
   if (nextSacredRainAt !== null && gameTime >= nextSacredRainAt) {
     sacredRainUntil = gameTime + SACRED_RAIN_DURATION_MS;
-    nextSacredRainAt = gameTime + SACRED_RAIN_INTERVAL_MS;
+    nextSacredRainAt = gameTime + profile.rainIntervalMs;
     if (!ensureMaizeOffering()) maizeSpawnRetryAt = gameTime + 500;
     rainTimerSpan.textContent = String(Math.ceil(SACRED_RAIN_DURATION_MS / 1000));
     BadgeManager.setVisible('rain', true);
+    spawnFloatingText('🌧️ ¡Lluvia sagrada!', window.innerWidth / 2, 80, '#8be7ff');
   }
   if (sacredRainUntil > gameTime && maizeSpawnRetryAt !== null && gameTime >= maizeSpawnRetryAt) {
     if (!ensureMaizeOffering()) maizeSpawnRetryAt = gameTime + 500;
@@ -1611,13 +2204,13 @@ function updateGameTimers(elapsedMs) {
     BadgeManager.setVisible('cosmicOrderFood', false);
   }
   if (nextCosmicOrderSpawnAt !== null && gameTime >= nextCosmicOrderSpawnAt) {
-    if (cosmicOrderFoods.length > 0) nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_INTERVAL_MS;
+    if (cosmicOrderFoods.length > 0) nextCosmicOrderSpawnAt = gameTime + profile.cosmicIntervalMs;
     else if (enemyGuardians.length === 0) nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_RETRY_MS;
-    else if (maybeSpawnCosmicOrderFood()) nextCosmicOrderSpawnAt = gameTime + COSMIC_ORDER_SPAWN_INTERVAL_MS;
+    else if (maybeSpawnCosmicOrderFood()) nextCosmicOrderSpawnAt = gameTime + profile.cosmicIntervalMs;
     else nextCosmicOrderSpawnAt = gameTime + 1000;
   }
 
-  const target = GUARDIAN_TARGETS[difficultySelect.value] || GUARDIAN_TARGETS.medium;
+  const target = profile.guardianTargets;
   const normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (isGameRunning && !isPaused && countdownEndsAt === null &&
       cosmicOrderResolveAt === null && normalCount < target && enemySpawnAt === null) {
@@ -1702,7 +2295,6 @@ function resetGame() {
   ];
   direction = { x: 1, y: 0 };
   directionQueue = [];
-  lives = MAX_LIVES;
   respawnProtectedUntil = 0;
   BadgeManager.setVisible('respawn', false);
   previousSnakePositions = snake.map(s => ({ ...s }));
@@ -1717,20 +2309,32 @@ function resetGame() {
   skullFoods = [];
   lastSkullPosition = null;
   nextSkullMoveAt = null;
+  isOnFire = false;
+  fireExpiresAt = 0;
   BadgeManager.setVisible('sacrificeOffering', false);
   BadgeManager.setVisible('skullFood', false);
   BadgeManager.setVisible('cosmicOrder', false);
   BadgeManager.setVisible('cosmicOrderFood', false);
   BadgeManager.setVisible('rain', false);
 
+  isFuria = false;
+  furiaReadyAt = 0;
+  furiaCooldownUntil = 0;
+  BadgeManager.setVisible('furia', false);
+  airFoods = [];
+  airSpawnAt = AIR_FIRST_SPAWN_MS;
+  airBoostUntil = 0;
+  BadgeManager.setVisible('air', false);
+
+  const profile = getDifficultyProfile();
   sacredRainUntil = 0;
-  nextSacredRainAt = SACRED_RAIN_FIRST_MS;
+  nextSacredRainAt = profile.rainFirstMs;
   maizeSpawnRetryAt = null;
-  nextCosmicOrderSpawnAt = COSMIC_ORDER_FIRST_SPAWN_MS;
+  nextCosmicOrderSpawnAt = profile.cosmicFirstMs;
   cosmicOrderResolveAt = null;
   cosmicOrderFlashStartedAt = null;
-  nextSacrificeSpawnAt = SACRIFICE_FIRST_SPAWN_MS;
-  nextSkullSpawnAt = SKULL_FIRST_SPAWN_MS;
+  nextSacrificeSpawnAt = profile.sacrificeFirstMs;
+  nextSkullSpawnAt = profile.skullFirstMs;
 
   particles = [];
   floatingTexts = [];
@@ -1744,16 +2348,13 @@ function resetGame() {
   jadeSpawnAt = null;
   freezeSpawnAt = FREEZE_FIRST_SPAWN_MS;
   guardiansFrozenUntil = 0;
-  nextXibalbaSpawnAt = null;
+  nextChaacSpawnAt = null;
   BadgeManager.setVisible('freeze', false);
   enemyGuardians = [];
   hasSpawnedGuardian = false;
   updateGuardianBadge();
 
-  isTurbo = false;
-  turboReadyAt = 0;
-  turboCooldownUntil = 0;
-  updateTurboUI();
+  updateFuriaUI();
 
   updateScoresUI();
   updateLivesUI();
@@ -1761,6 +2362,7 @@ function resetGame() {
   ensureFoodCount(6);
   maybeSpawnShieldFood();
   gameOverlay.classList.add('hidden');
+  updateMusicLayer();
 }
 
 function findRespawnPosition() {
@@ -1781,16 +2383,36 @@ function findRespawnPosition() {
 }
 
 function loseLife(reason) {
+  if (!GAME_MODES[gameModeSelect.value].livesEnabled) {
+    gameOver(reason);
+    return;
+  }
   lives = Math.max(0, lives - 1);
   updateLivesUI();
   screenShake = 8;
   vibrate([40, 30, 40]);
 
+  const prevHead = snake[0];
+  if (prevHead) {
+    const hx = prevHead.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = prevHead.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let i = 0; i < 14; i++) {
+      const a = (Math.PI * 2 * i) / 14;
+      const sp = 1.5 + Math.random() * 2;
+      particles.push({
+        x: hx, y: hy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        size: 2 + Math.random() * 2,
+        color: ['#ef5261', '#9b2929', '#f5efdc'][i % 3],
+        alpha: 1, decay: 0.03
+      });
+    }
+  }
+
   if (lives === 0) {
     gameOver(`${reason} Se agotaron los tres sacrificios.`);
     return;
   }
-  const prevHead = snake[0];
   const spawn = findRespawnPosition();
   if (!spawn) {
     gameOver('Los guardianes han cerrado todos los caminos.');
@@ -1805,10 +2427,15 @@ function loseLife(reason) {
   directionQueue = [];
   previousSnakePositions = snake.map(s => ({ ...s }));
   deactivateImmunity();
-  isTurbo = false;
-  turboReadyAt = 0;
-  turboCooldownUntil = 0;
-  updateTurboUI();
+  isFuria = false;
+  furiaReadyAt = 0;
+  furiaCooldownUntil = 0;
+  BadgeManager.setVisible('furia', false);
+  isOnFire = false;
+  fireExpiresAt = 0;
+  airBoostUntil = 0;
+  BadgeManager.setVisible('air', false);
+  updateFuriaUI();
   respawnProtectedUntil = gameTime + RESPAWN_PROTECTION_MS;
   respawnTimerSpan.textContent = String(Math.ceil(RESPAWN_PROTECTION_MS / 1000));
   BadgeManager.setVisible('respawn', true);
@@ -1819,6 +2446,7 @@ function loseLife(reason) {
   }
   updateScoresUI();
   if (sacrificeFoods.length === 0) nextSacrificeSpawnAt = gameTime + SACRIFICE_RESPAWN_DELAY_MS;
+  updateMusicLayer();
 }
 
 // ========================================================
@@ -1844,6 +2472,7 @@ function gameUpdate() {
     bonusFoods.some(f => f.x === head.x && f.y === head.y) ||
     shieldFoods.some(f => f.x === head.x && f.y === head.y) ||
     freezeFoods.some(f => f.x === head.x && f.y === head.y) ||
+    airFoods.some(f => f.x === head.x && f.y === head.y) ||
     cosmicOrderFoods.some(f => f.x === head.x && f.y === head.y) ||
     sacrificeFoods.some(f => f.x === head.x && f.y === head.y);
 
@@ -1866,28 +2495,45 @@ function gameUpdate() {
   const hitG = enemyGuardians.find(g => g.segments.some(s => s.x === head.x && s.y === head.y));
   if (hitG) {
     const isBoss = hitG.behavior.id === 'ambusher';
-    if (hasGuardianProtection() || guardiansFrozenUntil > gameTime) {
+    const profile = getDifficultyProfile();
+    if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isFuria) {
+      const furia = isFuria;
       const shield = isImmune;
       const frozen = guardiansFrozenUntil > gameTime;
-      const color = shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
-      const symbol = shield ? '💎' : frozen ? '❄️' : '🪶';
-      const reward = isBoss ? 250 : 100;
+      const color = furia ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
+      const symbol = furia ? '🔥' : shield ? '💎' : frozen ? '❄️' : '🪶';
+      const reward = furia ? FURIA_GUARDIAN_REWARD : (isBoss ? profile.bossReward : profile.guardianReward);
       screenShake = isBoss ? 12 : 10;
       triggerHeadPulse(color);
       playEnemyDefeatedSound();
       vibrate(isBoss ? [40, 30, 40, 30, 60] : 35);
       runGuardiansDefeated++;
       score += reward;
-      const label = isBoss
-        ? `+${reward} ${symbol} ¡XIBALBÁ VENCIDO!`
-        : `+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`;
+      const label = furia
+        ? `+${reward} ${symbol} ¡INCINERADO!`
+        : isBoss
+          ? `+${reward} ${symbol} ¡CHAAC VENCIDO!`
+          : `+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`;
       spawnFloatingText(label, head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, color);
+      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+      for (let i = 0; i < (isBoss ? 20 : 12); i++) {
+        const a = (Math.PI * 2 * i) / (isBoss ? 20 : 12);
+        const sp = 2 + Math.random() * 2.5;
+        particles.push({
+          x: hx, y: hy,
+          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          size: 2.5 + Math.random() * 2,
+          color: furia ? '#ff6b2c' : isBoss ? '#7ad0ff' : hitG.palette.head,
+          alpha: 1, decay: 0.025
+        });
+      }
       updateScoresUI();
       destroyEnemySnake(hitG.id);
     } else {
       screenShake = isBoss ? 12 : 8;
       loseLife(isBoss
-        ? '¡Xibalbá, señor del inframundo, te devoró!'
+        ? '¡Chaac, dios de la lluvia, te fulminó!'
         : `¡El ${hitG.behavior.name} te alcanzó!`);
       return;
     }
@@ -1904,9 +2550,11 @@ function gameUpdate() {
     triggerHeadPulse('#4ec9a0');
     spawnFloatingText('💎 ¡Jade +25!', hx, hy, '#4ec9a0');
     playEatSound('shield');
-    activateImmunity(10);
+    const profile = getDifficultyProfile();
+    activateImmunity(profile.jadeImmunityMs / 1000);
     updateScoresUI();
-    jadeSpawnAt = gameTime + (JADE_RESPAWN_DELAY_MS[difficultySelect.value] || JADE_RESPAWN_DELAY_MS.medium);
+    jadeSpawnAt = gameTime + profile.jadeRespawnMs;
+    spawnEatBurst(hx, hy, '#7de8c4', 10);
     return;
   }
   const freezeIdx = freezeFoods.findIndex(f => f.x === head.x && f.y === head.y);
@@ -1921,8 +2569,30 @@ function gameUpdate() {
     activateGuardianFreeze();
     freezeSpawnAt = gameTime + FREEZE_RESPAWN_DELAY_MS;
     updateScoresUI();
+    spawnEatBurst(hx, hy, '#8be7ff', 10);
     return;
   }
+  const airIdx = airFoods.findIndex(f => f.x === head.x && f.y === head.y);
+  if (airIdx !== -1) {
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+    airFoods.splice(airIdx, 1);
+    score += AIR_SCORE;
+    triggerHeadPulse('#b3e5ff');
+    spawnFloatingText(`💨 ¡Viento +${AIR_SCORE}!`, hx, hy, '#b3e5ff');
+    playAirSound();
+    activateAirBoost();
+    if (furiaCooldownUntil > gameTime) {
+      const remaining = furiaCooldownUntil - gameTime;
+      furiaCooldownUntil = gameTime + Math.max(0, remaining - AIR_FURIA_RECHARGE_BONUS_MS);
+      spawnFloatingText('⚡ Furia acelerada', hx, hy - 22, '#5cc8ff');
+    }
+    updateScoresUI();
+    airSpawnAt = gameTime + AIR_RESPAWN_DELAY_MS;
+    spawnEatBurst(hx, hy, '#b3e5ff', 10);
+    return;
+  }
+
   const sacIdx = sacrificeFoods.findIndex(f => f.x === head.x && f.y === head.y);
   if (sacIdx !== -1) {
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
@@ -1930,13 +2600,14 @@ function gameUpdate() {
     sacrificeFoods.splice(sacIdx, 1);
     BadgeManager.setVisible('sacrificeOffering', false);
     const prev = lives;
-    lives = Math.min(MAX_LIVES, lives + 1);
+    lives = Math.min(maxLives, lives + 1);
     updateLivesUI();
     triggerHeadPulse('#f3d7bd');
     spawnFloatingText(`🫀 +${lives - prev} Sacrificio recuperado`, hx, hy, '#f3d7bd');
     playEatSound('sacrifice');
     vibrate(20);
     nextSacrificeSpawnAt = lives < MAX_LIVES ? gameTime + SACRIFICE_REPEAT_DELAY_MS : null;
+    spawnEatBurst(hx, hy, '#ef5261', 14);
     return;
   }
   const coIdx = cosmicOrderFoods.findIndex(f => f.x === head.x && f.y === head.y);
@@ -1953,6 +2624,7 @@ function gameUpdate() {
     triggerHeadPulse('#d5bd70');
     spawnFloatingText('🌀 ¡Sello del orden!', hx, hy, '#d5bd70');
     playEatSound('bonus');
+    spawnEatBurst(hx, hy, '#d5bd70', 14);
     return;
   }
   const bonusIdx = bonusFoods.findIndex(f => f.x === head.x && f.y === head.y);
@@ -1965,6 +2637,7 @@ function gameUpdate() {
     spawnFloatingText('+50', hx, hy, '#facc15');
     playEatSound('bonus');
     updateScoresUI();
+    spawnEatBurst(hx, hy, '#facc15', 10);
     return;
   }
   const foodIdx = foods.findIndex(f =>
@@ -1984,6 +2657,7 @@ function gameUpdate() {
       maizeBonus ? '#facc15' : '#d5bd70'
     );
     playEatSound('normal');
+    spawnEatBurst(hx, hy, maizeBonus ? '#facc15' : '#d5bd70', maizeBonus ? 10 : 6);
     ensureFoodCount(6);
     updateScoresUI();
     return;
@@ -1994,12 +2668,16 @@ function gameUpdate() {
   if (crossed) {
     spawnWorldCrossingEffect(head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE + TILE_SIZE / 2);
   }
-  if (isTurbo && snake.length > 0) {
+  if (isFuria && snake.length > 0) {
     const tail = snake[snake.length - 1];
-    spawnTurboTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+    spawnFuriaTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+  } else if (airBoostUntil > gameTime && snake.length > 0) {
+    const tail = snake[snake.length - 1];
+    spawnAirTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
   }
 
   updateEnemySnakeAI();
+  updateMusicLayer();
 }
 
 // ========================================================
@@ -2021,21 +2699,33 @@ function updateScoresUI() {
     safeSetItem('snakeIoHighScore', highScore);
   }
 }
+
 function updateLivesUI() {
-  // Actualizar los corazones en el HUD móvil
-  if (mobileLifePips.length > 0) {
-    mobileLifePips.forEach((pip, i) => pip.classList.toggle('spent', i >= lives));
+  if (livesFixedPipEls && livesFixedPipEls.length > 0) {
+    livesFixedPipEls.forEach((pip, i) => {
+      // Ocultar los pips que excedan maxLives, marcar como gastados los que estén por encima de lives
+      if (i >= maxLives) {
+        pip.style.display = 'none';
+      } else {
+        pip.style.display = '';
+        pip.classList.toggle('spent', i >= lives);
+      }
+    });
   }
-  
-  // Si aún existe el badge de vidas en el DOM (aunque oculto), actualizarlo también
-  if (livesBadge) {
-    const lifePips = livesBadge.querySelectorAll('.life-pip');
-    lifePips.forEach((pip, i) => pip.classList.toggle('spent', i >= lives));
-    livesBadge.setAttribute('aria-label', `Sacrificios: ${lives} de ${MAX_LIVES}`);
-    livesBadge.setAttribute('data-lives-label', String(lives));
+  if (livesFixedContainer) {
+    livesFixedContainer.classList.toggle('critical', lives === 1 && maxLives > 1);
+    livesFixedContainer.setAttribute('aria-label', `Sacrificios restantes: ${lives} de ${maxLives}`);
   }
-  
-  if (livesCount) livesCount.textContent = String(lives);
+  if (livesMobilePipEls && livesMobilePipEls.length > 0) {
+    livesMobilePipEls.forEach((pip, i) => {
+      if (i >= maxLives) {
+        pip.style.display = 'none';
+      } else {
+        pip.style.display = '';
+        pip.classList.toggle('spent', i >= lives);
+      }
+    });
+  }
 }
 
 // ========================================================
@@ -2097,7 +2787,6 @@ function drawFeatherScale(segment, index, color) {
   ctx.restore();
 }
 
-// Cuerpo de Kukulcán: rombos dorados + plumas laterales alternadas
 function drawBodyDiamond(segment, index) {
   const cx = segment.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = segment.y * TILE_SIZE + TILE_SIZE / 2;
@@ -2153,11 +2842,9 @@ function drawBodyDiamond(segment, index) {
 function startFireBreath() {
   fireBreath = { startedAt: gameTime };
 }
-
 function clearFireBreath() {
   fireBreath = null;
 }
-
 function drawFireBreath() {
   if (!fireBreath || !isImmune || snake.length === 0) return;
   const cycle = (gameTime - fireBreath.startedAt) % FIRE_BREATH_CYCLE_MS;
@@ -2197,7 +2884,7 @@ function drawFireBreath() {
   ctx.restore();
 }
 
-// =================== KUKULCÁN ===================
+// =================== KUKULCÁN (CABEZA) ===================
 function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
@@ -2209,11 +2896,10 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const GOLD_PALE = '#fff2c2';
   const JADE_EYE = '#4ec9a0';
 
-  // === 1. CRESTA GRANDE ===
   ctx.save();
   ctx.lineCap = 'round';
 
-  // 5 plumas grandes
+  // DIBUJAR CRESTA/PLUMAS PRIMERO
   ctx.lineWidth = 3;
   ctx.strokeStyle = GOLD_DEEP;
   for (let f = -2; f <= 2; f++) {
@@ -2234,7 +2920,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     ctx.fill();
   }
 
-  // 3 plumas medias
   ctx.lineWidth = 2.6;
   ctx.strokeStyle = GOLD_MAIN;
   for (let f = -1; f <= 1; f++) {
@@ -2255,7 +2940,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     ctx.fill();
   }
 
-  // Pluma central
   ctx.lineWidth = 3.4;
   ctx.strokeStyle = GOLD_PALE;
   const centerLen = 20;
@@ -2284,7 +2968,7 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.fill();
   ctx.restore();
 
-  // === 2. OJOS GEMA DE JADE ===
+  // DIBUJAR CUERPO DE LA SERPIENTE (AHORA ENCIMA DE LA CRESTA)
   if (!isBlinking) {
     const eyeW = 5.5;
     const eyeH = 3.2;
@@ -2370,7 +3054,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     ctx.stroke();
   }
 
-  // === 3. ESCAMAS DORADAS EN LA CARA ===
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.fillStyle = GOLD_MAIN;
@@ -2403,7 +3086,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.fill();
   ctx.restore();
 
-  // === 4. FLECOS LATERALES ===
   ctx.save();
   ctx.lineCap = 'round';
   ctx.strokeStyle = GOLD_MAIN;
@@ -2422,7 +3104,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
   ctx.restore();
 
-  // === 5. DIENTES VISIBLES ===
   ctx.save();
   ctx.fillStyle = '#f5efdc';
   ctx.strokeStyle = 'rgba(0,0,0,0.3)';
@@ -2442,7 +3123,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
   ctx.restore();
 
-  // === 6. LENGUA BÍFIDA ===
   const showTongue = protectedFlag || headPulse > 0.6;
   if (showTongue) {
     ctx.save();
@@ -2480,13 +3160,11 @@ function drawGuardianHead(rs, guardian) {
   const perp = { x: -dir.y, y: dir.x };
   const rear = { x: cx - dir.x * TILE_SIZE * 0.35, y: cy - dir.y * TILE_SIZE * 0.35 };
 
-  // ==== XIBALBÁ (tiene su propio render especial) ====
   if (guardian.behavior.id === 'ambusher') {
-    drawXibalba(rs, guardian, cx, cy, dir, perp, rear);
+    drawChaac(rs, guardian, cx, cy, dir, perp, rear);
     return;
   }
 
-  // ==== CRESTAS NORMALES ====
   ctx.save();
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'round';
@@ -2523,7 +3201,6 @@ function drawGuardianHead(rs, guardian) {
   }
   ctx.restore();
 
-  // Colmillos (cazador)
   if (guardian.behavior.id === 'hunter') {
     ctx.save();
     ctx.fillStyle = '#ffffff';
@@ -2546,7 +3223,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.restore();
   }
 
-  // Tercer ojo (vidente)
   if (guardian.behavior.id === 'interceptor') {
     ctx.save();
     const haloR = TILE_SIZE * 0.28 + Math.sin(gameTime * 0.01) * 1.5;
@@ -2570,7 +3246,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.restore();
   }
 
-  // Dientes dorados (flanqueador)
   if (guardian.behavior.id === 'flanker') {
     ctx.save();
     ctx.fillStyle = '#ffc078';
@@ -2592,7 +3267,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.restore();
   }
 
-  // Ojos
   if (guardian.behavior.id !== 'interceptor') {
     ctx.fillStyle = guardian.palette.eye;
     const eo = 5, es = 4;
@@ -2611,153 +3285,133 @@ function drawGuardianHead(rs, guardian) {
   }
 }
 
-// ==== XIBALBÁ — Render especial (MEJORADO: más murciélago y oscuro) ====
-function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
-  // Paleta más oscura y "tinta"
-  const wingColor = '#0a0208'; // Casi negro con un toque rojo
-  const wingBone = '#4a0a15'; // Rojo sangre oscuro
-  const glowColor = '#ff1a2e'; // Rojo brillante para los detalles
-  const wingSpan = TILE_SIZE * 1.35; // Alas más grandes
-  const flap = Math.sin(gameTime * 0.008) * 0.25; // Aleteo más pronunciado
-  const wingPhase = (Math.sin(gameTime * 0.01) + 1) * 0.5;
+// ==== CHAAC — DIOS MAYA DE LA LLUVIA (mitología mejorada) ====
+function drawChaac(rs, guardian, cx, cy, dir, perp, rear) {
+  const pal = guardian.palette;
+  const time = gameTime;
+  const pulse = Math.sin(time * 0.004) * 0.5 + 0.5;
+  const lightningFlicker = Math.sin(time * 0.02) > 0.7;
 
   ctx.save();
 
-  // Aura infernal más intensa
-  const auraR = TILE_SIZE * 1.6; // Aura más grande
+  const auraR = TILE_SIZE * 1.5;
   const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
-  aura.addColorStop(0, 'rgba(139, 0, 0, 0.7)'); // Más opaco
-  aura.addColorStop(0.6, 'rgba(90, 0, 20, 0.4)');
-  aura.addColorStop(1, 'rgba(61, 13, 30, 0)');
+  aura.addColorStop(0, `rgba(90, 200, 255, ${0.35 + pulse * 0.15})`);
+  aura.addColorStop(0.5, 'rgba(42, 74, 94, 0.25)');
+  aura.addColorStop(1, 'rgba(13, 24, 34, 0)');
   ctx.fillStyle = aura;
   ctx.beginPath();
   ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Alas de murciélago — Más grandes y detalladas
-  for (let side = -1; side <= 1; side += 2) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    const wingAngle = side * (0.45 + flap); // Ángulo más abierto
-    ctx.rotate(wingAngle);
-
-    ctx.fillStyle = wingColor;
-    ctx.strokeStyle = wingBone;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    // Borde superior del ala
-    ctx.quadraticCurveTo(
-      side * wingSpan * 0.5, -wingSpan * 0.7,
-      side * wingSpan * 1.1, -wingSpan * 0.45
-    );
-    // Puntas de los "dedos" del ala
-    ctx.lineTo(side * wingSpan * 1.05, -wingSpan * 0.2);
-    ctx.quadraticCurveTo(
-      side * wingSpan * 0.85, -wingSpan * 0.05,
-      side * wingSpan * 0.95, wingSpan * 0.15
-    );
-    ctx.lineTo(side * wingSpan * 0.75, wingSpan * 0.28);
-    ctx.quadraticCurveTo(
-      side * wingSpan * 0.55, wingSpan * 0.2,
-      side * wingSpan * 0.7, wingSpan * 0.5
-    );
-    // Borde inferior
-    ctx.quadraticCurveTo(
-      side * wingSpan * 0.35, wingSpan * 0.35,
-      0, 0
-    );
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Huesos del ala (más visibles)
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 1.2;
-    ctx.globalAlpha = 0.7 + wingPhase * 0.3;
-    for (let bone = 1; bone <= 3; bone++) {
+  if (lightningFlicker) {
+    ctx.strokeStyle = pal.lightning;
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.85;
+    for (let l = 0; l < 3; l++) {
+      const startA = Math.random() * Math.PI * 2;
+      const startR = TILE_SIZE * 0.6;
+      const sx = cx + Math.cos(startA) * startR;
+      const sy = cy + Math.sin(startA) * startR;
+      const ex = cx + Math.cos(startA + (Math.random() - 0.5) * 0.9) * TILE_SIZE * 1.5;
+      const ey = cy + Math.sin(startA + (Math.random() - 0.5) * 0.9) * TILE_SIZE * 1.5;
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(
-        side * wingSpan * 0.4, -wingSpan * 0.2 * bone,
-        side * wingSpan * (0.5 + bone * 0.18), -wingSpan * (0.08 * bone - 0.1)
-      );
+      ctx.moveTo(sx, sy);
+      const midX = (sx + ex) / 2 + (Math.random() - 0.5) * TILE_SIZE * 0.4;
+      const midY = (sy + ey) / 2 + (Math.random() - 0.5) * TILE_SIZE * 0.4;
+      ctx.lineTo(midX, midY);
+      ctx.lineTo(ex, ey);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-
-    // Puntas brillantes
-    ctx.fillStyle = glowColor;
-    for (let tip = 0; tip < 4; tip++) {
-      const tipX = side * wingSpan * (0.9 - tip * 0.09);
-      const tipY = -wingSpan * (0.18 - tip * 0.1);
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
   }
 
-  // Cresta de huesos (4 puntas)
-  const crestTop = { x: cx - dir.x * TILE_SIZE * 0.3, y: cy - dir.y * TILE_SIZE * 0.3 };
-  for (let c = -1.5; c <= 1.5; c += 1) {
-    const spread = c * 3.2;
+  const crestTop = { x: cx - dir.x * TILE_SIZE * 0.28, y: cy - dir.y * TILE_SIZE * 0.28 };
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = pal.jade;
+  ctx.lineWidth = 2.4;
+  for (let f = -2; f <= 2; f++) {
+    const spread = f * 3.4;
     const baseX = crestTop.x + perp.x * spread;
     const baseY = crestTop.y + perp.y * spread;
-    const tipX = crestTop.x - dir.x * 10 + perp.x * (c * 5.5);
-    const tipY = crestTop.y - dir.y * 10 + perp.y * (c * 5.5);
-    ctx.strokeStyle = guardian.palette.crest;
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = 'round';
+    const len = 14 - Math.abs(f) * 2;
+    const tipX = crestTop.x - dir.x * len + perp.x * (f * 5.5);
+    const tipY = crestTop.y - dir.y * len + perp.y * (f * 5.5);
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
     ctx.lineTo(tipX, tipY);
     ctx.stroke();
-    ctx.fillStyle = glowColor;
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 6;
+    ctx.fillStyle = f === 0 ? pal.lightning : pal.jade;
     ctx.beginPath();
-    ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
+    ctx.arc(tipX, tipY, 1.6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
-
-  // Halo rojo alrededor de la cabeza
-  const eyeGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, TILE_SIZE * 0.6);
-  eyeGlow.addColorStop(0, 'rgba(255, 26, 46, 0.5)');
-  eyeGlow.addColorStop(0.7, 'rgba(255, 26, 46, 0.18)');
-  eyeGlow.addColorStop(1, 'rgba(255, 26, 46, 0)');
-  ctx.fillStyle = eyeGlow;
+  ctx.strokeStyle = pal.lightning;
+  ctx.lineWidth = 3;
+  const centerLen = 18;
+  const tipCX = crestTop.x - dir.x * centerLen;
+  const tipCY = crestTop.y - dir.y * centerLen;
   ctx.beginPath();
-  ctx.arc(cx, cy, TILE_SIZE * 0.6, 0, Math.PI * 2);
+  ctx.moveTo(crestTop.x, crestTop.y);
+  ctx.lineTo(tipCX, tipCY);
+  ctx.stroke();
+  ctx.strokeStyle = pal.jade;
+  ctx.lineWidth = 2;
+  const snakeBaseX = crestTop.x + perp.x * 2;
+  const snakeBaseY = crestTop.y + perp.y * 2;
+  const snakeMidX = crestTop.x + perp.x * 8 - dir.x * 3;
+  const snakeMidY = crestTop.y + perp.y * 8 - dir.y * 3;
+  const snakeEndX = crestTop.x + perp.x * 10 - dir.x * 7;
+  const snakeEndY = crestTop.y + perp.y * 10 - dir.y * 7;
+  ctx.beginPath();
+  ctx.moveTo(snakeBaseX, snakeBaseY);
+  ctx.quadraticCurveTo(snakeMidX, snakeMidY, snakeEndX, snakeEndY);
+  ctx.stroke();
+  ctx.fillStyle = pal.jade;
+  ctx.beginPath();
+  ctx.arc(snakeEndX, snakeEndY, 1.8, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = pal.lightning;
+  ctx.beginPath();
+  ctx.arc(snakeEndX, snakeEndY, 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
-  // Ojos diamante
-  const eyeOff = 4.5;
-  let e1x = rs.x * TILE_SIZE + eyeOff;
-  let e1y = rs.y * TILE_SIZE + eyeOff;
-  let e2x = rs.x * TILE_SIZE + TILE_SIZE - eyeOff - 3;
+  const eo = 4.5;
+  let e1x = rs.x * TILE_SIZE + eo;
+  let e1y = rs.y * TILE_SIZE + eo;
+  let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - 3;
   let e2y = e1y;
   if (dir.y !== 0) {
-    e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eyeOff - 3 : eyeOff);
+    e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - 3 : eo);
     e2y = e1y;
   } else if (dir.x !== 0) {
-    e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eyeOff - 3 : eyeOff);
+    e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - 3 : eo);
     e2x = e1x;
-    e2y = rs.y * TILE_SIZE + TILE_SIZE - eyeOff - 3;
+    e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - 3;
   }
-  ctx.fillStyle = glowColor;
-  ctx.shadowColor = glowColor;
+
+  const eyeGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, TILE_SIZE * 0.55);
+  eyeGlow.addColorStop(0, 'rgba(255, 242, 168, 0.45)');
+  eyeGlow.addColorStop(0.7, 'rgba(122, 208, 255, 0.18)');
+  eyeGlow.addColorStop(1, 'rgba(122, 208, 255, 0)');
+  ctx.fillStyle = eyeGlow;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TILE_SIZE * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = pal.lightning;
+  ctx.shadowColor = pal.lightning;
   ctx.shadowBlur = 8;
   for (const eye of [{ x: e1x, y: e1y }, { x: e2x, y: e2y }]) {
     const ecx = eye.x + 1.5;
     const ecy = eye.y + 1.5;
     ctx.beginPath();
-    ctx.moveTo(ecx, ecy - 2.2);
-    ctx.lineTo(ecx + 1.8, ecy);
-    ctx.lineTo(ecx, ecy + 2.2);
-    ctx.lineTo(ecx - 1.8, ecy);
+    ctx.moveTo(ecx, ecy - 2.4);
+    ctx.lineTo(ecx + 2, ecy);
+    ctx.lineTo(ecx, ecy + 2.4);
+    ctx.lineTo(ecx - 2, ecy);
     ctx.closePath();
     ctx.fill();
   }
@@ -2772,65 +3426,125 @@ function drawXibalba(rs, guardian, cx, cy, dir, perp, rear) {
   }
   ctx.globalAlpha = 1;
 
-  // Colmillos dobles
-  ctx.fillStyle = '#f5efdc';
+  ctx.fillStyle = pal.water;
+  ctx.globalAlpha = 0.85;
+  for (const eye of [{ x: e1x, y: e1y }, { x: e2x, y: e2y }]) {
+    const tearY = eye.y + 3 + (pulse * 2);
+    ctx.beginPath();
+    ctx.ellipse(eye.x + 1.5, tearY, 0.7, 1.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = pal.fang;
   ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = 0.6;
+  ctx.lineWidth = 0.7;
   const mouthX = cx + dir.x * TILE_SIZE * 0.42;
   const mouthY = cy + dir.y * TILE_SIZE * 0.42;
-  const fangLen = TILE_SIZE * 0.4;
   for (let side = -1; side <= 1; side += 2) {
-    const fx = mouthX + perp.x * side * 3.2;
-    const fy = mouthY + perp.y * side * 3.2;
+    const fx = mouthX + perp.x * side * 3.4;
+    const fy = mouthY + perp.y * side * 3.4;
     ctx.beginPath();
     ctx.moveTo(fx, fy);
-    ctx.lineTo(fx + dir.x * fangLen, fy + dir.y * fangLen);
+    ctx.lineTo(fx + dir.x * TILE_SIZE * 0.42, fy + dir.y * TILE_SIZE * 0.42);
     ctx.lineTo(fx + perp.x * side * 1.8, fy + perp.y * side * 1.8);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    const fx2 = fx - perp.x * side * 1.5;
-    const fy2 = fy - perp.y * side * 1.5;
+    const fx2 = fx - perp.x * side * 1.6;
+    const fy2 = fy - perp.y * side * 1.6;
     ctx.beginPath();
     ctx.moveTo(fx2, fy2);
-    ctx.lineTo(fx2 + dir.x * fangLen * 0.7, fy2 + dir.y * fangLen * 0.7);
-    ctx.lineTo(fx2 + perp.x * side * 1.2, fy2 + perp.y * side * 1.2);
+    ctx.lineTo(fx2 + dir.x * TILE_SIZE * 0.3, fy2 + dir.y * TILE_SIZE * 0.3);
+    ctx.lineTo(fx2 + perp.x * side * 1.3, fy2 + perp.y * side * 1.3);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
   }
 
-  // Marca infernal (espiral)
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(gameTime * 0.002);
-  ctx.strokeStyle = glowColor;
-  ctx.lineWidth = 1.2;
-  ctx.globalAlpha = 0.7 + wingPhase * 0.3;
+  ctx.rotate(time * 0.0012);
+  const hachaLen = TILE_SIZE * 0.55;
+  ctx.strokeStyle = pal.stoneDark;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  for (let s = 0; s < 20; s++) {
-    const a = (s / 20) * Math.PI * 1.6;
-    const r = 1 + s * 0.12;
-    const sx = Math.cos(a) * r;
-    const sy = Math.sin(a) * r;
-    if (s === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
-  }
+  ctx.moveTo(0, 0);
+  ctx.lineTo(hachaLen, 0);
   ctx.stroke();
+  ctx.fillStyle = pal.stone;
+  ctx.strokeStyle = pal.stoneDark;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(hachaLen, -2.5);
+  ctx.lineTo(hachaLen + 5, -4.5);
+  ctx.lineTo(hachaLen + 7, 0);
+  ctx.lineTo(hachaLen + 5, 4.5);
+  ctx.lineTo(hachaLen, 2.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (lightningFlicker) {
+    ctx.strokeStyle = pal.lightning;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(hachaLen + 1, -2);
+    ctx.lineTo(hachaLen + 3.5, 0);
+    ctx.lineTo(hachaLen + 1.5, 2);
+    ctx.stroke();
+  }
   ctx.restore();
 
-  // Partículas de fuego fatuo
-  ctx.fillStyle = glowColor;
-  for (let p = 0; p < 3; p++) {
-    const angle = gameTime * 0.003 + p * (Math.PI * 2 / 3);
-    const radius = TILE_SIZE * 0.55;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  for (let row = -1; row <= 1; row++) {
+    for (let col = -1; col <= 1; col++) {
+      const sx = cx + col * TILE_SIZE * 0.22;
+      const sy = cy + row * TILE_SIZE * 0.22;
+      ctx.fillStyle = (row + col) % 2 === 0 ? pal.jade : pal.water;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 1.6);
+      ctx.lineTo(sx + 1.4, sy);
+      ctx.lineTo(sx, sy + 1.6);
+      ctx.lineTo(sx - 1.4, sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  ctx.fillStyle = pal.water;
+  for (let p = 0; p < 5; p++) {
+    const angle = time * 0.002 + p * (Math.PI * 2 / 5);
+    const radius = TILE_SIZE * 0.62;
     const px = cx + Math.cos(angle) * radius;
-    const py = cy + Math.sin(angle) * radius - 3;
-    ctx.globalAlpha = 0.4 + Math.sin(gameTime * 0.008 + p) * 0.3;
+    const py = cy + Math.sin(angle) * radius - 2;
+    const dropAlpha = 0.35 + Math.sin(time * 0.006 + p) * 0.3;
+    ctx.globalAlpha = dropAlpha;
     ctx.beginPath();
-    ctx.arc(px, py, 1.4, 0, Math.PI * 2);
+    ctx.ellipse(px, py, 1, 1.6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  if (guardian.lightningBolts) {
+    guardian.lightningBolts.forEach(lb => {
+      const age = (gameTime - lb.bornAt) / 800;
+      if (age > 1) return;
+      ctx.strokeStyle = pal.lightning;
+      ctx.lineWidth = 2.2 * (1 - age);
+      ctx.globalAlpha = 1 - age;
+      const lx = lb.x * TILE_SIZE + TILE_SIZE / 2;
+      const ly = lb.y * TILE_SIZE + TILE_SIZE / 2;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly - TILE_SIZE);
+      ctx.lineTo(lx + (Math.random() - 0.5) * 7, ly);
+      ctx.lineTo(lx + (Math.random() - 0.5) * 5, ly + TILE_SIZE);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  }
 
   ctx.restore();
 }
@@ -2925,7 +3639,6 @@ function draw(interpolation = 1, updateEffects = false) {
 
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
-  // === COMIDA ===
   foods.forEach(food => {
     const targetX = food.x * TILE_SIZE + TILE_SIZE / 2;
     const targetY = food.y * TILE_SIZE + TILE_SIZE / 2;
@@ -2961,7 +3674,6 @@ function draw(interpolation = 1, updateEffects = false) {
     drawFoodOffering(food, cx, cy, pulse);
   });
 
-  // === BONUS ===
   bonusFoods.forEach(bf => {
     const cx = bf.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = bf.y * TILE_SIZE + TILE_SIZE / 2;
@@ -2984,7 +3696,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.stroke();
   });
 
-  // === JADE ===
   shieldFoods.forEach(sf => {
     const cx = sf.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = sf.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3018,7 +3729,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // === FREEZE ===
   freezeFoods.forEach(ff => {
     const cx = ff.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = ff.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3049,7 +3759,50 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // === SACRIFICIO ===
+  airFoods.forEach(af => {
+    const cx = af.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = af.y * TILE_SIZE + TILE_SIZE / 2;
+    const r = Math.max(5, TILE_SIZE / 2 - 2 + pulse * 0.3);
+    ctx.save();
+    const glowR = r + 7 + Math.sin(gameTime * 0.009) * 3;
+    const grad = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, glowR);
+    grad.addColorStop(0, 'rgba(179, 229, 255, 0.7)');
+    grad.addColorStop(0.6, 'rgba(140, 200, 240, 0.35)');
+    grad.addColorStop(1, 'rgba(140, 200, 240, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.translate(cx, cy);
+    ctx.rotate(gameTime * 0.003);
+    ctx.strokeStyle = '#d9f0ff';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    for (let s = 0; s < 3; s++) {
+      const baseAngle = (s / 3) * Math.PI * 2;
+      ctx.beginPath();
+      for (let t = 0; t < 12; t++) {
+        const tt = t / 11;
+        const angle = baseAngle + tt * Math.PI * 1.6;
+        const rad = r * (0.25 + tt * 0.85);
+        const px = Math.cos(angle) * rad;
+        const py = Math.sin(angle) * rad;
+        if (t === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#b3e5ff';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
   sacrificeFoods.forEach(o => {
     const cx = o.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = o.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3098,7 +3851,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // === CALAVERA ===
   skullFoods.forEach(s => {
     const cx = s.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = s.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3128,7 +3880,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // === SELLO CÓSMICO ===
   cosmicOrderFoods.forEach(co => {
     const cx = co.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = co.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3187,7 +3938,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // === GUARDIANES ===
   enemyGuardians.forEach(guardian => {
     const hitAt = guardian.cosmicOrderHitAt;
     guardian.segments.forEach((seg, idx) => {
@@ -3263,7 +4013,6 @@ function draw(interpolation = 1, updateEffects = false) {
   const isBlinking = (blinkCounter % 90) > 85;
   const playerProtected = hasGuardianProtection();
 
-  // === KUKULCÁN ===
   const KUKULKAN_HEAD = '#4ec9a0';
   const KUKULKAN_BODY = '#1a7a5e';
 
@@ -3277,6 +4026,22 @@ function draw(interpolation = 1, updateEffects = false) {
     aura.addColorStop(0, 'rgba(125, 232, 196, 0.22)');
     aura.addColorStop(1, 'rgba(125, 232, 196, 0)');
     ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (isFuria && snake.length > 0) {
+    const headSeg = snake[0];
+    const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
+    const hx = headRS.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = headRS.y * TILE_SIZE + TILE_SIZE / 2;
+    const flick = Math.sin(gameTime * 0.03) * 0.5 + 0.5;
+    const auraR = TILE_SIZE * (1.3 + flick * 0.3);
+    const furiaAura = ctx.createRadialGradient(hx, hy, TILE_SIZE * 0.3, hx, hy, auraR);
+    furiaAura.addColorStop(0, 'rgba(255, 140, 60, 0.18)');
+    furiaAura.addColorStop(1, 'rgba(255, 140, 60, 0)');
+    ctx.fillStyle = furiaAura;
     ctx.beginPath();
     ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
     ctx.fill();
@@ -3375,6 +4140,11 @@ function startGame() {
   getAudioContext();
   if (isGameRunning) finishRunStatistics();
   resetGame();
+
+  // ⚠️ IMPORTANTE: aplicar reglas del modo DESPUÉS de resetGame()
+  // porque resetGame() ya no toca las vidas.
+  applyGameModeRules();
+
   gameTime = 0;
   simulationAccumulator = 0;
   renderInterpolation = 1;
@@ -3385,7 +4155,7 @@ function startGame() {
   runGuardiansDefeated = 0;
   cancelCountdown();
   startCountdown();
-  updateTurboUI();
+  updateFuriaUI();
 
   dtStartBtn.textContent = '🔄 Reiniciar';
   dtPauseBtn.textContent = '⏸ Pausa';
@@ -3395,8 +4165,11 @@ function startGame() {
   gameOverlay.classList.add('hidden');
   stopWelcomeDemo();
   welcomeScreen.classList.add('hidden');
+  document.body.classList.remove('welcome-open', 'tutorial-open', 'gameover-open');
 
-  startSuspenseMusic();
+  updateLivesUI();
+
+  startMusic();
   startGameLoop();
 }
 
@@ -3410,13 +4183,13 @@ function togglePause() {
     startCountdown();
   }
   dtPauseBtn.textContent = isPaused ? '▶ Reanudar' : '⏸ Pausa';
-  updateTurboUI();
+  updateFuriaUI();
   if (isPaused) {
-    stopSuspenseMusic();
+    stopMusic();
     drawerMenu.classList.remove('hidden');
   } else {
     drawerMenu.classList.add('hidden');
-    startSuspenseMusic();
+    startMusic();
     startGameLoop();
   }
 }
@@ -3426,15 +4199,19 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   isGameRunning = false;
   cancelCountdown();
   clearFireBreath();
-  isTurbo = false;
-  turboReadyAt = 0;
-  turboCooldownUntil = 0;
-  updateTurboUI();
+  isFuria = false;
+  furiaReadyAt = 0;
+  furiaCooldownUntil = 0;
+  BadgeManager.setVisible('furia', false);
+  airBoostUntil = 0;
+  BadgeManager.setVisible('air', false);
+  updateFuriaUI();
   enemySpawnAt = null;
   jadeSpawnAt = null;
   freezeSpawnAt = null;
   guardiansFrozenUntil = 0;
   freezeFoods = [];
+  airFoods = [];
   BadgeManager.setVisible('freeze', false);
   sacredRainUntil = 0;
   nextSacredRainAt = null;
@@ -3457,7 +4234,9 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   enemyGuardians = [];
   updateGuardianBadge();
   deactivateImmunity();
-  stopSuspenseMusic();
+  isOnFire = false;
+  fireExpiresAt = 0;
+  stopMusic();
   playGameOverSound();
   vibrate([80, 50, 80, 50, 150]);
 
@@ -3465,6 +4244,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   finalScoreElement.textContent = score;
   finalLengthElement.textContent = snake.length;
   gameOverlay.classList.remove('hidden');
+  document.body.classList.add('gameover-open');
   dtStartBtn.textContent = '▶ Iniciar';
 }
 
@@ -3504,11 +4284,13 @@ function openTutorial() {
   welcomeStartBtn.classList.add('hidden');
   drawerMenu.classList.add('hidden');
   tutorialModal.classList.remove('hidden');
+  document.body.classList.add('tutorial-open');
   showTutorialStep(1);
 }
 function closeTutorial() {
   if (tutorialModal.classList.contains('hidden')) return;
   tutorialModal.classList.add('hidden');
+  document.body.classList.remove('tutorial-open');
   if (tutorialWasRunning && !tutorialWasPaused && isGameRunning && isPaused) {
     togglePause();
   } else if (tutorialWasRunning && tutorialWasPaused && isGameRunning && isPaused) {
@@ -3563,9 +4345,8 @@ window.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
-btnTurbo.addEventListener('pointerdown', e => { e.preventDefault(); triggerTurboBurst(); });
+btnTurbo.addEventListener('pointerdown', e => { e.preventDefault(); triggerFuria(); });
 
-// NUEVOS BOTONES DEL HUD MÓVIL
 mbPauseBtn.addEventListener('click', () => {
   if (isGameRunning) {
     togglePause();
@@ -3576,7 +4357,7 @@ mbPauseBtn.addEventListener('click', () => {
 
 mbTutorialBtn.addEventListener('click', () => {
   if (isGameRunning && !isPaused) {
-    togglePause(); 
+    togglePause();
   }
   openTutorial();
 });
@@ -3589,7 +4370,7 @@ window.addEventListener('keydown', e => {
   const isMove = e.key.startsWith('Arrow') || ['w','W','a','A','s','S','d','D'].includes(e.key);
   if (isText && isMove) return;
   if (!isText && (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused))) {
-    triggerTurboBurst();
+    triggerFuria();
   }
   switch (e.key) {
     case 'ArrowUp': case 'w': case 'W': changeDirection({ x: 0, y: -1 }); break;
@@ -3654,6 +4435,7 @@ tutStartBtn.addEventListener('click', () => {
   tutorialWasRunning = false; tutorialWasPaused = false;
   tutorialDrawerWasVisible = false; tutorialOpenedFromWelcome = false;
   tutorialModal.classList.add('hidden');
+  document.body.classList.remove('tutorial-open');
   startGame();
 });
 closeTutorialBtn.addEventListener('click', closeTutorial);
@@ -3683,8 +4465,61 @@ function closeStatistics() {
 }
 
 // ========================================================
-// 26. DIFICULTAD
+// 26. DIFICULTAD Y MODO
 // ========================================================
+function updateModeUI() {
+  const isClassic = gameModeSelect.value === 'classic';
+  difficultySelectorBox.style.display = isClassic ? 'flex' : 'none';
+  drawerDifficulty.parentElement.style.display = isClassic ? 'flex' : 'none';
+}
+
+/**
+ * Aplica TODAS las reglas del modo de juego actual.
+ * Es la ÚNICA autoridad sobre `maxLives` y `lives`.
+ * Se debe llamar: al cambiar de modo, al iniciar partida, y al cargar la página.
+ */
+function applyGameModeRules() {
+  const mode = GAME_MODES[gameModeSelect.value] || GAME_MODES.classic;
+
+  // === Vidas máximas según el modo ===
+  maxLives = mode.livesEnabled ? MAX_LIVES : 1;
+
+  // === Vidas actuales ===
+  // Si estamos iniciando una partida (isGameRunning === false recién puesto a true),
+  // queremos vidas al máximo. Si estamos cambiando de modo en medio de una partida,
+  // también reseteamos a las vidas máximas del nuevo modo para evitar inconsistencias.
+  lives = maxLives;
+  updateLivesUI();
+
+  // === Ítems ===
+  if (!mode.itemsEnabled) {
+    shieldFoods = [];
+    freezeFoods = [];
+    airFoods = [];
+    cosmicOrderFoods = [];
+    sacrificeFoods = [];
+    skullFoods = [];
+    BadgeManager.setVisible('sacrificeOffering', false);
+    BadgeManager.setVisible('skullFood', false);
+    BadgeManager.setVisible('cosmicOrder', false);
+    BadgeManager.setVisible('cosmicOrderFood', false);
+    BadgeManager.setVisible('rain', false);
+    BadgeManager.setVisible('immunity', false);
+    BadgeManager.setVisible('freeze', false);
+    sacredRainUntil = 0;
+    cosmicOrderResolveAt = null;
+  }
+
+  // === Timers de ítems (solo si el juego está en marcha) ===
+  if (isGameRunning) {
+    const profile = getDifficultyProfile();
+    nextSacredRainAt = mode.itemsEnabled ? gameTime + profile.rainFirstMs : null;
+    nextCosmicOrderSpawnAt = mode.itemsEnabled ? gameTime + profile.cosmicFirstMs : null;
+    nextSacrificeSpawnAt = mode.itemsEnabled ? gameTime + profile.sacrificeFirstMs : null;
+    nextSkullSpawnAt = mode.itemsEnabled ? gameTime + profile.skullFirstMs : null;
+  }
+}
+
 difficultySelect.addEventListener('change', () => {
   drawerDifficulty.value = difficultySelect.value;
   reconcileGuardianCount();
@@ -3692,6 +4527,26 @@ difficultySelect.addEventListener('change', () => {
 drawerDifficulty.addEventListener('change', () => {
   difficultySelect.value = drawerDifficulty.value;
   reconcileGuardianCount();
+});
+
+gameModeSelect.addEventListener('change', () => {
+  gameMode = gameModeSelect.value;
+  safeSetItem('snakeIoGameMode', gameMode);
+  drawerGameMode.value = gameMode;
+  updateModeUI();
+
+  // Si el juego ya está en marcha, reiniciamos la partida con el nuevo modo
+  // para evitar inconsistencias (vidas, ítems, timers, etc.).
+  // Esto es lo más justo y claro para el jugador.
+  if (isGameRunning) {
+    startGame();
+  } else {
+    applyGameModeRules();
+  }
+});
+drawerGameMode.addEventListener('change', () => {
+  gameModeSelect.value = drawerGameMode.value;
+  gameModeSelect.dispatchEvent(new Event('change'));
 });
 
 // ========================================================
@@ -3707,13 +4562,12 @@ window.addEventListener('blur', () => {
 // ========================================================
 // 28. WELCOME DEMO
 // ========================================================
-// Genera el escenario (posiciones y ruta) para cualquier tamaño de tablero
 function buildWelcomeScenario(cols, rows) {
   const sx = 4;
   const yTop = Math.max(1, Math.round(rows * 0.22));
   let yBot = Math.min(rows - 2, rows - 1 - Math.round(rows * 0.22));
   yBot = Math.max(yBot, yTop + 2);
-  const yG = Math.round((yTop + yBot) / 2);          // carril del guardián
+  const yG = Math.round((yTop + yBot) / 2);
   const jx = Math.max(sx + 5, Math.round(cols * 0.62));
   const xTurn = jx - 2;
   const mx = Math.max(sx + 2, Math.min(xTurn - 1, Math.round(cols * 0.36)));
@@ -3721,11 +4575,11 @@ function buildWelcomeScenario(cols, rows) {
 
   welcomeScenario = { sx, yTop, yBot, yG, jx, mx };
   welcomeDemoRoute = [
-    { direction: { x: 1, y: 0 },  steps: xTurn - sx },    // arriba: come maíz
-    { direction: { x: 0, y: 1 },  steps: yBot - yTop },   // baja
-    { direction: { x: 1, y: 0 },  steps: 2 },             // recoge jade
-    { direction: { x: 0, y: -1 }, steps: yBot - yG },     // sube al carril del guardián
-    { direction: { x: 1, y: 0 },  steps: last }           // embiste
+    { direction: { x: 1, y: 0 },  steps: xTurn - sx },
+    { direction: { x: 0, y: 1 },  steps: yBot - yTop },
+    { direction: { x: 1, y: 0 },  steps: 2 },
+    { direction: { x: 0, y: -1 }, steps: yBot - yG },
+    { direction: { x: 1, y: 0 },  steps: last }
   ];
 }
 
@@ -3755,10 +4609,11 @@ function resetWelcomeDemo() {
   welcomeDemoFlashUntil = 0;
   welcomeDemoGuardianDefeatedUntil = 0;
   welcomeDemoGameOverUntil = 0;
-  welcomeDemoCallout.textContent = 'Muévete por la cuadrícula y busca ofrendas';
+  welcomeDemoCalloutIndex = 0;
+  welcomeDemoCalloutTimer = 0;
+  welcomeDemoCallout.textContent = welcomeDemoCalloutMessages[0];
 }
 
-// Calcula columnas/filas para llenar TODO el canvas
 function updateWelcomeLayout(width, height) {
   const PAD = 8, HUD_H = 36;
   const availW = Math.max(100, width - PAD * 2);
@@ -3981,6 +4836,12 @@ function advanceWelcomeDemo() {
     welcomeDemoRouteIndex++;
     welcomeDemoRouteSteps = 0;
   }
+  welcomeDemoCalloutTimer++;
+  if (welcomeDemoCalloutTimer > 40) {
+    welcomeDemoCalloutTimer = 0;
+    welcomeDemoCalloutIndex = (welcomeDemoCalloutIndex + 1) % welcomeDemoCalloutMessages.length;
+    welcomeDemoCallout.textContent = welcomeDemoCalloutMessages[welcomeDemoCalloutIndex];
+  }
   if (welcomeDemoTick % 2 === 0) moveWelcomeDemoGuardian();
 }
 function drawWelcomeDemo(interpolation = 1) {
@@ -3996,7 +4857,6 @@ function drawWelcomeDemo(interpolation = 1) {
   c.fillStyle = '#141720';
   c.fillRect(0, 0, width, height);
 
-  // HUD con fuentes más grandes
   c.fillStyle = 'rgba(20, 23, 32, 0.9)';
   roundRect(c, 8, 6, Math.min(170, width * 0.55), 24, 9);
   c.fill();
@@ -4111,20 +4971,30 @@ updateSoundUI();
 drawerDpadToggle.checked = showDpad;
 touchControls.classList.toggle('hidden', !showDpad);
 updateScoresUI();
-updateLivesUI();
 updateStatisticsUI();
 showTutorialStep(1);
+
+lives = MAX_LIVES;
+updateLivesUI();
 
 const welcomeCard = welcomeScreen.querySelector('.welcome-card');
 welcomeCard.insertBefore(tutorialModal, welcomeStartBtn);
 tutorialModal.classList.remove('hidden');
 welcomeStartBtn.classList.add('hidden');
 
-BadgeManager.setVisible('lives', true);
+document.body.classList.add('welcome-open');
 
 resetWelcomeDemo();
 startWelcomeDemo();
 resetGame();
 
+updateLivesUI();
+
 resizeCanvas();
 draw();
+
+// Establecer el modo de juego inicial
+gameModeSelect.value = gameMode;
+drawerGameMode.value = gameMode;
+updateModeUI();
+applyGameModeRules(); 
