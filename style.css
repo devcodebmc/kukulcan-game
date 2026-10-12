@@ -55,7 +55,7 @@ html, body {
   line-height: 1.45;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none;
+  touch-action: manipulation; /* ✅ CAMBIADO: era 'none', ahora permite clicks */
 }
 
 button, input, select { font-family: inherit; }
@@ -68,6 +68,13 @@ h1, h2, h3 {
 
 .hidden { display: none !important; }
 
+/* Asegurar que los overlays ocultos no capturen clicks */
+.welcome-screen.hidden,
+.modal-backdrop.hidden {
+  pointer-events: none;
+  visibility: hidden;
+}
+
 /* =========================================================
    CANVAS
    ========================================================= */
@@ -79,6 +86,7 @@ h1, h2, h3 {
   z-index: 1;
   display: block;
   background: var(--bg-1);
+  touch-action: none; /* ✅ Solo aquí, para bloquear gestos sobre el tablero */
 }
 
 /* =========================================================
@@ -356,14 +364,21 @@ body.gameover-open .lives-fixed-container {
   display: none;
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
-  left: max(10px, env(safe-area-inset-left));
-  right: max(10px, env(safe-area-inset-right));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
   z-index: 45;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  pointer-events: none;
+  gap: 6px;
+  pointer-events: none; /* El contenedor no captura, pero los hijos sí */
 }
+
+/* ✅ Red de seguridad: TODOS los hijos directos del HUD móvil capturan clicks */
+.mobile-hud > * {
+  pointer-events: auto;
+}
+
+/* ✅ Botón del menú (hamburguesa) */
 .hud-btn {
   background: rgba(15, 18, 24, 0.7);
   backdrop-filter: blur(8px);
@@ -371,7 +386,8 @@ body.gameover-open .lives-fixed-container {
   border: 1px solid var(--line-strong);
   color: var(--text);
   font-size: 1rem;
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -380,51 +396,93 @@ body.gameover-open .lives-fixed-container {
   pointer-events: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 .hud-btn:active { transform: scale(0.92); }
 
-.hud-center-pill {
-  background: rgba(15, 18, 24, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--line-strong);
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  min-width: 0;
-}
-.hud-center-pill strong { color: var(--jade); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
-.hud-mini-logo { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
-.hud-stat { white-space: nowrap; }
-.hud-divider { opacity: 0.3; }
-
+/* ✅ Contenedor de acciones del HUD (pausa, tutorial, sonido) */
 .hud-actions {
   display: flex;
   gap: 6px;
   pointer-events: auto;
 }
+
 .hud-action-btn {
   background: rgba(15, 18, 24, 0.7);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--line-strong);
   color: var(--text);
   font-size: 0.9rem;
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  pointer-events: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 .hud-action-btn:active { transform: scale(0.92); }
+
+/* ✅ Píldora central con puntaje, récord y vidas */
+.hud-center-pill {
+  background: rgba(15, 18, 24, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line-strong);
+  padding: 5px 8px;
+  border-radius: 20px;
+  font-size: 0.74rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 0;
+  flex: 1;
+  justify-content: center;
+}
+.hud-center-pill strong { color: var(--jade); font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.hud-mini-logo { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
+.hud-stat { white-space: nowrap; }
+.hud-divider { opacity: 0.3; }
+
+/* Vidas en el HUD móvil */
+.hud-center-pill .lives-pips {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hud-center-pill .lives-pips .life-pip {
+  font-size: 0.85rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 3px rgba(239, 82, 97, 0.7));
+}
+.hud-center-pill .lives-pips .life-pip.spent {
+  opacity: 0.2;
+  filter: grayscale(1);
+}
+
+@media (max-width: 400px) {
+  .hud-center-pill {
+    padding: 4px 6px;
+    gap: 4px;
+    font-size: 0.68rem;
+  }
+  .hud-center-pill strong { font-size: 0.78rem; }
+  .hud-center-pill .lives-pips .life-pip { font-size: 0.75rem; }
+  .hud-mini-logo { width: 12px; height: 12px; }
+  .hud-stat { font-size: 0.68rem; }
+  .hud-actions { gap: 4px; }
+  .hud-action-btn, .hud-btn { width: 32px; height: 32px; font-size: 0.85rem; }
+}
 
 /* =========================================================
    BADGES DE ESTADO
@@ -511,7 +569,7 @@ body.gameover-open .lives-fixed-container {
   to   { transform: scale(1.15) rotate(6deg); }
 }
 
-/* === NUEVO: Badge de FURIA === */
+/* === Badge de FURIA === */
 .furia-badge {
   background: rgba(90, 30, 15, 0.95);
   border: 1px solid rgba(255, 107, 44, 0.95);
@@ -532,7 +590,7 @@ body.gameover-open .lives-fixed-container {
   to   { transform: scale(1.25) rotate(10deg); }
 }
 
-/* === NUEVO: Badge de AIRE (viento) === */
+/* === Badge de AIRE (viento) === */
 .air-badge {
   background: rgba(30, 60, 90, 0.9);
   border: 1px solid rgba(179, 229, 255, 0.85);

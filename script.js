@@ -1405,20 +1405,31 @@ function spawnEnemySnake() {
     const dy = Math.min(Math.abs(y - snake[0].y), gridRows - Math.abs(y - snake[0].y));
     if (dx + dy < 8) continue;
     if (candidate.some(c => !isCellFreeForNewGuardian(c.x, c.y))) continue;
+    // Evitar spawnear encima de otro guardián
+    if (enemyGuardians.some(g => g.segments.some(s => 
+      Math.abs(s.x - x) + Math.abs(s.y - y) < 5
+    ))) continue;
 
     const id = nextEnemyId++;
     const normalDefs = GUARDIAN_DEFS.filter(d => d.behavior !== 'ambusher');
-    const def = normalDefs[(id - 1) % normalDefs.length];
+    // === NUEVO: tipo de guardián aleatorio ===
+    const def = normalDefs[Math.floor(Math.random() * normalDefs.length)];
     const guardian = {
       id,
       segments: candidate,
       direction: { x: 1, y: 0 },
       tickCounter: 0,
-      expiresAt: gameTime + profile.guardianLifetimeMs, // <- Usa el lifetime del perfil
+      expiresAt: gameTime + profile.guardianLifetimeMs,
       frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
       palette: def.palette,
       behavior: { id: def.behavior, name: def.name },
-      traits: def.traits
+      traits: def.traits,
+      // === NUEVO: personalidad estable para diversificar IA ===
+      personality: {
+        aggression: 0.7 + Math.random() * 0.6,   // 0.7 - 1.3
+        caution: Math.random() * 0.4,            // 0 - 0.4
+        preferredDistance: 3 + Math.floor(Math.random() * 4) // 3 - 6
+      }
     };
     enemyGuardians.push(guardian);
     hasSpawnedGuardian = true;
@@ -1636,11 +1647,18 @@ function updateEnemySnakeAI() {
   const profile = getDifficultyProfile();
   const moveInterval = profile.guardianMoveInterval;
 
+  // === Mapa de celdas ocupadas por guardianes (objeto plano, no Set) ===
+  const occupiedByGuardians = {};
+  enemyGuardians.forEach(g => {
+    g.segments.forEach(s => {
+      occupiedByGuardians[`${s.x},${s.y}`] = true;
+    });
+  });
+
   for (const g of [...enemyGuardians]) {
-    // ELIMINADO: if (gameTime >= g.expiresAt) { destroyEnemySnake(g.id); continue; }
-    // Ahora los guardianes son permanentes hasta que el jugador los elimine.
     g.tickCounter++;
 
+    // ==== CHAAC: teletransporte con rayos ====
     if (g.behavior.id === 'ambusher') {
       if (gameTime >= g.nextTeleportAt) {
         const playerHead = snake[0];
@@ -1674,7 +1692,6 @@ function updateEnemySnakeAI() {
         }
       }
       if (g.teleportFlash > 0) g.teleportFlash = Math.max(0, g.teleportFlash - 0.05);
-
       if (g.lightningBolts) {
         g.lightningBolts = g.lightningBolts.filter(lb => gameTime - lb.bornAt < 800);
       }
@@ -1727,6 +1744,7 @@ function updateEnemySnakeAI() {
       continue;
     }
 
+    // ==== IA de guardianes normales ====
     const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
     if ((g.tickCounter + g.id) % interval !== 0) continue;
 
@@ -1740,21 +1758,66 @@ function updateEnemySnakeAI() {
     if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
     if (hasGuardianProtection()) { dx = -dx; dy = -dy; }
 
-    const candidates = Math.abs(dx) >= Math.abs(dy)
-      ? [{ x: Math.sign(dx) || 1, y: 0 }, { x: 0, y: Math.sign(dy) || 1 }]
-      : [{ x: 0, y: Math.sign(dy) || 1 }, { x: Math.sign(dx) || 1, y: 0 }];
-    candidates.push({ x: -candidates[0].x, y: -candidates[0].y });
-    candidates.push({ x: -candidates[1].x, y: -candidates[1].y });
+    // === Personalidad: aplicar agresividad ===
+    if (g.personality) {
+      dx *= g.personality.aggression;
+      dy *= g.personality.aggression;
+    }
 
-    const dir = candidates.find(c =>
-      !((c.x !== 0 && c.x === -g.direction.x) || (c.y !== 0 && c.y === -g.direction.y))
-    ) || g.direction;
-    g.direction = dir;
+    // === Generar candidatos ordenados por preferencia ===
+    const possibleDirs = [
+      { x: Math.sign(dx) || 1, y: 0 },
+      { x: 0, y: Math.sign(dy) || 1 },
+      { x: -Math.sign(dx) || -1, y: 0 },
+      { x: 0, y: -Math.sign(dy) || -1 }
+    ];
+    // Ordenar por cuál acerca más al objetivo (distancia Manhattan)
+    possibleDirs.sort((a, b) => {
+      const da = Math.abs(dx - a.x) + Math.abs(dy - a.y);
+      const db = Math.abs(dx - b.x) + Math.abs(dy - b.y);
+      return da - db;
+    });
+
+    const candidates = [];
+    possibleDirs.forEach(d => {
+      if (d.x === 0 && d.y === 0) return;
+      // Evitar reversa directa
+      if ((d.x !== 0 && d.x === -g.direction.x) || (d.y !== 0 && d.y === -g.direction.y)) return;
+      candidates.push(d);
+    });
+    // Fallback: si está acorralado, cualquier dirección válida
+    if (candidates.length === 0) {
+      const allDirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+      allDirs.forEach(d => {
+        if (!(d.x === -g.direction.x && d.y === -g.direction.y)) candidates.push(d);
+      });
+    }
+
+    // === Elegir el primer candidato que no colisione con otro guardián ===
+    let chosenDir = null;
+    for (const c of candidates) {
+      const nx = (enemyHead.x + c.x + gridCols) % gridCols;
+      const ny = (enemyHead.y + c.y + gridRows) % gridRows;
+      const key = `${nx},${ny}`;
+      // Si la celda está ocupada por OTRO guardián, descartar
+      if (occupiedByGuardians[key]) {
+        const isSelf = g.segments.some(s => s.x === nx && s.y === ny);
+        if (!isSelf) continue;
+      }
+      chosenDir = c;
+      break;
+    }
+    if (!chosenDir) chosenDir = g.direction;
+    g.direction = chosenDir;
 
     const newHead = {
-      x: (enemyHead.x + dir.x + gridCols) % gridCols,
-      y: (enemyHead.y + dir.y + gridRows) % gridRows
+      x: (enemyHead.x + chosenDir.x + gridCols) % gridCols,
+      y: (enemyHead.y + chosenDir.y + gridRows) % gridRows
     };
+
+    // === Actualizar el mapa de ocupación ===
+    delete occupiedByGuardians[`${enemyHead.x},${enemyHead.y}`];
+    occupiedByGuardians[`${newHead.x},${newHead.y}`] = true;
 
     const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
     if (touches) {
@@ -3165,10 +3228,24 @@ function drawGuardianHead(rs, guardian) {
     return;
   }
 
+  const pal = guardian.palette;
+
+  // === Cabeza con borde oscuro para mejor contraste ===
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TILE_SIZE * 0.42, 0, Math.PI * 2);
+  ctx.fillStyle = pal.head;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // === Cresta/plumas ===
   ctx.save();
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'round';
-  const crestColor = guardian.palette.crest;
+  const crestColor = pal.crest;
 
   if (guardian.behavior.id === 'flanker') {
     for (let side = -1; side <= 1; side += 2) {
@@ -3201,87 +3278,40 @@ function drawGuardianHead(rs, guardian) {
   }
   ctx.restore();
 
-  if (guardian.behavior.id === 'hunter') {
-    ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 0.8;
-    const mouthX = cx + dir.x * TILE_SIZE * 0.42;
-    const mouthY = cy + dir.y * TILE_SIZE * 0.42;
-    const fangLen = TILE_SIZE * 0.3;
-    for (let side = -1; side <= 1; side += 2) {
-      const fx = mouthX + perp.x * side * 3.5;
-      const fy = mouthY + perp.y * side * 3.5;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + dir.x * fangLen, fy + dir.y * fangLen);
-      ctx.lineTo(fx + perp.x * side * 1.5, fy + perp.y * side * 1.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.restore();
+  // === Ojos ===
+  const eo = 5, es = 4;
+  let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo;
+  let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - es, e2y = e1y;
+  if (dir.y !== 0) {
+    e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - es : eo);
+    e2y = e1y;
+  } else if (dir.x !== 0) {
+    e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - es : eo);
+    e2x = e1x;
+    e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - es;
   }
-
+  ctx.fillStyle = pal.eye;
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1;
   if (guardian.behavior.id === 'interceptor') {
-    ctx.save();
-    const haloR = TILE_SIZE * 0.28 + Math.sin(gameTime * 0.01) * 1.5;
-    const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
-    halo.addColorStop(0, 'rgba(240, 224, 255, 0.85)');
-    halo.addColorStop(1, 'rgba(166, 91, 212, 0)');
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#f0e0ff';
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE * 0.16, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#4a1a6b';
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE * 0.07, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  if (guardian.behavior.id === 'flanker') {
-    ctx.save();
-    ctx.fillStyle = '#ffc078';
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.lineWidth = 0.8;
-    const mouthX = cx + dir.x * TILE_SIZE * 0.4;
-    const mouthY = cy + dir.y * TILE_SIZE * 0.4;
-    for (let side = -1; side <= 1; side += 2) {
-      const fx = mouthX + perp.x * side * 4;
-      const fy = mouthY + perp.y * side * 4;
+    // Vidente: ojos en forma de diamante
+    for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
+      const ecx = eye.x + 2;
+      const ecy = eye.y + 2;
       ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + dir.x * TILE_SIZE * 0.16, fy + dir.y * TILE_SIZE * 0.16);
-      ctx.lineTo(fx + perp.x * side * 2, fy + perp.y * side * 2);
+      ctx.moveTo(ecx, ecy - 3);
+      ctx.lineTo(ecx + 3, ecy);
+      ctx.lineTo(ecx, ecy + 3);
+      ctx.lineTo(ecx - 3, ecy);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
     }
-    ctx.restore();
-  }
-
-  if (guardian.behavior.id !== 'interceptor') {
-    ctx.fillStyle = guardian.palette.eye;
-    const eo = 5, es = 4;
-    let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo;
-    let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - es, e2y = e1y;
-    if (dir.y !== 0) {
-      e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - es : eo);
-      e2y = e1y;
-    } else if (dir.x !== 0) {
-      e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - es : eo);
-      e2x = e1x;
-      e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - es;
-    }
+  } else {
     ctx.fillRect(e1x, e1y, es, es);
     ctx.fillRect(e2x, e2y, es, es);
+    ctx.strokeRect(e1x, e1y, es, es);
+    ctx.strokeRect(e2x, e2y, es, es);
   }
 }
 
@@ -4998,3 +5028,47 @@ gameModeSelect.value = gameMode;
 drawerGameMode.value = gameMode;
 updateModeUI();
 applyGameModeRules(); 
+
+// ========================================================
+// 30. PWA — CAPTURA DEL EVENTO DE INSTALACIÓN
+// ========================================================
+(function initPWAInstall() {
+  const btns = [
+    document.getElementById('pwa-install-btn'),
+    document.getElementById('pwa-install-btn-2')
+  ].filter(Boolean); // Filtra los null
+
+  if (btns.length === 0) {
+    console.log('[PWA] No hay botones de instalación en el DOM.');
+    return;
+  }
+
+  let deferredInstallPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('[PWA] beforeinstallprompt detectado. Mostrando botones.');
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    btns.forEach(btn => btn.classList.remove('hidden'));
+  });
+
+  btns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) {
+        console.log('[PWA] No hay prompt de instalación pendiente.');
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      console.log(`[PWA] Instalación: ${outcome}`);
+      deferredInstallPrompt = null;
+      btns.forEach(b => b.classList.add('hidden'));
+    });
+  });
+
+  window.addEventListener('appinstalled', () => {
+    console.log('[PWA] ¡Kukulcán instalado!');
+    btns.forEach(btn => btn.classList.add('hidden'));
+    deferredInstallPrompt = null;
+  });
+})();
