@@ -950,6 +950,39 @@ body.gameover-open .lives-fixed-container {
 }
 .welcome-actions {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+.welcome-selects {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.welcome-selects .select-box {
+  flex: 1;
+  min-width: 130px;
+  max-width: 200px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.welcome-selects .select-box label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-align: left;
+}
+.welcome-selects .styled-select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+.welcome-buttons {
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -1082,6 +1115,16 @@ body.gameover-open .lives-fixed-container {
     padding: 12px;
     gap: 10px;
     background: rgba(20, 24, 32, 0.98);
+  }
+  .welcome-selects {
+    gap: 8px;
+  }
+  .welcome-selects .select-box {
+    min-width: 100px;
+  }
+  .welcome-selects .styled-select {
+    padding: 8px;
+    font-size: 0.78rem;
   }
   .welcome-start-btn {
     padding: 12px 20px;

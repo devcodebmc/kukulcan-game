@@ -36,8 +36,29 @@
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
       </div>
       <div class="welcome-actions">
-        <button id="welcome-info-btn" class="icon-btn" aria-label="Instrucciones">ℹ️</button>
-        <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">▶ Jugar</button>
+        <div class="welcome-selects">
+          <div class="select-box">
+            <label for="welcome-game-mode">Modo</label>
+            <select id="welcome-game-mode" class="styled-select">
+              <option value="classic" selected>Clásico</option>
+              <option value="hunt">Cacería</option>
+              <option value="survival">Supervivencia</option>
+            </select>
+          </div>
+          <div class="select-box" id="welcome-difficulty-box">
+            <label for="welcome-difficulty">Dificultad</label>
+            <select id="welcome-difficulty" class="styled-select">
+              <option value="easy">Fácil</option>
+              <option value="medium" selected>Medio</option>
+              <option value="hard">Difícil</option>
+              <option value="extreme">Pesadilla</option>
+            </select>
+          </div>
+        </div>
+        <div class="welcome-buttons">
+          <button id="welcome-info-btn" class="icon-btn" aria-label="Instrucciones">ℹ️</button>
+          <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">▶ Jugar</button>
+        </div>
       </div>
     </div>
   </section>

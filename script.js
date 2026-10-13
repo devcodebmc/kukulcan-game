@@ -32,7 +32,7 @@ if ('serviceWorker' in navigator) {
 // 1. REFERENCIAS AL DOM
 // ========================================================
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d', { alpha: false });
+const ctx = canvas.getContext('2d', { alpha: true });
 
 const dtScore = document.getElementById('dt-score');
 const dtHighScore = document.getElementById('dt-high-score');
@@ -52,6 +52,9 @@ const welcomeInfoBtn = document.getElementById('welcome-info-btn');
 const welcomeDemo = document.getElementById('welcome-demo');
 const welcomeDemoCallout = document.getElementById('welcome-demo-callout');
 const welcomeDemoContext = welcomeDemo.getContext('2d', { alpha: false });
+const welcomeGameMode = document.getElementById('welcome-game-mode');
+const welcomeDifficulty = document.getElementById('welcome-difficulty');
+const welcomeDifficultyBox = document.getElementById('welcome-difficulty-box');
 
 const menuToggleBtn = document.getElementById('menu-toggle-btn');
 const mbScore = document.getElementById('mb-score');
@@ -60,7 +63,6 @@ const mbSoundBtn = document.getElementById('mb-sound-btn');
 const mbPauseBtn = document.getElementById('mb-pause-btn');
 const mbTutorialBtn = document.getElementById('mb-tutorial-btn');
 
-// === Indicador de vidas ===
 const livesFixedContainer = document.getElementById('lives-fixed-container');
 const livesFixedPips = document.getElementById('lives-fixed-pips');
 const livesFixedPipEls = livesFixedPips ? livesFixedPips.querySelectorAll('.life-pip') : [];
@@ -94,7 +96,6 @@ const skullFoodBadge = document.getElementById('skull-food-badge');
 const sacrificeOfferingBadge = document.getElementById('sacrifice-offering-badge');
 const threatBadge = document.getElementById('threat-badge');
 
-// === NUEVO: badges de FURIA y AIRE ===
 const furiaBadge = document.getElementById('furia-badge');
 const furiaTimerSpan = document.getElementById('furia-timer');
 const airBadge = document.getElementById('air-badge');
@@ -348,7 +349,6 @@ const DIFFICULTY_PROFILES = {
   }
 };
 
-// === MODOS DE JUEGO ===
 const GAME_MODES = {
   classic: {
     name: 'Clásico',
@@ -449,7 +449,6 @@ function getDifficultyProfile() {
     Object.assign(profile, mode.profileOverrides);
   }
 
-  // Aplicar multiplicadores del modo sobre los valores ya definidos
   profile.guardianFirstSpawnMs *= mode.guardianSpawnRate;
   profile.guardianNextSpawnMs *= mode.guardianSpawnRate;
   profile.guardianReward *= mode.guardianRewardMultiplier;
@@ -481,8 +480,9 @@ const GUARDIAN_FREEZE_DURATION_MS = 3000;
 const CHAAC_UNLOCK_MS = 45000;
 const CHAAC_COOLDOWN_MS = 60000;
 const CHAAC_LIFETIME_MS = 999999;
-const CHAAC_TELEPORT_MS = 3200;
+const CHAAC_TELEPORT_MS = 5000;      
 const CHAAC_RETRY_MS = 3000;
+const CHAAC_VULNERABLE_MS = 2200;    
 
 const GUARDIAN_DEFS = [
   {
@@ -519,14 +519,12 @@ const GUARDIAN_DEFS = [
   }
 ];
 
-// === CONTROL DE COLORES ÚNICOS POR PARTIDA ===
 let usedGuardianPalettes = [];
 
 function getUniqueGuardianDef() {
   const normalDefs = GUARDIAN_DEFS.filter(d => d.behavior !== 'ambusher');
   const available = normalDefs.filter(d => !usedGuardianPalettes.includes(d.name));
   if (available.length === 0) {
-    // Si ya se usaron todos, reiniciar (o devolver el que menos se usó)
     usedGuardianPalettes = [];
     return normalDefs[Math.floor(Math.random() * normalDefs.length)];
   }
@@ -1203,7 +1201,6 @@ function updateFuriaUI() {
   if (turboProgress) turboProgress.style.setProperty('--turbo-charge', `${Math.round(charge * 100)}%`);
 }
 
-// Alias para compatibilidad con código que aún llame "triggerTurboBurst"
 function triggerTurboBurst() { triggerFuria(); }
 function updateTurboUI() { updateFuriaUI(); }
 
@@ -1311,11 +1308,30 @@ function spawnEatBurst(x, y, color = '#d5bd70', count = 6) {
     });
   }
 }
+
 function updateAndDrawParticles(updateState = true) {
+  const MAX_PARTICLES = window.innerWidth <= 768 ? 60 : 150;
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+  
+  // ✅ Limitar cantidad
+  if (particles.length > MAX_PARTICLES) {
+    particles.splice(0, particles.length - MAX_PARTICLES);
+  }
+  
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (updateState) { p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; }
-    if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+    
+    // ✅ ELIMINAR PARTÍCULAS FUERA DE PANTALLA (evita smear en bordes)
+    const isOffScreen = p.x < -50 || p.x > screenW + 50 || 
+                        p.y < -50 || p.y > screenH + 50;
+    
+    if (p.alpha <= 0 || isOffScreen) { 
+      particles.splice(i, 1); 
+      continue; 
+    }
+    
     ctx.globalAlpha = p.alpha;
     ctx.fillStyle = p.color;
     ctx.beginPath();
@@ -1378,9 +1394,7 @@ function activateImmunity(seconds = 10) {
   updateMusicLayer();
 }
 
-function activateFireImmunity(seconds = 8) {
-  // No-op
-}
+function activateFireImmunity(seconds = 8) {}
 function deactivateFireImmunity() {
   isOnFire = false;
   fireExpiresAt = 0;
@@ -1511,7 +1525,6 @@ function spawnEnemySnake() {
     ))) continue;
 
     const id = nextEnemyId++;
-    // === USAR DEF ÚNICO ===
     const def = getUniqueGuardianDef();
     const guardian = {
       id,
@@ -1721,87 +1734,50 @@ function destroyEnemySnake(id, spawnBonus = true) {
   const idx = enemyGuardians.findIndex(g => g.id === id);
   if (idx === -1) return;
   const [g] = enemyGuardians.splice(idx, 1);
+
+  // ✅ Limpiar posiciones previas para evitar renderizado huérfano
+  previousGuardianPositions.delete(id);
+
+  // ✅ Limpiar partículas asociadas al guardián (humo de teletransporte, etc.)
+  if (g.smokeParticles) g.smokeParticles = [];
+
   if (spawnBonus) {
-    g.segments.forEach(s => bonusFoods.push({ x: s.x, y: s.y }));
-    if (g.behavior.id === 'ambusher') {
-      g.segments.forEach(s => {
-        bonusFoods.push({ x: s.x, y: s.y });
-        for (let p = 0; p < 4; p++) {
-          const a = (Math.PI * 2 * p) / 4 + Math.random() * 0.3;
-          const sp = 2 + Math.random() * 2;
-          particles.push({
-            x: s.x * TILE_SIZE + TILE_SIZE / 2,
-            y: s.y * TILE_SIZE + TILE_SIZE / 2,
-            vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-            size: 3 + Math.random() * 2,
-            color: Math.random() > 0.5 ? '#d98e2b' : '#14110f',
-            alpha: 1, decay: 0.02
-          });
-        }
+    g.segments.forEach(s => {
+      // ✅ Bonus food con expiración
+      bonusFoods.push({
+        x: s.x,
+        y: s.y,
+        expiresAt: gameTime + 12000
       });
+    });
+    if (g.behavior.id === 'ambusher') {
+      const head = g.segments[0];
+      bonusFoods.push({
+        x: head.x,
+        y: head.y,
+        expiresAt: gameTime + 15000,
+        isBossDrop: true
+      });
+      // Partículas de explosión (reducidas y efímeras)
+      for (let p = 0; p < 8; p++) {
+        const a = (Math.PI * 2 * p) / 8;
+        const sp = 1.5 + Math.random() * 2;
+        particles.push({
+          x: head.x * TILE_SIZE + TILE_SIZE / 2,
+          y: head.y * TILE_SIZE + TILE_SIZE / 2,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          size: 2 + Math.random() * 1.5,
+          color: ['#d98e2b', '#f2e2b8', '#14110f'][p % 3],
+          alpha: 1,
+          decay: 0.06
+        });
+      }
       nextChaacSpawnAt = gameTime + getDifficultyProfile().chaacCooldownMs;
     }
   }
   updateGuardianBadge();
   scheduleEnemySpawn();
-}
-
-function scoreMove(guardian, dir, occupiedByGuardians, playerHead, isFleeing) {
-  const enemyHead = guardian.segments[0];
-  const newX = (enemyHead.x + dir.x + gridCols) % gridCols;
-  const newY = (enemyHead.y + dir.y + gridRows) % gridRows;
-  const key = `${newX},${newY}`;
-
-  // Colisión con otro guardián
-  if (occupiedByGuardians[key]) {
-    const isSelf = guardian.segments.some(s => s.x === newX && s.y === newY);
-    if (!isSelf) return -Infinity;
-  }
-
-  // Colisión con serpiente
-  if (snake.some(s => s.x === newX && s.y === newY)) {
-    // Si estamos huyendo o protegidos, es malo; si perseguimos, es bueno
-    return isFleeing ? -Infinity : 1000;
-  }
-
-  let score = 0;
-
-  // Distancia al objetivo (con wrap)
-  const target = getGuardianTarget(guardian, playerHead, null);
-  let dx = target.x - newX;
-  let dy = target.y - newY;
-  if (Math.abs(dx) > gridCols / 2) dx = -Math.sign(dx) * (gridCols - Math.abs(dx));
-  if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
-  const dist = Math.abs(dx) + Math.abs(dy);
-
-  if (isFleeing) {
-    score -= dist * 10;
-  } else {
-    score -= dist * 10;
-  }
-
-  // Evitar callejones sin salida (flood fill limitado)
-  const freeSpace = floodFillCount(newX, newY, 12, occupiedByGuardians);
-  score += freeSpace * 1.5;
-
-  // Evitar celdas recientes
-  if (guardian.recentCells.includes(key)) {
-    score -= 50;
-  }
-
-  // Aleatoriedad según dificultad
-  const profile = getDifficultyProfile();
-  const difficulty = getEffectiveDifficulty();
-  let errorChance = 0;
-  if (difficulty === 'easy') errorChance = 0.35;
-  else if (difficulty === 'medium') errorChance = 0.2;
-  else if (difficulty === 'hard') errorChance = 0.1;
-  else if (difficulty === 'extreme') errorChance = 0.05;
-  if (Math.random() < errorChance) {
-    score += (Math.random() - 0.5) * 200;
-  }
-
-  return score;
 }
 
 function floodFillCount(startX, startY, maxCells, occupiedByGuardians) {
@@ -1849,11 +1825,14 @@ function updateEnemySnakeAI() {
   });
 
   for (const g of [...enemyGuardians]) {
+    if (g.destroyed) continue;
     g.tickCounter++;
 
-    // ==== TEZCATLIPOCA: teletransporte con humo de obsidiana ====
     if (g.behavior.id === 'ambusher') {
-      if (gameTime >= g.nextTeleportAt) {
+      // ⚖️ Tezcatlipoca solo se mueve/teletransporta si NO está vulnerable
+      const isVulnerable = gameTime < g.vulnerableUntil;
+      
+      if (!isVulnerable && gameTime >= g.nextTeleportAt) {
         const total = gridCols * gridRows;
         const start = Math.floor(Math.random() * total);
         for (let o = 0; o < total; o++) {
@@ -1863,12 +1842,15 @@ function updateEnemySnakeAI() {
           const dx = Math.min(Math.abs(tx - playerHead.x), gridCols - Math.abs(tx - playerHead.x));
           const dy = Math.min(Math.abs(ty - playerHead.y), gridRows - Math.abs(ty - playerHead.y));
           const dist = dx + dy;
-          if (dist >= 6 && dist <= 10 && !isGuardianCellOccupied(tx, ty)) {
+          // ⚖️ Rango más cercano (4-7 celdas) para que sea alcanzable
+          if (dist >= 4 && dist <= 7 && !isGuardianCellOccupied(tx, ty)) {
             const oldHead = g.segments[0];
             g.smokeParticles.push({ x: oldHead.x, y: oldHead.y, bornAt: gameTime });
             g.segments[0] = { x: tx, y: ty };
             g.teleportFlash = 1;
             g.teleportDest = { x: tx, y: ty };
+            // ⚖️ Después de teletransportarse, queda vulnerable 2.2s
+            g.vulnerableUntil = gameTime + CHAAC_VULNERABLE_MS;
             g.nextTeleportAt = gameTime + profile.chaacTeleportMs;
             for (let p = 0; p < 12; p++) {
               const a = Math.random() * Math.PI * 2;
@@ -1892,6 +1874,42 @@ function updateEnemySnakeAI() {
         g.smokeParticles = g.smokeParticles.filter(sp => gameTime - sp.bornAt < 800);
       }
 
+      // ⚖️ Si está vulnerable, no se mueve (queda quieto esperando ser eliminado)
+      if (isVulnerable) {
+        // Solo verifica si el jugador lo toca
+        const head = g.segments[0];
+        const touches = snake.some(s => s.x === head.x && s.y === head.y);
+        if (touches) {
+          if (hasGuardianProtection() || isFuria || guardiansFrozenUntil > gameTime) {
+            const frozen = guardiansFrozenUntil > gameTime;
+            const shield = isImmune;
+            const furia = isFuria;
+            const color = furia ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
+            const symbol = furia ? '🔥' : shield ? '💎' : frozen ? '❄️' : '🪶';
+            const reward = furia ? FURIA_GUARDIAN_REWARD : profile.bossReward;
+            screenShake = 12;
+            playEnemyDefeatedSound();
+            vibrate([40, 30, 40, 30, 60]);
+            runGuardiansDefeated++;
+            score += reward;
+            const label = furia
+              ? `+${reward} ${symbol} ¡TEZCATLIPOCA INCINERADO!`
+              : frozen
+                ? `+${reward} ${symbol} ¡TEZCATLIPOCA CONGELADO!`
+                : `+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`;
+            spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+            updateScoresUI();
+            destroyEnemySnake(g.id);
+            continue;
+          } else {
+            screenShake = 12;
+            loseLife('¡Tezcatlipoca, el jaguar de obsidiana, te devoró!');
+            return;
+          }
+        }
+        continue; // No se mueve mientras es vulnerable
+      }
+
       const enemyHead = g.segments[0];
       let dx = playerHead.x - enemyHead.x;
       let dy = playerHead.y - enemyHead.y;
@@ -1912,7 +1930,10 @@ function updateEnemySnakeAI() {
         x: (enemyHead.x + dir.x + gridCols) % gridCols,
         y: (enemyHead.y + dir.y + gridRows) % gridRows
       };
-      const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
+      // ⚖️ Detección ampliada: también detecta si el jugador está adyacente
+      const touches = snake.some(s => 
+        Math.abs(s.x - newHead.x) <= 1 && Math.abs(s.y - newHead.y) <= 1
+      );
       if (touches) {
         if (hasGuardianProtection() || isFuria || guardiansFrozenUntil > gameTime) {
           const frozen = guardiansFrozenUntil > gameTime;
@@ -1946,7 +1967,6 @@ function updateEnemySnakeAI() {
       continue;
     }
 
-    // ==== IA de guardianes normales con puntuación de movimientos ====
     const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
     if ((g.tickCounter + g.id) % interval !== 0) continue;
 
@@ -1962,12 +1982,10 @@ function updateEnemySnakeAI() {
     const candidates = [];
 
     for (const dir of possibleDirs) {
-      // Evitar reversa directa
       if ((dir.x !== 0 && dir.x === -g.direction.x) || (dir.y !== 0 && dir.y === -g.direction.y)) continue;
       const newX = (enemyHead.x + dir.x + gridCols) % gridCols;
       const newY = (enemyHead.y + dir.y + gridRows) % gridRows;
       const key = `${newX},${newY}`;
-      // Evitar colisión con otro guardián
       if (occupiedByGuardians[key]) {
         const isSelf = g.segments.some(s => s.x === newX && s.y === newY);
         if (!isSelf) continue;
@@ -1975,7 +1993,6 @@ function updateEnemySnakeAI() {
       candidates.push({ dir, newX, newY, key });
     }
 
-    // Fallback si no hay candidatos
     if (candidates.length === 0) {
       const allDirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
       for (const dir of allDirs) {
@@ -1987,12 +2004,10 @@ function updateEnemySnakeAI() {
       }
     }
 
-    // Evaluar cada candidato
     for (const cand of candidates) {
       const { dir, newX, newY } = cand;
       let score = 0;
 
-      // Distancia al objetivo (con wrap)
       const target = getGuardianTarget(g, playerHead, null);
       let dx = target.x - newX;
       let dy = target.y - newY;
@@ -2006,16 +2021,13 @@ function updateEnemySnakeAI() {
         score -= dist * 10;
       }
 
-      // Evitar callejones sin salida (flood fill limitado)
       const freeSpace = floodFillCount(newX, newY, 12, occupiedByGuardians);
       score += freeSpace * 1.5;
 
-      // Evitar celdas recientes
       if (g.recentCells.includes(cand.key)) {
         score -= 50;
       }
 
-      // Aleatoriedad según dificultad
       const difficulty = getEffectiveDifficulty();
       let errorChance = 0;
       if (difficulty === 'easy') errorChance = 0.35;
@@ -2040,15 +2052,12 @@ function updateEnemySnakeAI() {
       y: (enemyHead.y + bestDir.y + gridRows) % gridRows
     };
 
-    // Actualizar recentCells
     g.recentCells.push(`${newHead.x},${newHead.y}`);
     if (g.recentCells.length > 5) g.recentCells.shift();
 
-    // Actualizar el mapa de ocupación
     delete occupiedByGuardians[`${enemyHead.x},${enemyHead.y}`];
     occupiedByGuardians[`${newHead.x},${newHead.y}`] = true;
 
-    // Indicador de objetivo cuando está cerca
     const headDist = Math.min(
       Math.abs(newHead.x - playerHead.x),
       gridCols - Math.abs(newHead.x - playerHead.x)
@@ -2242,6 +2251,7 @@ function resolveCosmicOrder() {
   });
   enemyGuardians = [];
   previousGuardianPositions.clear();
+  particles = particles.filter(p => p.decay > 0.03 || p.alpha > 0.5);
   updateGuardianBadge();
 
   screenShake = 10;
@@ -2527,6 +2537,11 @@ function updateGameTimers(elapsedMs) {
     cosmicOrderFlashStartedAt = null;
   }
 
+  // ✅ Expiración de bonus foods
+  if (bonusFoods.length > 0) {
+    bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
+  }
+
   if (isImmune && snake.length > 0) {
     jadeTrailAccumulator += elapsedMs;
     if (jadeTrailAccumulator > 55) {
@@ -2799,8 +2814,19 @@ function gameUpdate() {
     return;
   }
 
-  const hitG = enemyGuardians.find(g => g.segments.some(s => s.x === head.x && s.y === head.y));
-  if (hitG) {
+  // ⚖️ Detección de colisión ampliada: incluye celdas adyacentes para el boss
+  // Esto hace que sea más fácil tocarlo con la cabeza de Kukulcán
+  const hitG = enemyGuardians.find(g => {
+    if (g.destroyed) return false;
+    if (g.behavior.id === 'ambusher') {
+      // ⚖️ Radio ampliado de 1 celda para Tezcatlipoca
+      return g.segments.some(s => 
+        Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1
+      );
+    }
+    return g.segments.some(s => s.x === head.x && s.y === head.y);
+  });
+  if (hitG && !hitG.destroyed) {
     const isBoss = hitG.behavior.id === 'ambusher';
     const profile = getDifficultyProfile();
     if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isFuria) {
@@ -3066,9 +3092,14 @@ function interpolateGridPosition(current, previous, progress) {
   else if (dx < -gridCols / 2) dx += gridCols;
   if (dy > gridRows / 2) dy -= gridRows;
   else if (dy < -gridRows / 2) dy += gridRows;
+  
+  // ✅ Clampear el resultado a los límites de la cuadrícula
+  const rawX = previous.x + dx * progress;
+  const rawY = previous.y + dy * progress;
+  
   return {
-    x: (previous.x + dx * progress + gridCols) % gridCols,
-    y: (previous.y + dy * progress + gridRows) % gridRows
+    x: Math.max(0, Math.min(gridCols - 1, (rawX + gridCols) % gridCols)),
+    y: Math.max(0, Math.min(gridRows - 1, (rawY + gridRows) % gridRows))
   };
 }
 function roundRect(c, x, y, w, h, r) {
@@ -3108,7 +3139,6 @@ function drawFeatherScale(segment, index, guardian) {
   ctx.save();
 
   if (type === 'hunter') {
-    // Manchas de jaguar (rosetas: círculo oscuro con punto claro)
     if (index % 2 === 0) {
       ctx.globalAlpha = 0.55;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -3127,7 +3157,6 @@ function drawFeatherScale(segment, index, guardian) {
       ctx.fill();
     }
   } else if (type === 'interceptor') {
-    // Glifos mayas (rombos pequeños formando patrón)
     ctx.globalAlpha = index % 2 === 0 ? 0.7 : 0.45;
     ctx.fillStyle = pal.crest;
     const s = size * 0.5;
@@ -3145,7 +3174,6 @@ function drawFeatherScale(segment, index, guardian) {
       ctx.fill();
     }
   } else if (type === 'flanker') {
-    // Plumas de quetzal (líneas diagonales verdes)
     ctx.globalAlpha = index % 2 === 0 ? 0.65 : 0.4;
     ctx.strokeStyle = pal.crest;
     ctx.lineWidth = 1.4;
@@ -3156,7 +3184,6 @@ function drawFeatherScale(segment, index, guardian) {
     ctx.lineTo(cx + size * 0.7 * backDir, cy - size * 0.7);
     ctx.stroke();
   } else {
-    // Fallback genérico
     ctx.globalAlpha = index % 2 === 0 ? 0.75 : 0.5;
     ctx.fillStyle = pal.crest;
     ctx.beginPath();
@@ -3224,7 +3251,6 @@ function drawBodyDiamond(segment, index, isGolden = false) {
     }
   }
 
-  // === DESTELLOS DE DIAMANTE (solo cuando está dorado, muy sutiles) ===
   if (isGolden) {
     const sparklePhase = (gameTime * 0.003 + index * 1.3) % (Math.PI * 2);
     const sparkleIntensity = Math.max(0, Math.sin(sparklePhase));
@@ -3298,14 +3324,13 @@ function drawFireBreath() {
   ctx.restore();
 }
 
-// =================== KUKULCÁN (CABEZA) ===================
+// =================== KUKULCÁN ===================
 function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
   const perp = { x: -dir.y, y: dir.x };
   const rear = { x: cx - dir.x * TILE_SIZE * 0.34, y: cy - dir.y * TILE_SIZE * 0.34 };
 
-  // === COLORES SEGÚN ESTADO ===
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
   const GOLD_MAIN = isGolden ? '#d4b45c' : '#d5bd70';
   const GOLD_DEEP = isGolden ? '#a8924a' : '#a8843a';
@@ -3313,42 +3338,25 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const JADE_EYE = '#4ec9a0';
   const HEAD_FILL = isGolden ? '#c2a95e' : '#4ec9a0';
 
-  // === CUERPO DE LA CABEZA (bloque redondeado original) ===
   ctx.save();
   ctx.fillStyle = HEAD_FILL;
-  roundRect(
-    ctx,
-    rs.x * TILE_SIZE + 1,
-    rs.y * TILE_SIZE + 1,
-    TILE_SIZE - 2,
-    TILE_SIZE - 2,
-    8
-  );
+  roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
   ctx.fill();
   ctx.strokeStyle = GOLD_PALE;
   ctx.lineWidth = isGolden ? 1.8 : 1.4;
-  roundRect(
-    ctx,
-    rs.x * TILE_SIZE + 1,
-    rs.y * TILE_SIZE + 1,
-    TILE_SIZE - 2,
-    TILE_SIZE - 2,
-    8
-  );
+  roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
   ctx.stroke();
   ctx.restore();
 
   ctx.save();
   ctx.lineCap = 'round';
 
-  // === CASCO DORADO DISCRETO SOBRE LOS OJOS (detalle nuevo, sutil) ===
   ctx.save();
   const helmCenterX = cx - dir.x * TILE_SIZE * 0.02;
   const helmCenterY = cy - dir.y * TILE_SIZE * 0.02;
   const helmW = TILE_SIZE * 0.7;
   const helmH = TILE_SIZE * 0.22;
 
-  // Banda dorada que cruza la frente
   ctx.translate(helmCenterX, helmCenterY);
   ctx.rotate(Math.atan2(dir.y, dir.x));
   ctx.fillStyle = GOLD_MAIN;
@@ -3358,14 +3366,12 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.fill();
   ctx.stroke();
 
-  // Franja clara superior
   ctx.fillStyle = GOLD_PALE;
   ctx.globalAlpha = 0.7;
   roundRect(ctx, -helmW / 2 + 1, -helmH / 2 - TILE_SIZE * 0.15 + 1, helmW - 2, helmH * 0.4, 1);
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Gema central jade sobre la banda
   ctx.fillStyle = JADE_EYE;
   ctx.shadowColor = JADE_EYE;
   ctx.shadowBlur = isGolden ? 7 : 4;
@@ -3381,7 +3387,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // Remaches laterales
   ctx.fillStyle = GOLD_DEEP;
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
@@ -3390,7 +3395,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
   ctx.restore();
 
-  // === OJOS ===
   if (!isBlinking) {
     const eyeW = 5.5;
     const eyeH = 3.2;
@@ -3423,12 +3427,10 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
       ctx.ellipse(gcx, gcy, eyeW / 2, eyeH / 2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-      // Pupila vertical (serpiente)
       ctx.fillStyle = '#0e1a14';
       ctx.beginPath();
       ctx.ellipse(gcx, gcy, eyeW * 0.1, eyeH * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Brillo
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.beginPath();
       ctx.ellipse(gcx - 0.8, gcy - 1, eyeW * 0.22, eyeH * 0.22, 0, 0, Math.PI * 2);
@@ -3437,7 +3439,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
       ctx.beginPath();
       ctx.arc(gcx + 1, gcy + 0.8, 0.5, 0, Math.PI * 2);
       ctx.fill();
-      // Borde dorado
       ctx.strokeStyle = GOLD_MAIN;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -3448,7 +3449,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     drawGemEye(e1x, e1y);
     drawGemEye(e2x, e2y);
 
-    // Cejas doradas
     ctx.strokeStyle = GOLD_DEEP;
     ctx.lineWidth = 1.4;
     ctx.lineCap = 'round';
@@ -3487,7 +3487,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     ctx.stroke();
   }
 
-  // === ROMBOS DECORATIVOS EN LA CABEZA (con detalle extra) ===
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.fillStyle = GOLD_MAIN;
@@ -3500,13 +3499,11 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.lineTo(frx - 1.6, fry);
   ctx.closePath();
   ctx.fill();
-  // Punto brillante central en el rombo frontal
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.arc(frx, fry, 0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Rombos laterales
   ctx.fillStyle = GOLD_MAIN;
   const lx1 = cx + perp.x * TILE_SIZE * 0.28 - dir.x * 2;
   const ly1 = cy + perp.y * TILE_SIZE * 0.28 - dir.y * 2;
@@ -3528,7 +3525,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.fill();
   ctx.restore();
 
-  // === ESCAMAS / PLUMAS LATERALES (las originales) ===
   ctx.save();
   ctx.lineCap = 'round';
   ctx.strokeStyle = GOLD_MAIN;
@@ -3547,7 +3543,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
   ctx.restore();
 
-  // === COLMILLOS ===
   ctx.save();
   ctx.fillStyle = '#f5efdc';
   ctx.strokeStyle = 'rgba(0,0,0,0.3)';
@@ -3567,7 +3562,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
   ctx.restore();
 
-  // === LENGUA ===
   const showTongue = protectedFlag || headPulse > 0.6 || isGolden;
   if (showTongue) {
     ctx.save();
@@ -3597,7 +3591,6 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   }
 }
 
-// === PENACHO DE KUKULCÁN (se dibuja DESPUÉS del cuerpo para quedar por encima) ===
 function drawKukulkanPlume(rs, dir, protectedFlag) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3613,7 +3606,6 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
   ctx.save();
   ctx.lineCap = 'round';
 
-  // === CRESTA / PLUMAS TRASERAS ===
   ctx.lineWidth = 3;
   ctx.strokeStyle = GOLD_DEEP;
   for (let f = -2; f <= 2; f++) {
@@ -3654,7 +3646,6 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
     ctx.fill();
   }
 
-  // === PLUMA CENTRAL ===
   ctx.lineWidth = 3.4;
   ctx.strokeStyle = GOLD_PALE;
   const centerLen = 22;
@@ -3700,7 +3691,6 @@ function drawGuardianHead(rs, guardian) {
   const pal = guardian.palette;
   const type = guardian.behavior.id;
 
-  // === OJOS COMUNES ===
   const eo = 5, es = 4;
   let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo;
   let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - es, e2y = e1y;
@@ -3713,11 +3703,8 @@ function drawGuardianHead(rs, guardian) {
     e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - es;
   }
 
-  // ==================== CAZADOR ====================
   if (type === 'hunter') {
     ctx.save();
-
-    // === CABEZA DE JAGUAR (bloque base redondeado) ===
     ctx.fillStyle = pal.head;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)';
     ctx.lineWidth = 1.5;
@@ -3725,7 +3712,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Orejas triangulares (a los lados traseros)
     ctx.fillStyle = pal.head;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 1;
@@ -3739,7 +3725,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      // Interior de la oreja
       ctx.fillStyle = pal.crest;
       ctx.beginPath();
       ctx.moveTo(earX, earY);
@@ -3750,7 +3735,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.fillStyle = pal.head;
     }
 
-    // Manchas de jaguar alrededor de los ojos
     for (let side = -1; side <= 1; side += 2) {
       const rx = cx + dir.x * TILE_SIZE * 0.1 + perp.x * side * TILE_SIZE * 0.22;
       const ry = cy + dir.y * TILE_SIZE * 0.1 + perp.y * side * TILE_SIZE * 0.22;
@@ -3764,7 +3748,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.fill();
     }
 
-    // Hocico
     ctx.fillStyle = pal.crest;
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 0.8;
@@ -3779,7 +3762,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Nariz triangular
     ctx.fillStyle = '#1a1008';
     ctx.beginPath();
     ctx.moveTo(cx + dir.x * TILE_SIZE * 0.35, cy + dir.y * TILE_SIZE * 0.35);
@@ -3788,7 +3770,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.closePath();
     ctx.fill();
 
-    // Colmillos
     ctx.fillStyle = '#fff8dc';
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.6;
@@ -3804,7 +3785,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.stroke();
     }
 
-    // Bigotes
     ctx.strokeStyle = pal.crest;
     ctx.lineWidth = 0.5;
     ctx.globalAlpha = 0.6;
@@ -3818,7 +3798,6 @@ function drawGuardianHead(rs, guardian) {
     }
     ctx.globalAlpha = 1;
 
-    // Máscara funeraria (banda roja sobre la frente)
     ctx.strokeStyle = '#9b2929';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
@@ -3826,7 +3805,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.lineTo(cx - dir.x * TILE_SIZE * 0.2 - perp.x * TILE_SIZE * 0.35, cy - dir.y * TILE_SIZE * 0.2 - perp.y * TILE_SIZE * 0.35);
     ctx.stroke();
 
-    // Gema central en la máscara
     ctx.fillStyle = '#fff0c6';
     ctx.beginPath();
     ctx.arc(cx - dir.x * TILE_SIZE * 0.2, cy - dir.y * TILE_SIZE * 0.2, 1.5, 0, Math.PI * 2);
@@ -3834,7 +3812,6 @@ function drawGuardianHead(rs, guardian) {
 
     ctx.restore();
 
-    // Ojos
     ctx.fillStyle = pal.eye;
     ctx.fillRect(e1x, e1y, es, es);
     ctx.fillRect(e2x, e2y, es, es);
@@ -3848,11 +3825,8 @@ function drawGuardianHead(rs, guardian) {
     ctx.strokeRect(e2x, e2y, es, es);
   }
 
-  // ==================== VIDENTE ====================
   else if (type === 'interceptor') {
     ctx.save();
-
-    // === CABEZA BASE (bloque redondeado, sin forma de cráneo) ===
     ctx.fillStyle = pal.head;
     ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 1.5;
@@ -3860,7 +3834,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Tercer ojo de obsidiana (rombo frontal)
     const thirdEyeX = cx + dir.x * TILE_SIZE * 0.12;
     const thirdEyeY = cy + dir.y * TILE_SIZE * 0.12;
     ctx.fillStyle = '#1a0830';
@@ -3879,7 +3852,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.arc(thirdEyeX, thirdEyeY, 0.9, 0, Math.PI * 2);
     ctx.fill();
 
-    // Tocado de plumas largas
     ctx.strokeStyle = pal.crest;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
@@ -3899,7 +3871,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.fill();
     }
 
-    // Orejeras mayas
     for (let side = -1; side <= 1; side += 2) {
       const orX = cx + perp.x * side * TILE_SIZE * 0.32 - dir.x * TILE_SIZE * 0.05;
       const orY = cy + perp.y * side * TILE_SIZE * 0.32 - dir.y * TILE_SIZE * 0.05;
@@ -3915,10 +3886,8 @@ function drawGuardianHead(rs, guardian) {
       ctx.arc(orX, orY, 1, 0, Math.PI * 2);
       ctx.fill();
     }
-
     ctx.restore();
 
-    // Ojos en rombo
     ctx.fillStyle = pal.eye;
     for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
       const ecx = eye.x + 2;
@@ -3946,11 +3915,8 @@ function drawGuardianHead(rs, guardian) {
     }
   }
 
-  // ==================== FLANQUEADOR ====================
   else if (type === 'flanker') {
     ctx.save();
-
-    // === CABEZA BASE (bloque redondeado) ===
     ctx.fillStyle = pal.head;
     ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 1.5;
@@ -3958,7 +3924,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Nariz ganchuda prominente
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.9;
@@ -3976,13 +3941,11 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Orificio de la nariz
     ctx.fillStyle = '#1a0806';
     ctx.beginPath();
     ctx.arc(noseTipX - dir.x * 2, noseTipY - dir.y * 2, 0.9, 0, Math.PI * 2);
     ctx.fill();
 
-    // Mandíbula expuesta
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 0.7;
@@ -3997,7 +3960,6 @@ function drawGuardianHead(rs, guardian) {
     ctx.fill();
     ctx.stroke();
 
-    // Dientes expuestos
     ctx.fillStyle = '#fff8dc';
     for (let i = 0; i < 3; i++) {
       const dx = cx + dir.x * TILE_SIZE * (0.08 + i * 0.07) + perp.x * 0;
@@ -4010,7 +3972,6 @@ function drawGuardianHead(rs, guardian) {
       ctx.fill();
     }
 
-    // Plumas de quetzal laterales
     ctx.strokeStyle = pal.crest;
     ctx.lineWidth = 2.2;
     ctx.lineCap = 'round';
@@ -4032,7 +3993,6 @@ function drawGuardianHead(rs, guardian) {
       }
     }
 
-    // Orejeras de jade
     for (let side = -1; side <= 1; side += 2) {
       const orX = cx + perp.x * side * TILE_SIZE * 0.34 - dir.x * TILE_SIZE * 0.08;
       const orY = cy + perp.y * side * TILE_SIZE * 0.34 - dir.y * TILE_SIZE * 0.08;
@@ -4048,10 +4008,8 @@ function drawGuardianHead(rs, guardian) {
       ctx.arc(orX, orY, 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
-
     ctx.restore();
 
-    // Ojos
     ctx.fillStyle = pal.eye;
     ctx.fillRect(e1x, e1y, es, es);
     ctx.fillRect(e2x, e2y, es, es);
@@ -4066,7 +4024,6 @@ function drawGuardianHead(rs, guardian) {
   }
 }
 
-// ==== TEZCATLIPOCA — JAGUAR GEOMÉTRICO ====
 function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   const pal = guardian.palette;
   const time = gameTime;
@@ -4075,19 +4032,42 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
 
   ctx.save();
 
+  // ⚖️ Indicador de vulnerabilidad (parpadeo dorado cuando es eliminable)
+  const isVulnerable = guardian.vulnerableUntil && gameTime < guardian.vulnerableUntil;
+  
   // === AURA DE OBSIDIANA ===
   const auraR = TILE_SIZE * 1.9;
   const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
-  aura.addColorStop(0, `rgba(217, 142, 43, ${0.28 + pulse * 0.12})`);
-  aura.addColorStop(0.5, 'rgba(168, 86, 27, 0.18)');
-  aura.addColorStop(1, 'rgba(20, 17, 15, 0)');
+  if (isVulnerable) {
+    // Aura dorada pulsante cuando es vulnerable
+    const vulnPulse = Math.sin(gameTime * 0.015) * 0.5 + 0.5;
+    aura.addColorStop(0, `rgba(255, 220, 120, ${0.45 + vulnPulse * 0.25})`);
+    aura.addColorStop(0.5, `rgba(217, 142, 43, ${0.25 + vulnPulse * 0.15})`);
+    aura.addColorStop(1, 'rgba(255, 220, 120, 0)');
+  } else {
+    aura.addColorStop(0, `rgba(217, 142, 43, ${0.28 + pulse * 0.12})`);
+    aura.addColorStop(0.5, 'rgba(168, 86, 27, 0.18)');
+    aura.addColorStop(1, 'rgba(20, 17, 15, 0)');
+  }
   ctx.fillStyle = aura;
   ctx.beginPath();
   ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
   ctx.fill();
+  
+  // ⚖️ Anillo dorado brillante cuando es vulnerable
+  if (isVulnerable) {
+    ctx.save();
+    const ringPulse = Math.sin(gameTime * 0.02) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(255, 220, 120, ${0.6 + ringPulse * 0.4})`;
+    ctx.lineWidth = 2 + ringPulse * 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, TILE_SIZE * 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 
-  // === CUERPO GEOMÉTRICO (BLOQUES) ===
-  // Dibujamos el cuerpo como 4 segmentos rectangulares gruesos que se estrechan
   const bodySegments = 4;
   const bodyStepX = -dir.x * TILE_SIZE * 0.55;
   const bodyStepY = -dir.y * TILE_SIZE * 0.55;
@@ -4102,7 +4082,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.translate(segX, segY);
     ctx.rotate(angle);
 
-    // Bloque del cuerpo (ámbar o naranja quemado alternado)
     ctx.fillStyle = i % 2 === 0 ? pal.head : pal.body;
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 1.4;
@@ -4110,7 +4089,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
     ctx.stroke();
 
-    // Roseta de obsidiana (rombo) en el centro del segmento
     ctx.fillStyle = pal.obsidian;
     ctx.beginPath();
     const rs2 = segH * 0.22;
@@ -4124,8 +4102,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.restore();
   }
 
-  // === 4 PATAS ===
-  // Patas dibujadas como pequeños bloques a los lados del cuerpo
   for (let side = -1; side <= 1; side += 2) {
     for (let p = 0; p < 2; p++) {
       const offset = (p === 0 ? 0.5 : 1.5);
@@ -4136,7 +4112,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.translate(pawX, pawY);
       ctx.rotate(angle);
 
-      // Pata (bloque rectangular)
       ctx.fillStyle = pal.body;
       ctx.strokeStyle = pal.obsidian;
       ctx.lineWidth = 1.1;
@@ -4144,7 +4119,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.fill();
       ctx.stroke();
 
-      // Garra (pequeño triángulo ámbar)
       ctx.fillStyle = pal.head;
       ctx.beginPath();
       ctx.moveTo(TILE_SIZE * 0.18, -TILE_SIZE * 0.14);
@@ -4157,13 +4131,10 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     }
   }
 
-  // === COLA DE SERPIENTE ===
-  // Cola curva que sale de la parte trasera del cuerpo con segmentos pequeños
   const tailBaseX = cx - dir.x * TILE_SIZE * 2.4;
   const tailBaseY = cy - dir.y * TILE_SIZE * 2.4;
   const tailWave = Math.sin(time * 0.008) * 2.5;
 
-  // Segmentos de la cola (5 bloquecitos que se van curvando)
   for (let i = 0; i < 5; i++) {
     const tt = i / 4;
     const wave = Math.sin(time * 0.008 + i * 0.8) * 2.5;
@@ -4183,7 +4154,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.restore();
   }
 
-  // Punta de la cola: rombo de obsidiana (como punta de flecha)
   const tipTailX = tailBaseX - dir.x * TILE_SIZE * 1.75 + perp.x * tailWave;
   const tipTailY = tailBaseY - dir.y * TILE_SIZE * 1.75 + perp.y * tailWave;
   ctx.save();
@@ -4202,14 +4172,12 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.stroke();
   ctx.restore();
 
-  // === CORONA DE PLUMAS RADIANTES ===
-  // Plumas dispuestas en abanico alrededor de la parte superior de la cabeza
   ctx.save();
   const crownCenterX = cx - dir.x * TILE_SIZE * 0.05;
   const crownCenterY = cy - dir.y * TILE_SIZE * 0.05;
   const plumeCount = 9;
   for (let p = 0; p < plumeCount; p++) {
-    const tt = (p / (plumeCount - 1)) - 0.5; // -0.5 a 0.5
+    const tt = (p / (plumeCount - 1)) - 0.5;
     const plumeAngle = angle + tt * Math.PI * 0.9;
     const plumeLen = TILE_SIZE * (0.9 - Math.abs(tt) * 0.35);
     const baseX = crownCenterX + Math.cos(plumeAngle) * TILE_SIZE * 0.35;
@@ -4217,7 +4185,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     const tipX = crownCenterX + Math.cos(plumeAngle) * (TILE_SIZE * 0.35 + plumeLen);
     const tipY = crownCenterY + Math.sin(plumeAngle) * (TILE_SIZE * 0.35 + plumeLen);
 
-    // Forma de hoja/pluma (rombo alargado)
     const perpP = { x: -Math.sin(plumeAngle), y: Math.cos(plumeAngle) };
     const leafW = TILE_SIZE * 0.14;
 
@@ -4233,7 +4200,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
     ctx.stroke();
 
-    // Nervadura central de la pluma
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 0.6;
     ctx.beginPath();
@@ -4243,12 +4209,10 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   }
   ctx.restore();
 
-  // === CABEZA GEOMÉTRICA DE JAGUAR ===
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  // Base de la cabeza (bloque cuadrado con esquinas redondeadas)
   const headSize = TILE_SIZE * 0.82;
   ctx.fillStyle = pal.head;
   ctx.strokeStyle = pal.obsidian;
@@ -4257,7 +4221,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.fill();
   ctx.stroke();
 
-  // Orejas triangulares (arriba, a los lados)
   for (let side = -1; side <= 1; side += 2) {
     const earX = side * headSize * 0.34;
     const earY = -headSize * 0.5;
@@ -4271,7 +4234,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    // Interior de la oreja
     ctx.fillStyle = pal.body;
     ctx.beginPath();
     ctx.moveTo(earX - TILE_SIZE * 0.05, earY + TILE_SIZE * 0.02);
@@ -4281,20 +4243,17 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
   }
 
-  // Manchas de obsidiana alrededor de los ojos (rosetas)
   for (let side = -1; side <= 1; side += 2) {
     ctx.fillStyle = pal.obsidian;
     ctx.beginPath();
     ctx.arc(side * headSize * 0.26, 0, headSize * 0.16, 0, Math.PI * 2);
     ctx.fill();
-    // Punto ámbar interior
     ctx.fillStyle = pal.head;
     ctx.beginPath();
     ctx.arc(side * headSize * 0.26, 0, headSize * 0.08, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Ojos (rombos verdes/ámbar brillantes)
   for (let side = -1; side <= 1; side += 2) {
     const eyeX = side * headSize * 0.24;
     const eyeY = 0;
@@ -4310,14 +4269,12 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Pupila vertical (obsidiana)
     ctx.fillStyle = pal.obsidian;
     ctx.beginPath();
     ctx.ellipse(eyeX, eyeY, headSize * 0.018, headSize * 0.05, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Nariz (triángulo invertido de obsidiana)
   ctx.fillStyle = pal.obsidian;
   ctx.beginPath();
   ctx.moveTo(0, headSize * 0.05);
@@ -4326,7 +4283,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.closePath();
   ctx.fill();
 
-  // Hocico (bloque más claro debajo de la nariz)
   ctx.fillStyle = pal.ember;
   ctx.strokeStyle = pal.obsidian;
   ctx.lineWidth = 0.8;
@@ -4334,7 +4290,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.fill();
   ctx.stroke();
 
-  // Colmillos triangulares
   for (let side = -1; side <= 1; side += 2) {
     ctx.fillStyle = '#f5efdc';
     ctx.strokeStyle = pal.obsidian;
@@ -4348,7 +4303,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.stroke();
   }
 
-  // Bigotes (líneas de obsidiana)
   ctx.strokeStyle = pal.obsidian;
   ctx.lineWidth = 0.6;
   ctx.globalAlpha = 0.7;
@@ -4364,7 +4318,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
 
   ctx.restore();
 
-  // === HUMO DE OBSIDIANA (teletransporte) ===
   if (guardian.smokeParticles) {
     guardian.smokeParticles.forEach(sp => {
       const age = (gameTime - sp.bornAt) / 800;
@@ -4455,10 +4408,45 @@ function drawFoodOffering(food, cx, cy, pulse) {
 }
 
 // ========================================================
-// 20. DRAW PRINCIPAL
+// 20. DRAW PRINCIPAL — AHORA CON LIMPIEZA CORRECTA
 // ========================================================
 function draw(interpolation = 1, updateEffects = false) {
+  // ========================================================
+  // ✅ FIX PROFESIONAL DEL SMEAR:
+  // 1. Resetear la transformación al estado base
+  // 2. Limpiar TODO el canvas (ahora funciona porque alpha:true)
+  // 3. Aplicar clip a toda el área visible para evitar dibujar fuera
+  // 4. Redibujar el fondo completo
+  // 5. Restaurar transformación para el juego
+  // ========================================================
+  
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+  
+  // Reset transform y limpieza TOTAL del canvas
   ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+  
+  // Redibujar fondo completo del tablero
+  if (boardCanvas) {
+    ctx.drawImage(boardCanvas, 0, 0, screenW, screenH);
+  } else {
+    const theme = BOARD_THEMES[gameMode] || BOARD_THEMES.classic;
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, screenW, screenH);
+  }
+  
+  // ✅ CLIP: Recortar todo el dibujado al área visible del juego
+  // Esto evita que partículas, guardianes o cualquier elemento se pinten fuera
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, screenW, screenH);
+  ctx.clip();
+  
+  // Aplicar screen shake después del clip
   if (screenShake > 0) {
     const dx = (Math.random() - 0.5) * screenShake;
     const dy = (Math.random() - 0.5) * screenShake;
@@ -4468,10 +4456,7 @@ function draw(interpolation = 1, updateEffects = false) {
       if (screenShake < 0.3) screenShake = 0;
     }
   }
-
-  if (boardCanvas) ctx.drawImage(boardCanvas, 0, 0, window.innerWidth, window.innerHeight);
-  else { ctx.fillStyle = '#141720'; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight); }
-
+  
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
   foods.forEach(food => {
@@ -4512,7 +4497,16 @@ function draw(interpolation = 1, updateEffects = false) {
   bonusFoods.forEach(bf => {
     const cx = bf.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = bf.y * TILE_SIZE + TILE_SIZE / 2;
-    ctx.fillStyle = '#f0cf70';
+    
+    const timeLeft = bf.expiresAt ? bf.expiresAt - gameTime : 999999;
+    const isExpiring = timeLeft < 3000;
+    const blinkAlpha = isExpiring 
+      ? (Math.sin(gameTime * 0.02) > 0 ? 1 : 0.3)
+      : 1;
+    
+    ctx.save();
+    ctx.globalAlpha = blinkAlpha;
+    ctx.fillStyle = bf.isBossDrop ? '#ffb347' : '#f0cf70';
     ctx.beginPath();
     const radius = Math.max(4, TILE_SIZE / 2 - 2 + pulse * 0.45);
     for (let p = 0; p < 16; p++) {
@@ -4529,6 +4523,7 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.beginPath();
     ctx.arc(cx, cy, radius * 0.36, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
   });
 
   shieldFoods.forEach(sf => {
@@ -4773,7 +4768,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.restore();
   });
 
-  // Guardianes con interpolación individual
   enemyGuardians.forEach(guardian => {
     const hitAt = guardian.cosmicOrderHitAt;
     guardian.segments.forEach((seg, idx) => {
@@ -4783,7 +4777,6 @@ function draw(interpolation = 1, updateEffects = false) {
 
       const previousSegments = previousGuardianPositions.get(guardian.id);
       let progress = interpolation;
-      // Si el guardián se ha movido en este tick, interpolamos; si no, usamos 1
       if (guardian.lastMoveTick === guardian.tickCounter) {
         progress = interpolation;
       } else {
@@ -4801,13 +4794,11 @@ function draw(interpolation = 1, updateEffects = false) {
         ? '#f5e5ad'
         : isHead ? guardian.palette.head : guardian.palette.body;
 
-      // Estrechamiento hacia la cola
       const tailFactor = 1 - (idx / guardian.segments.length) * 0.5;
       const segSize = TILE_SIZE * tailFactor;
 
       ctx.fillStyle = fillColor;
 
-      // Forma de la cabeza según dirección
       if (isHead) {
         roundRect(
           ctx,
@@ -4837,7 +4828,6 @@ function draw(interpolation = 1, updateEffects = false) {
       }
     });
 
-    // Indicador de objetivo
     if (guardian.targetIndicator) {
       const ti = guardian.targetIndicator;
       const tx = ti.x * TILE_SIZE + TILE_SIZE / 2;
@@ -4891,11 +4881,10 @@ function draw(interpolation = 1, updateEffects = false) {
     }
   });
 
-    if (updateEffects) blinkCounter++;
+  if (updateEffects) blinkCounter++;
   const isBlinking = (blinkCounter % 90) > 85;
   const playerProtected = hasGuardianProtection();
 
-  // === ESTADO DORADO DE KUKULCÁN ===
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
   const KUKULKAN_HEAD = isGolden ? '#b8a668' : '#4ec9a0';
   const KUKULKAN_BODY = isGolden ? '#9c8a4a' : '#1a7a5e';
@@ -4903,7 +4892,6 @@ function draw(interpolation = 1, updateEffects = false) {
   const KUKULKAN_INNER = isGolden ? 'rgba(245, 235, 190, 0.4)' : 'rgba(182, 242, 209, 0.28)';
   const KUKULKAN_PLATE = isGolden ? '#c2b06a' : null;
 
-  // === AURA VERDE (protección de plumas / respawn) ===
   if (playerProtected && snake.length > 0) {
     const headSeg = snake[0];
     const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
@@ -4919,7 +4907,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fill();
   }
 
-  // === AURA DORADA MUY SUTIL (inmunidad / furia / hielo) ===
   if (isGolden && snake.length > 0) {
     const headSeg = snake[0];
     const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
@@ -4936,7 +4923,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Partículas doradas orbitando (muy espaciadas)
     if (updateEffects && Math.random() < 0.15) {
       const a = Math.random() * Math.PI * 2;
       const r = TILE_SIZE * (0.9 + Math.random() * 0.5);
@@ -4952,7 +4938,6 @@ function draw(interpolation = 1, updateEffects = false) {
     }
   }
 
-  // === AURA DE FURIA (roja/naranja, también suavizada) ===
   if (isFuria && snake.length > 0) {
     const headSeg = snake[0];
     const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
@@ -4969,7 +4954,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fill();
   }
 
-  // === DIBUJAR CADA SEGMENTO DE KUKULCÁN ===
   snake.forEach((seg, idx) => {
     const isHead = idx === 0;
     const rs = interpolateGridPosition(
@@ -4979,7 +4963,6 @@ function draw(interpolation = 1, updateEffects = false) {
     );
 
     if (!isHead) {
-      // === CUERPO ===
       ctx.fillStyle = KUKULKAN_BODY;
       roundRect(
         ctx,
@@ -4993,7 +4976,6 @@ function draw(interpolation = 1, updateEffects = false) {
 
       ctx.save();
 
-      // === PLACAS DE ARMADURA (cuando está dorado) ===
       if (isGolden) {
         ctx.fillStyle = KUKULKAN_PLATE;
         roundRect(
@@ -5017,7 +4999,6 @@ function draw(interpolation = 1, updateEffects = false) {
         );
         ctx.stroke();
 
-        // Remaches más discretos
         ctx.fillStyle = '#8a7a4a';
         const rivetR = 0.7;
         const rxs = [rs.x * TILE_SIZE + 4, rs.x * TILE_SIZE + TILE_SIZE - 4];
@@ -5031,7 +5012,6 @@ function draw(interpolation = 1, updateEffects = false) {
         }
       }
 
-      // Borde del segmento
       ctx.strokeStyle = KUKULKAN_BORDER;
       ctx.lineWidth = isGolden ? 1.2 : 1;
       roundRect(
@@ -5044,7 +5024,6 @@ function draw(interpolation = 1, updateEffects = false) {
       );
       ctx.stroke();
 
-      // Brillo interior superior (más tenue)
       ctx.strokeStyle = KUKULKAN_INNER;
       ctx.lineWidth = isGolden ? 0.9 : 0.8;
       ctx.beginPath();
@@ -5053,15 +5032,12 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.stroke();
       ctx.restore();
 
-      // Rombo decorativo con destellos
       drawBodyDiamond(rs, idx, isGolden);
 
-       } else {
-      // === CABEZA (sin penacho) ===
+    } else {
       drawKukulkanHead(rs, direction, playerProtected, isBlinking);
     }
 
-    // Pulso alrededor de la cabeza
     if (isHead && headPulse > 0) {
       const pR = TILE_SIZE * 0.5 + 3 + (1 - headPulse) * 8;
       ctx.save();
@@ -5080,7 +5056,6 @@ function draw(interpolation = 1, updateEffects = false) {
     }
   });
 
-  // === SEGUNDA PASADA: PENACHO DE KUKULCÁN (por encima del cuerpo) ===
   if (snake.length > 0) {
     const headSeg = snake[0];
     const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
@@ -5099,10 +5074,12 @@ function draw(interpolation = 1, updateEffects = false) {
       const flash = Math.max(0, Math.sin(progress * Math.PI * 3));
       ctx.globalAlpha = flash * (1 - progress * 0.35) * 0.38;
       ctx.fillStyle = Math.floor(progress * 3) % 2 === 0 ? '#fff0b0' : '#8be7ff';
-      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.fillRect(0, 0, screenW, screenH);
       ctx.globalAlpha = 1;
     }
   }
+  
+  // ✅ Restaurar el clip
   ctx.restore();
 }
 
@@ -5114,8 +5091,6 @@ function startGame() {
   if (isGameRunning) finishRunStatistics();
   resetGame();
 
-  // ⚠️ IMPORTANTE: aplicar reglas del modo DESPUÉS de resetGame()
-  // porque resetGame() ya no toca las vidas.
   gameTime = 0;
   applyGameModeRules();
 
@@ -5206,6 +5181,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   respawnProtectedUntil = 0;
   BadgeManager.setVisible('respawn', false);
   enemyGuardians = [];
+  particles = [];
   updateGuardianBadge();
   deactivateImmunity();
   isOnFire = false;
@@ -5462,11 +5438,28 @@ function updateModeUI() {
   rebuildBoardCanvas(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2), true);
 }
 
-/**
- * Aplica TODAS las reglas del modo de juego actual.
- * Es la ÚNICA autoridad sobre `maxLives` y `lives`.
- * Se debe llamar: al cambiar de modo, al iniciar partida, y al cargar la página.
- */
+function updateWelcomeModeUI() {
+  const isClassic = welcomeGameMode.value === 'classic';
+  welcomeDifficultyBox.style.display = isClassic ? 'flex' : 'none';
+}
+
+welcomeGameMode.addEventListener('change', () => {
+  gameMode = welcomeGameMode.value;
+  safeSetItem('snakeIoGameMode', gameMode);
+  gameModeSelect.value = gameMode;
+  drawerGameMode.value = gameMode;
+  updateWelcomeModeUI();
+  updateModeUI();
+  if (isGameRunning) startGame();
+  else applyGameModeRules();
+});
+
+welcomeDifficulty.addEventListener('change', () => {
+  difficultySelect.value = welcomeDifficulty.value;
+  drawerDifficulty.value = welcomeDifficulty.value;
+  reconcileGuardianCount();
+});
+
 function applyGameModeRules() {
   const mode = GAME_MODES[gameModeSelect.value] || GAME_MODES.classic;
 
@@ -5497,7 +5490,6 @@ function applyGameModeRules() {
     freezeSpawnAt = null;
     airSpawnAt = null;
   } else {
-    // Re-activar los timers si es necesario
     const profile = getDifficultyProfile();
     if (isGameRunning) {
       nextSacredRainAt = gameTime + profile.rainFirstMs;
@@ -5512,10 +5504,12 @@ function applyGameModeRules() {
 
 difficultySelect.addEventListener('change', () => {
   drawerDifficulty.value = difficultySelect.value;
+  welcomeDifficulty.value = difficultySelect.value;
   reconcileGuardianCount();
 });
 drawerDifficulty.addEventListener('change', () => {
   difficultySelect.value = drawerDifficulty.value;
+  welcomeDifficulty.value = drawerDifficulty.value;
   reconcileGuardianCount();
 });
 
@@ -5523,6 +5517,8 @@ gameModeSelect.addEventListener('change', () => {
   gameMode = gameModeSelect.value;
   safeSetItem('snakeIoGameMode', gameMode);
   drawerGameMode.value = gameMode;
+  welcomeGameMode.value = gameMode;
+  updateWelcomeModeUI();
   updateModeUI();
 
   if (isGameRunning) {
@@ -5964,9 +5960,6 @@ showTutorialStep(1);
 lives = MAX_LIVES;
 updateLivesUI();
 
-// El tutorial integrado ya no se usa en la welcome-screen
-// Se ha reemplazado por introTutorialModal
-
 document.body.classList.add('welcome-open');
 
 resetWelcomeDemo();
@@ -5978,12 +5971,14 @@ updateLivesUI();
 resizeCanvas();
 draw();
 
-// Establecer el modo de juego inicial
 gameModeSelect.value = gameMode;
 drawerGameMode.value = gameMode;
+welcomeGameMode.value = gameMode;
+welcomeDifficulty.value = difficultySelect.value;
+updateWelcomeModeUI();
 updateModeUI();
 gameTime = 0;
-applyGameModeRules(); 
+applyGameModeRules();
 
 // ========================================================
 // 30. PWA — CAPTURA DEL EVENTO DE INSTALACIÓN
