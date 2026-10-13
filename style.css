@@ -55,7 +55,7 @@ html, body {
   line-height: 1.45;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: manipulation; /* ✅ CAMBIADO: era 'none', ahora permite clicks */
+  touch-action: manipulation;
 }
 
 button, input, select { font-family: inherit; }
@@ -68,7 +68,6 @@ h1, h2, h3 {
 
 .hidden { display: none !important; }
 
-/* Asegurar que los overlays ocultos no capturen clicks */
 .welcome-screen.hidden,
 .modal-backdrop.hidden {
   pointer-events: none;
@@ -86,7 +85,7 @@ h1, h2, h3 {
   z-index: 1;
   display: block;
   background: var(--bg-1);
-  touch-action: none; /* ✅ Solo aquí, para bloquear gestos sobre el tablero */
+  touch-action: none;
 }
 
 /* =========================================================
@@ -370,15 +369,13 @@ body.gameover-open .lives-fixed-container {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  pointer-events: none; /* El contenedor no captura, pero los hijos sí */
+  pointer-events: none;
 }
 
-/* ✅ Red de seguridad: TODOS los hijos directos del HUD móvil capturan clicks */
 .mobile-hud > * {
   pointer-events: auto;
 }
 
-/* ✅ Botón del menú (hamburguesa) */
 .hud-btn {
   background: rgba(15, 18, 24, 0.7);
   backdrop-filter: blur(8px);
@@ -401,7 +398,6 @@ body.gameover-open .lives-fixed-container {
 }
 .hud-btn:active { transform: scale(0.92); }
 
-/* ✅ Contenedor de acciones del HUD (pausa, tutorial, sonido) */
 .hud-actions {
   display: flex;
   gap: 6px;
@@ -430,7 +426,6 @@ body.gameover-open .lives-fixed-container {
 }
 .hud-action-btn:active { transform: scale(0.92); }
 
-/* ✅ Píldora central con puntaje, récord y vidas */
 .hud-center-pill {
   background: rgba(15, 18, 24, 0.7);
   backdrop-filter: blur(8px);
@@ -454,7 +449,6 @@ body.gameover-open .lives-fixed-container {
 .hud-stat { white-space: nowrap; }
 .hud-divider { opacity: 0.3; }
 
-/* Vidas en el HUD móvil */
 .hud-center-pill .lives-pips {
   display: flex;
   align-items: center;
@@ -548,7 +542,6 @@ body.gameover-open .lives-fixed-container {
   filter: drop-shadow(0 0 3px rgba(125, 232, 196, 0.9));
 }
 
-/* === Badge de FUEGO (Xiuhcóatl) === */
 .fire-badge {
   background: rgba(90, 30, 15, 0.92);
   border: 1px solid rgba(255, 107, 44, 0.85);
@@ -569,7 +562,6 @@ body.gameover-open .lives-fixed-container {
   to   { transform: scale(1.15) rotate(6deg); }
 }
 
-/* === Badge de FURIA === */
 .furia-badge {
   background: rgba(90, 30, 15, 0.95);
   border: 1px solid rgba(255, 107, 44, 0.95);
@@ -590,7 +582,6 @@ body.gameover-open .lives-fixed-container {
   to   { transform: scale(1.25) rotate(10deg); }
 }
 
-/* === Badge de AIRE (viento) === */
 .air-badge {
   background: rgba(30, 60, 90, 0.9);
   border: 1px solid rgba(179, 229, 255, 0.85);
@@ -957,7 +948,20 @@ body.gameover-open .lives-fixed-container {
   text-align: center;
   line-height: 1.35;
 }
-.welcome-start-btn { min-width: min(260px, 100%); align-self: center; }
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.welcome-start-btn { min-width: min(200px, 100%); }
+.welcome-actions .icon-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 1.3rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 /* =========================================================
    RESPONSIVE
@@ -975,47 +979,16 @@ body.gameover-open .lives-fixed-container {
 @media (min-width: 768px) {
   .welcome-card {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: 1fr;
     align-items: stretch;
     gap: 18px;
-    width: min(1100px, 100%);
-    height: min(600px, calc(100dvh - 64px));
+    width: min(700px, 100%);
+    height: auto;
     padding: clamp(18px, 2.5vw, 28px);
   }
   .welcome-preview { height: 100%; justify-content: center; }
-  .welcome-demo { height: clamp(200px, 34dvh, 340px); }
-  .welcome-card > #tutorial-modal {
-    position: static;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: 0;
-    z-index: auto;
-    display: flex !important;
-    align-items: stretch;
-    justify-content: stretch;
-    min-height: 0;
-    animation: none;
-  }
-  .welcome-card > #tutorial-modal.hidden { display: flex !important; }
-  .welcome-card > #tutorial-modal > .tutorial-card {
-    width: 100%;
-    max-width: none;
-    max-height: none;
-    height: 100%;
-    background: rgba(13, 18, 22, 0.6);
-    border: 1px solid var(--line);
-    padding: 20px;
-    text-align: center;
-    justify-content: space-between;
-    animation: none;
-  }
-  .welcome-card > #tutorial-modal .tutorial-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
+  .welcome-demo { height: clamp(200px, 40dvh, 340px); }
+  .welcome-actions { margin-top: 10px; }
 }
 
 @media (max-width: 768px) {
@@ -1078,15 +1051,16 @@ body.gameover-open .lives-fixed-container {
   }
 
   .welcome-preview {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     width: 100%;
     border: none;
     border-bottom: 1px solid rgba(105, 211, 180, 0.16);
     border-radius: 0;
     background: linear-gradient(180deg, rgba(13, 20, 24, 0.95), rgba(20, 28, 32, 0.95));
+    min-height: 0;
   }
   .welcome-demo {
-    height: clamp(140px, 28dvh, 260px);
+    height: 100%;
     border-radius: 0;
   }
   .preview-legend {
@@ -1103,185 +1077,75 @@ body.gameover-open .lives-fixed-container {
     background: rgba(9, 16, 20, 0.7);
   }
 
-  .welcome-card > #tutorial-modal {
-    flex: 1 1 auto;
-    display: flex !important;
-    min-height: 0;
-    position: static;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: 0;
-    z-index: auto;
-    border: none;
-    border-radius: 0;
-    animation: none;
-  }
-  .welcome-card > #tutorial-modal.hidden { display: flex !important; }
-
-  .welcome-card > #tutorial-modal > .tutorial-card {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: none;
-    max-height: none;
-    height: 100%;
-    min-height: 0;
-    padding: 0;
-    gap: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    overflow: hidden;
-    animation: none;
-    justify-content: space-between;
-  }
-
-  .welcome-card > #tutorial-modal .tutorial-header {
+  .welcome-actions {
     flex: 0 0 auto;
-    gap: 6px;
-    padding: 8px 22px 6px 12px;
-    border-bottom: 1px solid rgba(105, 211, 180, 0.12);
-    background: rgba(13, 18, 22, 0.35);
+    padding: 12px;
+    gap: 10px;
+    background: rgba(20, 24, 32, 0.98);
   }
-  .welcome-card > #tutorial-modal .tutorial-logo { width: 22px; height: 22px; }
-  .welcome-card > #tutorial-modal .tutorial-header h2 { font-size: 0.92rem; line-height: 1.15; color: var(--gold); }
-  .welcome-card > #tutorial-modal .tutorial-close-btn { font-size: 1rem; }
-
-  .welcome-card > #tutorial-modal .tutorial-content {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    justify-content: center;
-    align-items: stretch;
-    min-height: 0;
-    width: 100%;
-    padding: 10px 12px;
-    overflow: hidden;
-    gap: 6px;
+  .welcome-start-btn {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    min-height: 48px;
   }
-  .welcome-card > #tutorial-modal .tutorial-step {
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    justify-content: center;
-    text-align: center;
-    width: 100%;
-    flex: 0 0 auto;
-  }
-  .welcome-card > #tutorial-modal .tutorial-step.active { display: flex; animation: fadeIn 0.3s ease; }
-  .welcome-card > #tutorial-modal .tutorial-icon-banner { display: none; }
-  .welcome-card > #tutorial-modal .tutorial-lead { font-size: 0.86rem; line-height: 1.35; margin-bottom: 2px; color: var(--text); }
-  .welcome-card > #tutorial-modal .tutorial-tip {
-    font-size: 0.76rem;
-    padding: 6px 9px;
-    line-height: 1.35;
-    width: 100%;
-    background: rgba(13, 18, 22, 0.5);
-    border: 1px solid rgba(105, 211, 180, 0.1);
-    border-radius: 6px;
-  }
-
-  .welcome-card > #tutorial-modal .tutorial-guardian-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-    width: 100%;
-  }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list li {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 5px 4px;
-    font-size: 0.7rem;
-    line-height: 1.2;
-    background: rgba(13, 18, 22, 0.5);
-    border: 1px solid rgba(105, 211, 180, 0.1);
-    border-radius: 6px;
-  }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list strong { margin-bottom: 1px; font-size: 0.74rem; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list span { font-size: 0.64rem; }
-
-  .welcome-card > #tutorial-modal .step-dots { flex: 0 0 auto; margin: 0; padding: 4px 0 6px; justify-content: center; }
-  .welcome-card > #tutorial-modal .step-dots .dot { width: 6px; height: 6px; }
-  .welcome-card > #tutorial-modal .step-dots .dot.active { width: 18px; }
-
-  .welcome-card > #tutorial-modal .tutorial-footer {
-    flex: 0 0 auto;
-    display: flex;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 12px 10px;
-    border-top: 1px solid rgba(105, 211, 180, 0.12);
-    background: rgba(13, 18, 22, 0.35);
-  }
-  .welcome-card > #tutorial-modal .tutorial-footer .btn {
-    flex: 1;
-    padding: 10px 8px;
-    font-size: 0.84rem;
-    min-height: 42px;
+  .welcome-actions .icon-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.4rem;
   }
 }
 
 @media (max-width: 480px) {
   .welcome-screen { padding: max(3px, env(safe-area-inset-top)) 4px max(3px, env(safe-area-inset-bottom)); }
   .welcome-card { max-height: calc(100dvh - max(6px, env(safe-area-inset-top) + env(safe-area-inset-bottom))); }
-  .welcome-demo { height: clamp(120px, 24dvh, 220px); }
   .preview-legend { padding: 2px 5px; gap: 2px 5px; font-size: 0.56rem; min-height: 16px; }
   .preview-callout { padding: 2px 6px; min-height: 20px; font-size: 0.6rem; }
-  .welcome-card > #tutorial-modal .tutorial-header { padding: 6px 20px 5px 10px; }
-  .welcome-card > #tutorial-modal .tutorial-header h2 { font-size: 0.84rem; }
-  .welcome-card > #tutorial-modal .tutorial-content { padding: 8px 10px; }
-  .welcome-card > #tutorial-modal .tutorial-lead { font-size: 0.8rem; }
-  .welcome-card > #tutorial-modal .tutorial-tip { font-size: 0.72rem; padding: 5px 8px; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list li { padding: 4px 3px; font-size: 0.66rem; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list strong { font-size: 0.7rem; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list span { font-size: 0.6rem; }
-  .welcome-card > #tutorial-modal .tutorial-footer { padding: 6px 10px 8px; }
-  .welcome-card > #tutorial-modal .tutorial-footer .btn { padding: 8px 6px; font-size: 0.78rem; min-height: 38px; }
   .hud-stat { font-size: 0; }
   .hud-stat strong { font-size: 0.82rem; }
 }
 
-@media (max-height: 650px) and (max-width: 767px) {
-  .welcome-demo { height: clamp(90px, 20dvh, 160px); }
-  .welcome-card > #tutorial-modal .tutorial-header { padding: 6px 20px 4px 10px; }
-  .welcome-card > #tutorial-modal .tutorial-content { padding: 6px 10px; }
-  .welcome-card > #tutorial-modal .tutorial-lead { font-size: 0.78rem; }
-  .welcome-card > #tutorial-modal .tutorial-tip { font-size: 0.7rem; padding: 5px 8px; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list li { padding: 4px 6px; font-size: 0.66rem; }
+/* Modal de tutorial de intro */
+.intro-tutorial-card .tutorial-content {
+  gap: 16px;
+  padding: 10px 0;
+}
+.intro-tutorial-card .tutorial-step {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  text-align: left;
+  gap: 12px;
+}
+.intro-tutorial-card .tutorial-icon-banner {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.intro-tutorial-card .tutorial-lead {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.intro-tutorial-card .tutorial-lead strong {
+  color: var(--gold-lt);
+}
+.intro-tutorial-card .tutorial-footer {
+  margin-top: 10px;
 }
 
-@media (max-height: 430px) {
-  .welcome-screen { padding: 3px; }
-  .welcome-card { max-height: calc(100dvh - 6px); }
-  .welcome-demo { height: clamp(60px, 15dvh, 90px); }
-  .preview-legend { min-height: 16px; gap: 2px 5px; padding: 2px 4px; font-size: 0.54rem; }
-  .preview-callout { min-height: 18px; padding: 2px 5px; font-size: 0.56rem; }
-  .welcome-card > #tutorial-modal .tutorial-header { padding: 4px 18px 4px 8px; gap: 4px; }
-  .welcome-card > #tutorial-modal .tutorial-header h2 { font-size: 0.78rem; }
-  .welcome-card > #tutorial-modal .tutorial-logo { display: none; }
-  .welcome-card > #tutorial-modal .tutorial-content { padding: 4px 8px; }
-  .welcome-card > #tutorial-modal .tutorial-step { gap: 3px; }
-  .welcome-card > #tutorial-modal .tutorial-lead { font-size: 0.68rem; line-height: 1.25; }
-  .welcome-card > #tutorial-modal .tutorial-tip { font-size: 0.62rem; padding: 3px 6px; }
-  .welcome-card > #tutorial-modal .tutorial-guardian-list li { padding: 2px 4px; font-size: 0.58rem; }
-  .welcome-card > #tutorial-modal .tutorial-footer { padding: 4px 8px 6px; }
-  .welcome-card > #tutorial-modal .tutorial-footer .btn { min-height: 30px; padding: 4px 6px; font-size: 0.68rem; }
-  .welcome-card > #tutorial-modal .step-dots { margin: 0; padding: 2px 0 4px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .welcome-card, #cosmic-order-food-badge:not(.hidden), .hud-badge,
-  .sacrifice-offering-badge, .sacrifice-offering-badge .badge-icon,
-  .fire-badge, .fire-badge .badge-icon,
-  .furia-badge, .furia-badge .badge-icon,
-  .air-badge, .air-badge .badge-icon,
-  .skull-food-badge, .modal-backdrop, .drawer-card, .tutorial-card,
-  .statistics-card, .modal-card, .lives-pips .life-pip,
-  .lives-fixed-container.critical, .turbo-btn.active .turbo-icon,
-  .turbo-btn.active { animation: none !important; }
+@media (max-width: 480px) {
+  .intro-tutorial-card {
+    padding: 16px;
+  }
+  .intro-tutorial-card .tutorial-header h2 {
+    font-size: 1.1rem;
+  }
+  .intro-tutorial-card .tutorial-icon-banner {
+    font-size: 1.5rem;
+  }
+  .intro-tutorial-card .tutorial-lead {
+    font-size: 0.85rem;
+  }
 }
 
 /* =========================================================
@@ -1289,96 +1153,35 @@ body.gameover-open .lives-fixed-container {
    ========================================================= */
 .pwa-install-floating {
   position: fixed;
-  bottom: max(20px, calc(env(safe-area-inset-bottom) + 16px));
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+  right: max(12px, calc(env(safe-area-inset-right) + 8px));
   z-index: 9999;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 22px;
-  font-size: 0.9rem;
-  font-weight: 700;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
   font-family: var(--font-ui);
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--gold), #947335);
-  color: #101a13;
-  border: 2px solid var(--gold-hi);
-  box-shadow:
-    0 8px 28px rgba(198, 164, 85, 0.55),
-    0 4px 12px rgba(0, 0, 0, 0.7),
-    0 0 0 6px rgba(198, 164, 85, 0.15);
+  border-radius: 8px;
+  background: rgba(30, 35, 45, 0.85);
+  color: var(--text-dim);
+  border: 1px solid var(--line);
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  animation: pwa-float-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-             pwa-float-pulse 2.4s ease-in-out 1s infinite;
-  transition: transform 0.15s, filter 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-
 .pwa-install-floating:hover {
-  filter: brightness(1.1);
-  transform: translateX(-50%) translateY(-2px);
+  background: rgba(40, 45, 55, 0.95);
+  color: var(--text);
 }
-
-.pwa-install-floating:active {
-  transform: translateX(-50%) scale(0.95);
-}
-
 .pwa-install-icon {
-  font-size: 1.15rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
-.pwa-install-text {
-  line-height: 1;
-}
-
-/* Solo mostrar el botón cuando NO se está jugando activamente.
-   Es decir, en welcome-screen o en game-over. Así no interfiere con el gameplay. */
+/* Solo mostrar el botón cuando NO se está jugando activamente. */
 body:not(.welcome-open):not(.gameover-open) .pwa-install-floating:not(.hidden) {
   display: none !important;
-}
-
-@keyframes pwa-float-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(30px) scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-}
-
-@keyframes pwa-float-pulse {
-  0%, 100% {
-    box-shadow:
-      0 8px 28px rgba(198, 164, 85, 0.55),
-      0 4px 12px rgba(0, 0, 0, 0.7),
-      0 0 0 6px rgba(198, 164, 85, 0.15);
-  }
-  50% {
-    box-shadow:
-      0 8px 36px rgba(198, 164, 85, 0.85),
-      0 4px 16px rgba(0, 0, 0, 0.8),
-      0 0 0 10px rgba(198, 164, 85, 0.25);
-  }
-}
-
-/* En pantallas muy pequeñas, reducir tamaño */
-@media (max-width: 400px) {
-  .pwa-install-floating {
-    padding: 10px 18px;
-    font-size: 0.82rem;
-    gap: 6px;
-  }
-  .pwa-install-icon { font-size: 1rem; }
-}
-
-/* Respetar la preferencia de movimiento reducido */
-@media (prefers-reduced-motion: reduce) {
-  .pwa-install-floating {
-    animation: none !important;
-  }
 }

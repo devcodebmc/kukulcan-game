@@ -35,7 +35,10 @@
         </div>
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
       </div>
-      <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">📖 Ver instrucciones</button>
+      <div class="welcome-actions">
+        <button id="welcome-info-btn" class="icon-btn" aria-label="Instrucciones">ℹ️</button>
+        <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">▶ Jugar</button>
+      </div>
     </div>
   </section>
 
@@ -276,7 +279,7 @@
             <li><strong>Cazador</strong><span>Rojo · persigue directo</span></li>
             <li><strong>Vidente</strong><span>Violeta · anticipa tu rumbo</span></li>
             <li><strong>Flanqueador</strong><span>Naranja · intenta rodearte</span></li>
-            <li><strong>Chaac</strong><span>Dios de la lluvia · hacha de rayo</span></li>
+            <li><strong>Tezcatlipoca</strong><span>Jaguar de obsidiana · humo y garras</span></li>
           </ul>
           <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>. 🫀 El <strong>sacrificio</strong> en el templo recupera uno.</p>
         </div>
@@ -349,6 +352,34 @@
     <span class="pwa-install-icon">📲</span>
     <span class="pwa-install-text">Instalar Juego</span>
   </button>
+
+  <!-- Modal de instrucciones resumidas para la intro -->
+  <div id="intro-tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="intro-tutorial-title">
+    <div class="tutorial-card intro-tutorial-card">
+      <div class="tutorial-header">
+        <img src="snk.png" alt="" class="tutorial-logo">
+        <h2 id="intro-tutorial-title">Instrucciones Rápidas</h2>
+        <button id="close-intro-tutorial-btn" class="close-btn tutorial-close-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="tutorial-content">
+        <div class="tutorial-step active">
+          <div class="tutorial-icon-banner">🐍 🪶</div>
+          <p class="tutorial-lead"><strong>Controles:</strong> Desliza el dedo o usa <strong>Flechas / WASD</strong>. Pulsa <strong>Espacio / Shift</strong> o el botón 🔥 para la <strong>FURIA</strong> (incinera guardianes al tocarlos).</p>
+        </div>
+        <div class="tutorial-step active">
+          <div class="tutorial-icon-banner">💎 ❄️ 💨 🌀</div>
+          <p class="tutorial-lead"><strong>Ítems y Poderes:</strong> 💎 Jade te protege. ❄️ Hielo congela guardianes. 💨 Viento te da velocidad y puntos. 🌀 <strong>Sello del Orden Cósmico:</strong> recógelo y tras 1s elimina a todos los guardianes (+50 c/u). 🌽 El maíz te hace crecer.</p>
+        </div>
+        <div class="tutorial-step active">
+          <div class="tutorial-icon-banner">⚔️ 🎯 🛡️</div>
+          <p class="tutorial-lead"><strong>Guardianes y Modos:</strong> Evita a los guardianes. En <strong>Clásico</strong> tienes 3 vidas. <strong>Cacería</strong> es más agresivo. <strong>Supervivencia</strong> es a una sola vida y sin ítems.</p>
+        </div>
+      </div>
+      <div class="tutorial-footer">
+        <button id="intro-tut-start-btn" class="btn btn-primary">🚀 ¡A Jugar!</button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

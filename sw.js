@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER — La Travesía de Kukulcán
 // ========================================================
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `kukulcan-${CACHE_VERSION}`;
 
 // Recursos que se cachean durante la instalación (precache)
