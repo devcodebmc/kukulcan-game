@@ -36,9 +36,6 @@
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
       </div>
       <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">📖 Ver instrucciones</button>
-      <button id="pwa-install-btn" class="btn btn-outline welcome-start-btn hidden" aria-label="Instalar juego como aplicación">
-        📲 Instalar Juego
-      </button>
     </div>
   </section>
 
@@ -346,6 +343,12 @@
       <p id="statistics-storage-status" class="statistics-storage-status" role="status"></p>
     </section>
   </div>
+
+  <!-- ✅ Botón flotante de instalación PWA — fuera de cualquier contenedor, siempre visible -->
+  <button id="pwa-install-btn" class="pwa-install-floating hidden" aria-label="Instalar juego como aplicación">
+    <span class="pwa-install-icon">📲</span>
+    <span class="pwa-install-text">Instalar Juego</span>
+  </button>
 
   <script src="script.js"></script>
 </body>
