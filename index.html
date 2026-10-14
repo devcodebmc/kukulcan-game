@@ -95,7 +95,8 @@
     </div>
 
     <div class="toolbar-right">
-      <div class="select-box">
+      <!-- Selectores ocultos: se controlan desde el modal de configuración -->
+      <div class="select-box toolbar-hidden-select">
         <label for="game-mode-select">Modo</label>
         <select id="game-mode-select" class="styled-select">
           <option value="classic" selected>⚔️ Clásico</option>
@@ -105,7 +106,7 @@
           <option value="timed">⏱️ Contrarreloj</option>
         </select>
       </div>
-      <div class="select-box" id="difficulty-selector-box">
+      <div class="select-box toolbar-hidden-select" id="difficulty-selector-box">
         <label for="difficulty-select">Dificultad</label>
         <select id="difficulty-select" class="styled-select">
           <option value="easy">Fácil</option>
@@ -114,11 +115,10 @@
           <option value="extreme">Pesadilla</option>
         </select>
       </div>
+
+      <button id="dt-settings-btn" class="icon-btn" title="Configuración" aria-label="Configuración">⚙️</button>
       <button id="dt-sound-btn" class="icon-btn" title="Sonido" aria-label="Sonido">🔊</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
-      <button id="dt-achievements-btn" class="icon-btn" title="Logros" aria-label="Logros">🏆</button>
-      <button id="dt-customize-btn" class="icon-btn" title="Personalizar" aria-label="Personalizar">🎨</button>
-      <button id="dt-stats-btn" class="icon-btn" title="Estadísticas" aria-label="Estadísticas">📊</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
       <button id="dt-pause-btn" class="btn btn-secondary">⏸ Pausa</button>
     </div>
@@ -142,6 +142,7 @@
       </div>
     </div>
     <div class="hud-actions">
+      <button id="mb-settings-btn" class="hud-action-btn" aria-label="Configuración">⚙️</button>
       <button id="mb-pause-btn" class="hud-action-btn" aria-label="Pausa">⏸</button>
       <button id="mb-tutorial-btn" class="hud-action-btn" aria-label="Instrucciones">❓</button>
       <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
@@ -223,7 +224,6 @@
         <span class="badge-text-mobile">Guardián</span>
       </div>
     </div>
-    <!-- ✅ NUEVOS BADGES DE MECÁNICAS -->
     <div class="badges-priority-special" id="badges-priority-special">
       <div id="timer-badge" class="hud-badge timer-badge hidden">
         <span class="badge-icon">⏱️</span>
@@ -331,6 +331,67 @@
             📲 Instalar Juego
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL DE CONFIGURACIÓN
+       ═══════════════════════════════════════════════════════ -->
+  <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings-card">
+      <div class="settings-header">
+        <h2 id="settings-title">⚙️ Configuración</h2>
+        <button id="close-settings-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="settings-body">
+        <div class="settings-group">
+          <label for="settings-game-mode">🎮 Modo de Juego</label>
+          <select id="settings-game-mode" class="styled-select">
+            <option value="classic">⚔️ Clásico</option>
+            <option value="hunt">🎯 Cacería</option>
+            <option value="survival">🛡️ Supervivencia</option>
+            <option value="zen">🧘 Zen</option>
+            <option value="timed">⏱️ Contrarreloj</option>
+          </select>
+        </div>
+
+        <div class="settings-group" id="settings-difficulty-group">
+          <label for="settings-difficulty">⚡ Dificultad</label>
+          <select id="settings-difficulty" class="styled-select">
+            <option value="easy">Fácil</option>
+            <option value="medium" selected>Medio</option>
+            <option value="hard">Difícil</option>
+            <option value="extreme">Pesadilla</option>
+          </select>
+        </div>
+
+        <div class="settings-group">
+          <div class="toggle-row">
+            <label for="settings-sound-toggle">🔊 Sonido y música</label>
+            <input type="checkbox" id="settings-sound-toggle" class="styled-checkbox" checked>
+          </div>
+          <div class="toggle-row">
+            <label for="settings-dpad-toggle">🎮 Cruceta táctil</label>
+            <input type="checkbox" id="settings-dpad-toggle" class="styled-checkbox">
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <button id="settings-customize-btn" class="btn btn-outline" style="width:100%;">🎨 Personalizar</button>
+          <button id="settings-achievements-btn" class="btn btn-outline" style="width:100%;">🏆 Logros</button>
+          <button id="settings-stats-btn" class="btn btn-outline" style="width:100%;">📊 Estadísticas</button>
+          <button id="settings-tutorial-btn" class="btn btn-outline" style="width:100%;">❓ Tutorial</button>
+        </div>
+
+        <div class="settings-group">
+          <button id="settings-restart-btn" class="btn btn-secondary" style="width:100%;">🔄 Reiniciar partida</button>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button id="settings-apply-btn" class="btn btn-primary" style="width:100%;">✅ Aplicar y Cerrar</button>
       </div>
     </div>
   </div>

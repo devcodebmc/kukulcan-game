@@ -53,9 +53,6 @@ const dtSoundBtn = document.getElementById('dt-sound-btn');
 const dtTutorialBtn = document.getElementById('dt-tutorial-btn');
 const dtStartBtn = document.getElementById('dt-start-btn');
 const dtPauseBtn = document.getElementById('dt-pause-btn');
-const dtStatsBtn = document.getElementById('dt-stats-btn');
-const dtAchievementsBtn = document.getElementById('dt-achievements-btn');
-const dtCustomizeBtn = document.getElementById('dt-customize-btn');
 const difficultySelect = document.getElementById('difficulty-select');
 const gameModeSelect = document.getElementById('game-mode-select');
 const difficultySelectorBox = document.getElementById('difficulty-selector-box');
@@ -181,6 +178,82 @@ const statisticsModal = document.getElementById('statistics-modal');
 const closeStatisticsBtn = document.getElementById('close-statistics-btn');
 const statisticsStorageStatus = document.getElementById('statistics-storage-status');
 const countdownOverlay = document.getElementById('countdown-overlay');
+
+// Referencias del modal de configuración
+const settingsModal = document.getElementById('settings-modal');
+const dtSettingsBtn = document.getElementById('dt-settings-btn');
+const mbSettingsBtn = document.getElementById('mb-settings-btn');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+const settingsGameMode = document.getElementById('settings-game-mode');
+const settingsDifficulty = document.getElementById('settings-difficulty');
+const settingsDifficultyGroup = document.getElementById('settings-difficulty-group');
+const settingsSoundToggle = document.getElementById('settings-sound-toggle');
+const settingsDpadToggle = document.getElementById('settings-dpad-toggle');
+const settingsCustomizeBtn = document.getElementById('settings-customize-btn');
+const settingsAchievementsBtn = document.getElementById('settings-achievements-btn');
+const settingsStatsBtn = document.getElementById('settings-stats-btn');
+const settingsTutorialBtn = document.getElementById('settings-tutorial-btn');
+const settingsRestartBtn = document.getElementById('settings-restart-btn');
+const settingsApplyBtn = document.getElementById('settings-apply-btn');
+
+// ========================================================
+// MODAL DE CONFIGURACIÓN
+// ========================================================
+let settingsWasRunning = false;
+let settingsWasPaused = false;
+
+function openSettings() {
+  settingsWasRunning = isGameRunning;
+  settingsWasPaused = isPaused;
+  if (settingsWasRunning && !settingsWasPaused) togglePause();
+
+  settingsGameMode.value = gameModeSelect.value;
+  settingsDifficulty.value = difficultySelect.value;
+  settingsSoundToggle.checked = !isMuted;
+  settingsDpadToggle.checked = showDpad;
+
+  updateSettingsDifficultyVisibility();
+  drawerMenu.classList.add('hidden');
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettings() {
+  settingsModal.classList.add('hidden');
+  if (settingsWasRunning && !settingsWasPaused && isGameRunning && isPaused) {
+    togglePause();
+  } else if (settingsWasRunning && settingsWasPaused && isGameRunning && isPaused) {
+    drawerMenu.classList.remove('hidden');
+  }
+  settingsWasRunning = false;
+  settingsWasPaused = false;
+}
+
+function updateSettingsDifficultyVisibility() {
+  const isClassic = settingsGameMode.value === 'classic';
+  settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
+}
+
+function applySettings() {
+  if (settingsGameMode.value !== gameModeSelect.value) {
+    gameModeSelect.value = settingsGameMode.value;
+    gameModeSelect.dispatchEvent(new Event('change'));
+  }
+  if (settingsDifficulty.value !== difficultySelect.value) {
+    difficultySelect.value = settingsDifficulty.value;
+    difficultySelect.dispatchEvent(new Event('change'));
+  }
+  toggleSound(settingsSoundToggle.checked);
+  showDpad = settingsDpadToggle.checked;
+  safeSetItem('snakeIoShowDpad', showDpad);
+  touchControls.classList.toggle('hidden', !showDpad);
+
+  drawerGameMode.value = gameModeSelect.value;
+  drawerDifficulty.value = difficultySelect.value;
+  drawerSoundToggle.checked = !isMuted;
+  drawerDpadToggle.checked = showDpad;
+
+  closeSettings();
+}
 
 // ========================================================
 // 2. BADGE MANAGER
@@ -3971,7 +4044,7 @@ function drawVignette() {
   ctx.fillRect(0, 0, w, h);
 }
 
-// ✅ NUEVA: Dibujar oscuridad (Supervivencia)
+// ✅ NUEVA: Dibujar oscuridad (Supervivencia) - CORREGIDA
 function drawDarkness() {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode || !mode.hasDarkness) return;
@@ -3983,33 +4056,16 @@ function drawDarkness() {
   const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
   const radiusPx = darknessRadius * TILE_SIZE;
 
-  const gradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.35, hx, hy, radiusPx);
-  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  gradient.addColorStop(0.55, 'rgba(0, 0, 0, 0.55)');
-  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.94)');
+  // Crear un gradiente radial que va desde transparente (centro) a negro (borde)
+  const gradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.2, hx, hy, radiusPx * 1.2);
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');       // Centro totalmente visible
+  gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');   // Zona intermedia semi-visible
+  gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.85)');  // Zona oscura
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');    // Borde casi negro
 
-  ctx.save();
-  // Rellenar todo menos el círculo de visión
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
-  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-  ctx.globalCompositeOperation = 'destination-out';
-  const cutGradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.35, hx, hy, radiusPx);
-  cutGradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-  cutGradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.85)');
-  cutGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = cutGradient;
-  ctx.beginPath();
-  ctx.arc(hx, hy, radiusPx, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Aplicar viñeta sobre el borde de la visión
-  ctx.save();
+  // Rellenar toda la pantalla con este gradiente
   ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(hx, hy, radiusPx * 1.15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 }
 
 // ✅ NUEVA: Dibujar tinte de eclipse
@@ -6277,6 +6333,7 @@ mbTutorialBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) { closeSettings(); return; }
   if (e.key === 'Escape' && !tutorialModal.classList.contains('hidden')) { closeTutorial(); return; }
   if (e.key === 'Escape' && !introTutorialModal.classList.contains('hidden')) { closeIntroTutorial(); return; }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) { closeStatistics(); return; }
@@ -6329,9 +6386,6 @@ dtStartBtn.addEventListener('click', () => {
 dtPauseBtn.addEventListener('click', togglePause);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
-dtStatsBtn.addEventListener('click', openStatistics);
-dtAchievementsBtn.addEventListener('click', openAchievements);
-dtCustomizeBtn.addEventListener('click', openCustomize);
 
 drawerStatsBtn.addEventListener('click', openStatistics);
 drawerAchievementsBtn.addEventListener('click', openAchievements);
@@ -6391,6 +6445,27 @@ tutStartBtn.addEventListener('click', () => {
 });
 closeTutorialBtn.addEventListener('click', closeTutorial);
 tutorialModal.addEventListener('click', e => { if (e.target === tutorialModal) closeTutorial(); });
+
+// Eventos del modal de configuración
+dtSettingsBtn.addEventListener('click', openSettings);
+mbSettingsBtn.addEventListener('click', openSettings);
+closeSettingsBtn.addEventListener('click', closeSettings);
+settingsApplyBtn.addEventListener('click', applySettings);
+settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
+
+settingsGameMode.addEventListener('change', updateSettingsDifficultyVisibility);
+settingsSoundToggle.addEventListener('change', e => toggleSound(e.target.checked));
+settingsDpadToggle.addEventListener('change', e => {
+  showDpad = e.target.checked;
+  safeSetItem('snakeIoShowDpad', showDpad);
+  touchControls.classList.toggle('hidden', !showDpad);
+});
+
+settingsCustomizeBtn.addEventListener('click', () => { closeSettings(); openCustomize(); });
+settingsAchievementsBtn.addEventListener('click', () => { closeSettings(); openAchievements(); });
+settingsStatsBtn.addEventListener('click', () => { closeSettings(); openStatistics(); });
+settingsTutorialBtn.addEventListener('click', () => { closeSettings(); openTutorial(); });
+settingsRestartBtn.addEventListener('click', () => { closeSettings(); startGame(); });
 
 // ========================================================
 // 27. ESTADÍSTICAS
