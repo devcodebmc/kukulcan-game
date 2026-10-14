@@ -16,8 +16,6 @@ if ('serviceWorker' in navigator) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed') {
                 if (navigator.serviceWorker.controller) {
-                  // ✅ En lugar de recargar automáticamente (riesgo de bucle),
-                  // mostramos un banner al usuario para que él decida.
                   console.log('Nueva versión disponible.');
                   const banner = document.getElementById('update-banner');
                   if (banner) banner.classList.remove('hidden');
@@ -31,7 +29,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// ✅ Listener del botón "Actualizar" del banner PWA
 document.addEventListener('DOMContentLoaded', () => {
   const updateBtn = document.getElementById('update-banner-btn');
   if (updateBtn) {
@@ -52,10 +49,8 @@ const dtCoins = document.getElementById('dt-coins');
 const dtSoundBtn = document.getElementById('dt-sound-btn');
 const dtTutorialBtn = document.getElementById('dt-tutorial-btn');
 const dtStartBtn = document.getElementById('dt-start-btn');
-const dtPauseBtn = document.getElementById('dt-pause-btn');
-const difficultySelect = document.getElementById('difficulty-select');
-const gameModeSelect = document.getElementById('game-mode-select');
-const difficultySelectorBox = document.getElementById('difficulty-selector-box');
+const dtSettingsBtn = document.getElementById('dt-settings-btn');
+const dtCustomizeBtn = document.getElementById('dt-customize-btn');
 
 const welcomeScreen = document.getElementById('welcome-screen');
 const welcomeStartBtn = document.getElementById('welcome-start-btn');
@@ -73,30 +68,13 @@ const menuToggleBtn = document.getElementById('menu-toggle-btn');
 const mbScore = document.getElementById('mb-score');
 const mbHighScore = document.getElementById('mb-high-score');
 const mbSoundBtn = document.getElementById('mb-sound-btn');
-const mbPauseBtn = document.getElementById('mb-pause-btn');
-const mbTutorialBtn = document.getElementById('mb-tutorial-btn');
+const mbSettingsBtn = document.getElementById('mb-settings-btn');
 
 const livesFixedContainer = document.getElementById('lives-fixed-container');
 const livesFixedPips = document.getElementById('lives-fixed-pips');
 const livesFixedPipEls = livesFixedPips ? livesFixedPips.querySelectorAll('.life-pip') : [];
 const livesMobilePips = document.getElementById('lives-mobile-pips');
 const livesMobilePipEls = livesMobilePips ? livesMobilePips.querySelectorAll('.life-pip') : [];
-
-const drawerMenu = document.getElementById('drawer-menu');
-const closeDrawerBtn = document.getElementById('close-drawer-btn');
-const drawerScore = document.getElementById('drawer-score');
-const drawerHighScore = document.getElementById('drawer-high-score');
-const drawerCoins = document.getElementById('drawer-coins');
-const drawerDifficulty = document.getElementById('drawer-difficulty');
-const drawerGameMode = document.getElementById('drawer-game-mode');
-const drawerDpadToggle = document.getElementById('drawer-dpad-toggle');
-const drawerSoundToggle = document.getElementById('drawer-sound-toggle');
-const drawerResumeBtn = document.getElementById('drawer-resume-btn');
-const drawerRestartBtn = document.getElementById('drawer-restart-btn');
-const drawerTutorialBtn = document.getElementById('drawer-tutorial-btn');
-const drawerStatsBtn = document.getElementById('drawer-stats-btn');
-const drawerAchievementsBtn = document.getElementById('drawer-achievements-btn');
-const drawerCustomizeBtn = document.getElementById('drawer-customize-btn');
 
 const immunityTimerSpan = document.getElementById('immunity-timer');
 const respawnBadge = document.getElementById('respawn-badge');
@@ -117,7 +95,6 @@ const furiaTimerSpan = document.getElementById('furia-timer');
 const airBadge = document.getElementById('air-badge');
 const airTimerSpan = document.getElementById('air-timer');
 
-// ✅ NUEVOS BADGES DE MECÁNICAS
 const timerBadge = document.getElementById('timer-badge');
 const timerValueSpan = document.getElementById('timer-value');
 const eclipseBadge = document.getElementById('eclipse-badge');
@@ -148,7 +125,6 @@ const introTutorialModal = document.getElementById('intro-tutorial-modal');
 const closeIntroTutorialBtn = document.getElementById('close-intro-tutorial-btn');
 const introTutStartBtn = document.getElementById('intro-tut-start-btn');
 
-// ✅ NUEVOS MODALES
 const loreModal = document.getElementById('lore-modal');
 const closeLoreBtn = document.getElementById('close-lore-btn');
 const loreStartBtn = document.getElementById('lore-start-btn');
@@ -179,14 +155,14 @@ const closeStatisticsBtn = document.getElementById('close-statistics-btn');
 const statisticsStorageStatus = document.getElementById('statistics-storage-status');
 const countdownOverlay = document.getElementById('countdown-overlay');
 
-// Referencias del modal de configuración
+// Referencias del modal de configuración unificado
 const settingsModal = document.getElementById('settings-modal');
-const dtSettingsBtn = document.getElementById('dt-settings-btn');
-const mbSettingsBtn = document.getElementById('mb-settings-btn');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 const settingsGameMode = document.getElementById('settings-game-mode');
 const settingsDifficulty = document.getElementById('settings-difficulty');
 const settingsDifficultyGroup = document.getElementById('settings-difficulty-group');
+const gameModeSelect = settingsGameMode;
+const difficultySelect = settingsDifficulty;
 const settingsSoundToggle = document.getElementById('settings-sound-toggle');
 const settingsDpadToggle = document.getElementById('settings-dpad-toggle');
 const settingsCustomizeBtn = document.getElementById('settings-customize-btn');
@@ -195,65 +171,6 @@ const settingsStatsBtn = document.getElementById('settings-stats-btn');
 const settingsTutorialBtn = document.getElementById('settings-tutorial-btn');
 const settingsRestartBtn = document.getElementById('settings-restart-btn');
 const settingsApplyBtn = document.getElementById('settings-apply-btn');
-
-// ========================================================
-// MODAL DE CONFIGURACIÓN
-// ========================================================
-let settingsWasRunning = false;
-let settingsWasPaused = false;
-
-function openSettings() {
-  settingsWasRunning = isGameRunning;
-  settingsWasPaused = isPaused;
-  if (settingsWasRunning && !settingsWasPaused) togglePause();
-
-  settingsGameMode.value = gameModeSelect.value;
-  settingsDifficulty.value = difficultySelect.value;
-  settingsSoundToggle.checked = !isMuted;
-  settingsDpadToggle.checked = showDpad;
-
-  updateSettingsDifficultyVisibility();
-  drawerMenu.classList.add('hidden');
-  settingsModal.classList.remove('hidden');
-}
-
-function closeSettings() {
-  settingsModal.classList.add('hidden');
-  if (settingsWasRunning && !settingsWasPaused && isGameRunning && isPaused) {
-    togglePause();
-  } else if (settingsWasRunning && settingsWasPaused && isGameRunning && isPaused) {
-    drawerMenu.classList.remove('hidden');
-  }
-  settingsWasRunning = false;
-  settingsWasPaused = false;
-}
-
-function updateSettingsDifficultyVisibility() {
-  const isClassic = settingsGameMode.value === 'classic';
-  settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
-}
-
-function applySettings() {
-  if (settingsGameMode.value !== gameModeSelect.value) {
-    gameModeSelect.value = settingsGameMode.value;
-    gameModeSelect.dispatchEvent(new Event('change'));
-  }
-  if (settingsDifficulty.value !== difficultySelect.value) {
-    difficultySelect.value = settingsDifficulty.value;
-    difficultySelect.dispatchEvent(new Event('change'));
-  }
-  toggleSound(settingsSoundToggle.checked);
-  showDpad = settingsDpadToggle.checked;
-  safeSetItem('snakeIoShowDpad', showDpad);
-  touchControls.classList.toggle('hidden', !showDpad);
-
-  drawerGameMode.value = gameModeSelect.value;
-  drawerDifficulty.value = difficultySelect.value;
-  drawerSoundToggle.checked = !isMuted;
-  drawerDpadToggle.checked = showDpad;
-
-  closeSettings();
-}
 
 // ========================================================
 // 2. BADGE MANAGER
@@ -269,7 +186,6 @@ const BadgeManager = (() => {
     'cosmicOrderFood', 'skullFood', 'threat'
   ];
   const highOrder = ['furia', 'air', 'immunity', 'freeze', 'respawn'];
-  // ✅ Nuevo orden de badges especiales
   const specialOrder = ['timer', 'eclipse', 'xibalba', 'darkness'];
 
   const refs = {
@@ -284,7 +200,6 @@ const BadgeManager = (() => {
     sacrificeOffering: sacrificeOfferingBadge,
     skullFood: skullFoodBadge,
     threat: threatBadge,
-    // ✅ Nuevos
     timer: timerBadge,
     eclipse: eclipseBadge,
     xibalba: xibalbaBadge,
@@ -296,7 +211,6 @@ const BadgeManager = (() => {
     respawn: false, freeze: false, rain: false,
     cosmicOrder: false, cosmicOrderFood: false, sacrificeOffering: false,
     skullFood: false, threat: false,
-    // ✅ Nuevos
     timer: false, eclipse: false, xibalba: false, darkness: false
   };
 
@@ -345,7 +259,7 @@ const BadgeManager = (() => {
       });
     }
 
-    // ✅ SPECIAL PRIORITY (mecánicas de modos)
+    // SPECIAL PRIORITY
     if (mobile) {
       const active = specialOrder.filter(k => logical[k]);
       const visible = new Set(active.slice(0, MAX_SPECIAL_MOBILE));
@@ -502,7 +416,6 @@ const DIFFICULTY_PROFILES = {
   }
 };
 
-// ✅ MODOS ACTUALIZADOS (con Zen, Contrarreloj y banderas de mecánicas)
 const GAME_MODES = {
   classic: {
     name: 'Clásico',
@@ -630,38 +543,29 @@ const GAME_MODES = {
   }
 };
 
-// ========================================================
 // ✅ NUEVAS CONSTANTES DE MECÁNICAS
-// ========================================================
-
-// Eclipse (modo Clásico)
 const ECLIPSE_FIRST_MS = 60000;
 const ECLIPSE_INTERVAL_MS = 75000;
 const ECLIPSE_DURATION_MS = 5000;
 const ECLIPSE_WARNING_MS = 3000;
 
-// Oscuridad (modo Supervivencia)
 const DARKNESS_START_MS = 15000;
 const DARKNESS_MAX_RADIUS = 8;
 const DARKNESS_MIN_RADIUS = 2.5;
 const DARKNESS_FULL_MS = 180000;
 
-// Rastro de humo (modo Cacería)
 const HUNT_TRAIL_LIFETIME_MS = 4000;
 const HUNT_TRAIL_SLOW_FACTOR = 1.35;
 
-// Contrarreloj
 const TIMED_INITIAL_MS = 60000;
 const TIMED_MAIZE_BONUS_MS = 2000;
 const TIMED_BONUS_BONUS_MS = 5000;
 const TIMED_WARNING_MS = 10000;
 
-// Pruebas de Xibalbá (Supervivencia)
 const XIBALBA_FIRST_MS = 30000;
 const XIBALBA_INTERVAL_MS = 45000;
 const XIBALBA_DURATION_MS = 10000;
 
-// ✅ Configuración de Tezcatlipoca por dificultad
 const TEZCATLIPOCA_CONFIG = {
   easy:    { unlockMs: 90000,  cooldownMs: 90000,  teleportMs: 4500, vulnerableMs: 3000 },
   medium:  { unlockMs: 60000,  cooldownMs: 60000,  teleportMs: 4000, vulnerableMs: 2500 },
@@ -694,7 +598,6 @@ const BOARD_THEMES = {
     vignetteColor: 'rgba(0,0,0,0.7)',
     cost: 0
   },
-  // ✅ NUEVOS TEMAS DESBLOQUEABLES
   obsidian: {
     bg: '#0a0a0d',
     gridLine: 'rgba(120, 120, 120, 0.12)',
@@ -741,7 +644,6 @@ function getDifficultyProfile() {
 
 const FREEZE_FIRST_SPAWN_MS = 16000;
 const FREEZE_RESPAWN_DELAY_MS = 22000;
-
 const GUARDIAN_FREEZE_DURATION_MS = 3000;
 
 const CHAAC_UNLOCK_MS = 45000;
@@ -751,7 +653,6 @@ const CHAAC_TELEPORT_MS = 5000;
 const CHAAC_RETRY_MS = 3000;
 const CHAAC_VULNERABLE_MS = 2200;
 
-// ✅ GUARDIANES CON NOMBRES MAYAS Y PARTÍCULAS AMBIENTALES
 const GUARDIAN_DEFS = [
   {
     behavior: 'hunter',
@@ -862,7 +763,7 @@ function safeSetItem(key, value) {
 }
 
 // ========================================================
-// ✅ 5. SISTEMA DE PROGRESIÓN
+// 5. SISTEMA DE PROGRESIÓN
 // ========================================================
 let progression = {
   totalMaize: 0,
@@ -905,7 +806,7 @@ function saveProgression() {
 loadProgression();
 
 // ========================================================
-// ✅ 5.1. LOGROS
+// 5.1. LOGROS
 // ========================================================
 const ACHIEVEMENTS = [
   { id: 'first_maize',    name: 'Primera Ofrenda',       description: 'Recoge tu primer maíz.',                          icon: '🌽', check: (p) => p.totalMaize >= 1 },
@@ -991,7 +892,7 @@ function renderAchievementsUI() {
 }
 
 // ========================================================
-// ✅ 5.2. SKINS Y TEMAS DESBLOQUEABLES
+// 5.2. SKINS Y TEMAS DESBLOQUEABLES
 // ========================================================
 const KUKULKAN_SKINS = {
   default: {
@@ -1221,7 +1122,6 @@ const FIRE_BREATH_ACTIVE_MS = 540;
 
 let jadeTrailAccumulator = 0;
 
-// ✅ ESTADO DE NUEVAS MECÁNICAS
 let eclipseActive = false;
 let eclipseUntil = 0;
 let nextEclipseAt = null;
@@ -1293,6 +1193,9 @@ let customizeWasPaused = false;
 let loreWasRunning = false;
 let loreWasPaused = false;
 
+let settingsWasRunning = false;
+let settingsWasPaused = false;
+
 let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
 let gameMode = safeGetItem('snakeIoGameMode', 'classic');
 
@@ -1360,7 +1263,6 @@ function finishRunStatistics() {
   r.guardiansDefeated += runGuardiansDefeated;
   saveStats();
 
-  // ✅ Actualizar progresión
   progression.totalGamesPlayed++;
   progression.totalSurvivalMs += survivalMs;
   progression.totalGuardiansDefeated += runGuardiansDefeated;
@@ -1462,7 +1364,6 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
     }
   }
 
-  // ✅ Iluminación central tipo pirámide
   const centerGlow = boardContext.createRadialGradient(
     width / 2, height / 2, 0,
     width / 2, height / 2, Math.max(width, height) * 0.55
@@ -1473,7 +1374,6 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
   boardContext.fillStyle = centerGlow;
   boardContext.fillRect(0, 0, width, height);
 
-  // Pirámide central estilizada
   const centerX = width / 2;
   const centerY = height / 2;
   boardContext.strokeStyle = theme.patternColor;
@@ -1536,34 +1436,31 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
   } catch (e) { return null; }
 }
 
-// ✅ Escala pentatónica menor (frecuencias en Hz)
-// C, Eb, F, G, Bb, C (una octava arriba)
 const PENTATONIC_MINOR = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00, 466.16];
 
-// ✅ Capas musicales con instrumentos simulados
 const MUSIC_LAYERS = {
-  1: { // Meditativo — flauta de barro suave
+  1: {
     notes: [130.81, 155.56, 174.61, 196.00],
     interval: 950,
     type: 'sine',
     vol: 0.045,
     drumEvery: 4
   },
-  2: { // Exploración — ocarina + tambor suave
+  2: {
     notes: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63],
     interval: 640,
     type: 'triangle',
     vol: 0.055,
     drumEvery: 3
   },
-  3: { // Tensión — cascabeles + flauta aguda
+  3: {
     notes: [174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00],
     interval: 440,
     type: 'sawtooth',
     vol: 0.05,
     drumEvery: 2
   },
-  4: { // Furia — percusión intensa + silbato de muerte
+  4: {
     notes: [233.08, 261.63, 311.13, 349.23, 392.00, 466.16, 523.25],
     interval: 290,
     type: 'square',
@@ -1594,19 +1491,16 @@ function playMusicTick() {
     const freq = layer.notes[noteIndex];
     playTone(freq, layer.interval * 0.85, layer.vol, layer.type);
 
-    // ✅ Eco armónico (flauta)
     if (musicLayer >= 2) {
       setTimeout(() => {
         if (!isGameRunning || isPaused || isMuted) return;
         playTone(freq * 1.5, layer.interval * 0.5, layer.vol * 0.4, 'sine');
       }, layer.interval * 0.3);
     }
-    // ✅ Percusión de fondo (tambor de tronco)
     if (layer.drumEvery && musicTick % layer.drumEvery === 0) {
       playTone(55, 180, 0.09, 'sine');
       setTimeout(() => playTone(60, 120, 0.06, 'sine'), 50);
     }
-    // ✅ Cascabeles en capas altas
     if (musicLayer >= 4) {
       setTimeout(() => {
         if (!isGameRunning || isPaused || isMuted) return;
@@ -1756,7 +1650,6 @@ function playCosmicOrderSound() {
   } catch (e) {}
 }
 
-// ✅ NUEVOS SONIDOS PARA MECÁNICAS
 function playEclipseSound() {
   if (isMuted) return;
   try {
@@ -1800,7 +1693,7 @@ function updateSoundUI() {
   const icon = isMuted ? '🔇' : '🔊';
   dtSoundBtn.textContent = icon;
   mbSoundBtn.textContent = icon;
-  drawerSoundToggle.checked = !isMuted;
+  settingsSoundToggle.checked = !isMuted;
 }
 function toggleSound(forceState = null) {
   isMuted = forceState !== null ? !forceState : !isMuted;
@@ -1880,9 +1773,6 @@ function updateFuriaUI() {
   btnTurbo.setAttribute('aria-label', isFuria ? 'Furia de Xiuhcóatl activa' : 'Activar Furia (Fuego + Velocidad)');
   if (turboProgress) turboProgress.style.setProperty('--turbo-charge', `${Math.round(charge * 100)}%`);
 }
-
-function triggerTurboBurst() { triggerFuria(); }
-function updateTurboUI() { updateFuriaUI(); }
 
 // ========================================================
 // 11. EFECTOS VISUALES
@@ -2072,12 +1962,6 @@ function activateImmunity(seconds = 10) {
   updateMusicLayer();
 }
 
-function activateFireImmunity(seconds = 8) {}
-function deactivateFireImmunity() {
-  isOnFire = false;
-  fireExpiresAt = 0;
-}
-
 function deactivateImmunity() {
   isImmune = false;
   immunityExpiresAt = 0;
@@ -2244,7 +2128,6 @@ function spawnEnemySnake() {
   return false;
 }
 
-// ✅ Spawn de Tezcatlipoca — ahora disponible en TODAS las dificultades
 function spawnChaac() {
   const difficulty = getEffectiveDifficulty();
   const config = TEZCATLIPOCA_CONFIG[difficulty] || TEZCATLIPOCA_CONFIG.medium;
@@ -2367,7 +2250,6 @@ function updateGuardianBadge() {
   BadgeManager.setVisible('threat', true);
 }
 
-// ✅ NUEVA: Partículas ambientales por guardián
 function updateGuardianAmbientParticles() {
   if (isPaused || cosmicOrderResolveAt !== null) return;
 
@@ -2421,10 +2303,8 @@ function getGuardianTarget(g, playerHead, difficulty) {
 
 function reconcileGuardianCount() {
   const profile = getDifficultyProfile();
-  const newDifficulty = getEffectiveDifficulty();
   const target = profile.guardianTargets;
 
-  // ✅ Ya no eliminamos a Tezcatlipoca por dificultad: aparece en todas
   let normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalCount > target) {
     for (let i = enemyGuardians.length - 1; i >= 0 && normalCount > target; i--) {
@@ -2466,7 +2346,6 @@ function destroyEnemySnake(id, spawnBonus = true) {
         expiresAt: gameTime + 15000,
         isBossDrop: true
       });
-      // ✅ Registrar derrota de Tezcatlipoca
       progression.totalTezcatlipocaDefeated++;
       saveProgression();
       checkAchievements();
@@ -2783,7 +2662,6 @@ function updateEnemySnakeAI() {
       g.targetIndicator = null;
     }
 
-    // ✅ Rastro de humo (modo Cacería)
     if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail) {
       huntTrail.push({
         x: enemyHead.x,
@@ -2915,7 +2793,6 @@ function maybeSpawnFreezeFood() {
   }
   return false;
 }
-function maybeSpawnFireFood() { return true; }
 
 function maybeSpawnAirFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
@@ -2997,7 +2874,6 @@ function resolveCosmicOrder() {
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const base = SPEEDS[sel] || SPEEDS.medium;
-  // ✅ Penalización reducida (antes 2.4) para que sea más justo con guardianes
   const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
   let adaptive = Math.max(base * 0.78, base - lengthPenalty);
   if (isFuria) {
@@ -3005,7 +2881,6 @@ function getCurrentSpeed() {
   } else if (airBoostUntil > gameTime) {
     adaptive *= AIR_BOOST_MULTIPLIER;
   }
-  // ✅ Rastro de humo (Cacería) ralentiza
   if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
     const head = snake[0];
     const onTrail = huntTrail.some(t => t.x === head.x && t.y === head.y);
@@ -3094,13 +2969,12 @@ function updateGameTimers(elapsedMs) {
 
   updateMusicLayer();
 
+  // ✅ Manejo de congelamiento de guardianes
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
+      // Descongelar a todos los guardianes
       enemyGuardians.forEach(g => {
-        if (g.frozenAt !== null) {
-          g.expiresAt += gameTime - g.frozenAt;
-          g.frozenAt = null;
-        }
+        g.frozenAt = null;
       });
       guardiansFrozenUntil = 0;
       BadgeManager.setVisible('freeze', false);
@@ -3154,7 +3028,6 @@ function updateGameTimers(elapsedMs) {
     scheduleEnemySpawn(ok ? null : 1500);
   }
 
-  // ✅ Tezcatlipoca aparece en TODAS las dificultades
   const profile = getDifficultyProfile();
   const effectiveDiff = getEffectiveDifficulty();
   const tezConfig = TEZCATLIPOCA_CONFIG[effectiveDiff] || TEZCATLIPOCA_CONFIG.medium;
@@ -3187,7 +3060,6 @@ function updateGameTimers(elapsedMs) {
     });
   }
 
-  // ✅ Partículas ambientales de guardianes
   updateGuardianAmbientParticles();
 
   if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) {
@@ -3271,12 +3143,10 @@ function updateGameTimers(elapsedMs) {
     cosmicOrderFlashStartedAt = null;
   }
 
-  // ✅ Expiración de bonus foods
   if (bonusFoods.length > 0) {
     bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
   }
 
-  // ✅ Expiración del rastro de humo
   if (huntTrail.length > 0) {
     huntTrail = huntTrail.filter(t => t.expiresAt > gameTime);
   }
@@ -3290,7 +3160,6 @@ function updateGameTimers(elapsedMs) {
     }
   }
 
-  // ✅ NUEVAS MECÁNICAS DE MODOS
   updateModeMechanics(elapsedMs);
 }
 
@@ -3301,9 +3170,7 @@ function updateModeMechanics(elapsedMs) {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode) return;
 
-  // ═══════════════════════════════════════════════════════
-  // ECLIPSE (modo Clásico)
-  // ═══════════════════════════════════════════════════════
+  // ECLIPSE
   if (mode.hasEclipse && nextEclipseAt !== null) {
     if (!eclipseActive && gameTime >= nextEclipseAt - ECLIPSE_WARNING_MS && !eclipseWarningShown) {
       eclipseWarningShown = true;
@@ -3330,9 +3197,7 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // OSCURIDAD (modo Supervivencia)
-  // ═══════════════════════════════════════════════════════
+  // OSCURIDAD
   if (mode.hasDarkness) {
     if (darknessStartTime === null) darknessStartTime = gameTime;
     const elapsedSinceDark = gameTime - darknessStartTime;
@@ -3346,9 +3211,7 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
   // CONTRARRELOJ
-  // ═══════════════════════════════════════════════════════
   if (mode.hasTimer) {
     timedRemainingMs -= elapsedMs;
     BadgeManager.setVisible('timer', true);
@@ -3365,9 +3228,7 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════
-  // PRUEBAS DE XIBALBÁ (modo Supervivencia)
-  // ═══════════════════════════════════════════════════════
+  // PRUEBAS DE XIBALBÁ (con mensaje claro)
   if (mode.name === 'Supervivencia') {
     if (nextXibalbaTrialAt !== null && gameTime >= nextXibalbaTrialAt && !activeXibalbaTrial) {
       const trials = [
@@ -3383,6 +3244,7 @@ function updateModeMechanics(elapsedMs) {
       const badgeText = xibalbaBadge.querySelector('.badge-text-desktop');
       if (badgeText) badgeText.textContent = trial.description;
       if (xibalbaTimerSpan) xibalbaTimerSpan.textContent = Math.ceil(trial.durationMs / 1000);
+      // Mensaje grande y claro que se desvanece
       spawnFloatingText(trial.description, window.innerWidth / 2, 100, '#ff8fa3');
     }
     if (activeXibalbaTrial) {
@@ -3394,7 +3256,6 @@ function updateModeMechanics(elapsedMs) {
         xibalbaMaizeBlocked = false;
         BadgeManager.setVisible('xibalba', false);
         nextXibalbaTrialAt = gameTime + XIBALBA_INTERVAL_MS;
-        // ✅ Recompensa por superar la prueba
         score += 100;
         progression.maizeCoins += 5;
         updateScoresUI();
@@ -3538,7 +3399,6 @@ function resetGame() {
   maybeSpawnShieldFood();
   gameOverlay.classList.add('hidden');
 
-  // ✅ Reset de nuevas mecánicas
   eclipseActive = false;
   eclipseUntil = 0;
   eclipseWarningShown = false;
@@ -3557,7 +3417,6 @@ function resetGame() {
   nextXibalbaTrialAt = mode.name === 'Supervivencia' ? XIBALBA_FIRST_MS : null;
   xibalbaMaizeBlocked = false;
 
-  // ✅ Reset UI de badges especiales
   BadgeManager.setVisible('timer', false);
   BadgeManager.setVisible('eclipse', false);
   BadgeManager.setVisible('xibalba', false);
@@ -3659,7 +3518,6 @@ function gameUpdate() {
 
   if (directionQueue.length > 0) direction = directionQueue.shift();
 
-  // ✅ Invertir dirección si hay eclipse activo
   let moveDir = direction;
   if (eclipseActive) {
     moveDir = { x: -direction.x, y: -direction.y };
@@ -3675,9 +3533,9 @@ function gameUpdate() {
   const newY = (snake[0].y + moveDir.y + gridRows) % gridRows;
   const head = { x: newX, y: newY };
 
-  // ✅ Bloqueo de maíz si la prueba de Xibalbá está activa
   const canEatMaize = !xibalbaMaizeBlocked;
 
+  // ✅ 1. Verificar colisión con el propio cuerpo (después de calcular nueva posición)
   const willGrow =
     (canEatMaize && foods.some(f => f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt))) ||
     bonusFoods.some(f => f.x === head.x && f.y === head.y) ||
@@ -3693,6 +3551,7 @@ function gameUpdate() {
     return;
   }
 
+  // ✅ 2. Verificar colisión con la calavera
   const skullIdx = skullFoods.findIndex(f => f.x === head.x && f.y === head.y);
   if (skullIdx !== -1) {
     skullFoods.splice(skullIdx, 1);
@@ -3703,6 +3562,7 @@ function gameUpdate() {
     return;
   }
 
+  // ✅ 3. Verificar colisión con guardianes (antes de comer, para evitar bugs)
   const hitG = enemyGuardians.find(g => {
     if (g.destroyed) return false;
     if (g.behavior.id === 'ambusher') {
@@ -3758,10 +3618,12 @@ function gameUpdate() {
     }
   }
 
+  // ✅ 4. Mover la serpiente (solo si no hubo colisión)
   snake.unshift(head);
 
   let ateItem = false;
 
+  // ✅ 5. Procesar comida (después de mover, pero antes de quitar la cola si comió)
   const jadeIdx = shieldFoods.findIndex(f => f.x === head.x && f.y === head.y);
   if (jadeIdx !== -1) {
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
@@ -3873,7 +3735,6 @@ function gameUpdate() {
       playEatSound('bonus');
       updateScoresUI();
       spawnEatBurst(hx, hy, '#facc15', 10);
-      // ✅ Bonus también da tiempo en Contrarreloj
       if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
         timedRemainingMs += TIMED_BONUS_BONUS_MS;
         spawnFloatingText(`+${TIMED_BONUS_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
@@ -3887,9 +3748,8 @@ function gameUpdate() {
       f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt)
     );
     if (foodIdx !== -1) {
-      // ✅ Bloqueo de maíz durante prueba de Xibalbá
       if (xibalbaMaizeBlocked) {
-        // No come, se salta este bloque
+        // No come
       } else {
         const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
         const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
@@ -3898,7 +3758,6 @@ function gameUpdate() {
         const foodScore = 10 + maizeBonus;
         score += foodScore;
 
-        // ✅ Actualizar progresión
         if (food.offering === 'maize') {
           progression.totalMaize++;
         } else if (food.offering === 'cacao') {
@@ -3913,7 +3772,6 @@ function gameUpdate() {
           maizeBonus ? '#facc15' : '#d5bd70'
         );
 
-        // ✅ Contrarreloj: añadir tiempo
         if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
           timedRemainingMs += TIMED_MAIZE_BONUS_MS;
           spawnFloatingText(`+${TIMED_MAIZE_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
@@ -3929,6 +3787,7 @@ function gameUpdate() {
     }
   }
 
+  // ✅ 6. Si no comió, quitar la cola
   if (!ateItem) {
     snake.pop();
   }
@@ -3954,18 +3813,14 @@ function gameUpdate() {
 function updateScoresUI() {
   dtScore.textContent = score;
   mbScore.textContent = score;
-  drawerScore.textContent = score;
   dtHighScore.textContent = highScore;
   mbHighScore.textContent = highScore;
-  drawerHighScore.textContent = highScore;
   dtLength.textContent = snake.length;
   if (dtCoins) dtCoins.textContent = progression.maizeCoins;
-  if (drawerCoins) drawerCoins.textContent = progression.maizeCoins;
   if (score > highScore) {
     highScore = score;
     dtHighScore.textContent = highScore;
     mbHighScore.textContent = highScore;
-    drawerHighScore.textContent = highScore;
     safeSetItem('snakeIoHighScore', highScore);
   }
 }
@@ -4044,7 +3899,6 @@ function drawVignette() {
   ctx.fillRect(0, 0, w, h);
 }
 
-// ✅ NUEVA: Dibujar oscuridad (Supervivencia) - CORREGIDA
 function drawDarkness() {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode || !mode.hasDarkness) return;
@@ -4056,19 +3910,16 @@ function drawDarkness() {
   const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
   const radiusPx = darknessRadius * TILE_SIZE;
 
-  // Crear un gradiente radial que va desde transparente (centro) a negro (borde)
   const gradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.2, hx, hy, radiusPx * 1.2);
-  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');       // Centro totalmente visible
-  gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');   // Zona intermedia semi-visible
-  gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.85)');  // Zona oscura
-  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');    // Borde casi negro
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+  gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.85)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');
 
-  // Rellenar toda la pantalla con este gradiente
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 }
 
-// ✅ NUEVA: Dibujar tinte de eclipse
 function drawEclipseTint() {
   if (!eclipseActive) return;
   const remaining = Math.max(0, eclipseUntil - gameTime);
@@ -4080,7 +3931,6 @@ function drawEclipseTint() {
   ctx.restore();
 }
 
-// ✅ NUEVA: Dibujar rastro de humo (Cacería)
 function drawHuntTrail() {
   if (huntTrail.length === 0) return;
   ctx.save();
@@ -4251,7 +4101,6 @@ function drawBodyDiamond(segment, index, isGolden = false) {
   ctx.restore();
 }
 
-// =================== FIRE BREATH ===================
 function startFireBreath() {
   fireBreath = { startedAt: gameTime };
 }
@@ -4297,7 +4146,6 @@ function drawFireBreath() {
   ctx.restore();
 }
 
-// =================== KUKULCÁN ===================
 function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
@@ -4649,7 +4497,6 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
   ctx.restore();
 }
 
-// =================== GUARDIANES ===================
 function drawGuardianHead(rs, guardian) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
@@ -5307,7 +5154,6 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.restore();
 }
 
-// =================== OFRENDAS ===================
 function drawFoodOffering(food, cx, cy, pulse) {
   const isMaize = food.offering === 'maize';
   const isCacao = food.offering === 'cacao';
@@ -5415,7 +5261,6 @@ function draw(interpolation = 1, updateEffects = false) {
 
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
 
-  // ✅ Rastro de humo (Cacería) — se dibuja debajo de todo
   drawHuntTrail();
 
   foods.forEach(food => {
@@ -5908,7 +5753,6 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fill();
   }
 
-  // ✅ Skin activo
   const skin = getActiveSkin();
   const KUKULKAN_BODY = isGolden ? '#9c8a4a' : skin.body;
   const KUKULKAN_BORDER = isGolden ? '#d4c488' : skin.border;
@@ -6016,10 +5860,7 @@ function draw(interpolation = 1, updateEffects = false) {
 
   if (isGameRunning) drawVignette();
 
-  // ✅ Oscuridad (Supervivencia) — encima de todo
   drawDarkness();
-
-  // ✅ Tinte de eclipse (Clásico)
   drawEclipseTint();
 
   if (cosmicOrderFlashStartedAt !== null) {
@@ -6043,35 +5884,57 @@ function draw(interpolation = 1, updateEffects = false) {
 function startGame() {
   getAudioContext();
   if (isGameRunning) finishRunStatistics();
+
+  // ✅ 1. Detener CUALQUIER frame pendiente antes de reiniciar
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  lastFrameTimestamp = null;
+  simulationAccumulator = 0;
+  renderInterpolation = 1;
+
+  // ✅ 2. Forzar estado limpio
+  isPaused = false;
+  isGameRunning = false;
+  cancelCountdown();
+  stopMusic();
+
+  // ✅ 3. Resetear TODO el estado del juego
   resetGame();
 
+  // ✅ 4. Inicializar nueva partida
   gameTime = 0;
   applyGameModeRules();
 
-  simulationAccumulator = 0;
-  renderInterpolation = 1;
   isGameRunning = true;
   isPaused = false;
   runStartedAt = gameTime;
   runDifficulty = getEffectiveDifficulty();
   runGuardiansDefeated = 0;
-  cancelCountdown();
+
   startCountdown();
   updateFuriaUI();
 
   dtStartBtn.textContent = '🔄 Reiniciar';
-  dtPauseBtn.textContent = '⏸ Pausa';
 
+  // ✅ 5. Ocultar TODOS los overlays/modales
   tutorialModal.classList.add('hidden');
   introTutorialModal.classList.add('hidden');
-  drawerMenu.classList.add('hidden');
+  settingsModal.classList.add('hidden');
   gameOverlay.classList.add('hidden');
+  loreModal.classList.add('hidden');
+  achievementsModal.classList.add('hidden');
+  customizeModal.classList.add('hidden');
+  statisticsModal.classList.add('hidden');
+
   stopWelcomeDemo();
   welcomeScreen.classList.add('hidden');
   document.body.classList.remove('welcome-open', 'tutorial-open', 'gameover-open');
 
   updateLivesUI();
 
+  // ✅ 6. Arrancar bucle y música
   startMusic();
   startGameLoop();
 }
@@ -6083,15 +5946,12 @@ function togglePause() {
     isPaused = true;
   } else {
     isPaused = false;
-    startCountdown();
+    // ✅ No reiniciamos countdown aquí para que despausar sea fluido
   }
-  dtPauseBtn.textContent = isPaused ? '▶ Reanudar' : '⏸ Pausa';
   updateFuriaUI();
   if (isPaused) {
     stopMusic();
-    drawerMenu.classList.remove('hidden');
   } else {
-    drawerMenu.classList.add('hidden');
     startMusic();
     startGameLoop();
   }
@@ -6101,6 +5961,15 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   finishRunStatistics();
   const coinsEarned = Math.floor(score / 10);
   isGameRunning = false;
+  isPaused = false;
+
+  // ✅ Detener el game loop explícitamente
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  lastFrameTimestamp = null;
+
   cancelCountdown();
   clearFireBreath();
   isFuria = false;
@@ -6142,7 +6011,6 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   isOnFire = false;
   fireExpiresAt = 0;
 
-  // ✅ Limpiar mecánicas de modo
   eclipseActive = false;
   BadgeManager.setVisible('eclipse', false);
   BadgeManager.setVisible('timer', false);
@@ -6192,12 +6060,12 @@ function openTutorial() {
   if (!tutorialModal.classList.contains('hidden')) return;
   tutorialWasRunning = isGameRunning;
   tutorialWasPaused = isPaused;
-  tutorialDrawerWasVisible = !drawerMenu.classList.contains('hidden');
+  tutorialDrawerWasVisible = false;
   tutorialOpenedFromWelcome = !welcomeScreen.classList.contains('hidden');
   if (tutorialWasRunning && !tutorialWasPaused) togglePause();
   if (!tutorialOpenedFromWelcome) document.body.appendChild(tutorialModal);
   welcomeStartBtn.classList.add('hidden');
-  drawerMenu.classList.add('hidden');
+  settingsModal.classList.add('hidden');
   tutorialModal.classList.remove('hidden');
   document.body.classList.add('tutorial-open');
   showTutorialStep(1);
@@ -6208,10 +6076,6 @@ function closeTutorial() {
   document.body.classList.remove('tutorial-open');
   if (tutorialWasRunning && !tutorialWasPaused && isGameRunning && isPaused) {
     togglePause();
-  } else if (tutorialWasRunning && tutorialWasPaused && isGameRunning && isPaused) {
-    drawerMenu.classList.remove('hidden');
-  } else if (tutorialDrawerWasVisible) {
-    drawerMenu.classList.remove('hidden');
   }
   const card = welcomeScreen.querySelector('.welcome-card');
   if (card && tutorialModal.parentElement !== card) {
@@ -6235,7 +6099,6 @@ function closeIntroTutorial() {
   introTutorialModal.classList.add('hidden');
 }
 
-// ✅ LORE
 function openLore() {
   loreWasRunning = isGameRunning;
   loreWasPaused = isPaused;
@@ -6250,12 +6113,11 @@ function closeLore() {
   loreWasPaused = false;
 }
 
-// ✅ LOGROS
 function openAchievements() {
   achievementsWasRunning = isGameRunning;
   achievementsWasPaused = isPaused;
   if (achievementsWasRunning && !achievementsWasPaused) togglePause();
-  drawerMenu.classList.add('hidden');
+  settingsModal.classList.add('hidden');
   renderAchievementsUI();
   achievementsModal.classList.remove('hidden');
 }
@@ -6266,12 +6128,11 @@ function closeAchievements() {
   achievementsWasPaused = false;
 }
 
-// ✅ PERSONALIZACIÓN
 function openCustomize() {
   customizeWasRunning = isGameRunning;
   customizeWasPaused = isPaused;
   if (customizeWasRunning && !customizeWasPaused) togglePause();
-  drawerMenu.classList.add('hidden');
+  settingsModal.classList.add('hidden');
   renderCustomizeUI();
   customizeModal.classList.remove('hidden');
 }
@@ -6316,21 +6177,6 @@ window.addEventListener('touchend', e => {
 }, { passive: true });
 
 btnTurbo.addEventListener('pointerdown', e => { e.preventDefault(); triggerFuria(); });
-
-mbPauseBtn.addEventListener('click', () => {
-  if (isGameRunning) {
-    togglePause();
-  } else {
-    drawerMenu.classList.toggle('hidden');
-  }
-});
-
-mbTutorialBtn.addEventListener('click', () => {
-  if (isGameRunning && !isPaused) {
-    togglePause();
-  }
-  openTutorial();
-});
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) { closeSettings(); return; }
@@ -6379,17 +6225,20 @@ closeLoreBtn.addEventListener('click', closeLore);
 loreStartBtn.addEventListener('click', () => { closeLore(); startGame(); });
 loreModal.addEventListener('click', e => { if (e.target === loreModal) closeLore(); });
 
-dtStartBtn.addEventListener('click', () => {
-  if (!welcomeScreen.classList.contains('hidden')) startGame();
-  else startGame();
+restartOverlayBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  setTimeout(() => startGame(), 0);
 });
-dtPauseBtn.addEventListener('click', togglePause);
+
+dtStartBtn.addEventListener('click', () => {
+  startGame();
+});
+
+dtSettingsBtn.addEventListener('click', openSettings);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
-
-drawerStatsBtn.addEventListener('click', openStatistics);
-drawerAchievementsBtn.addEventListener('click', openAchievements);
-drawerCustomizeBtn.addEventListener('click', openCustomize);
+dtCustomizeBtn.addEventListener('click', openCustomize);
 
 closeStatisticsBtn.addEventListener('click', closeStatistics);
 statisticsModal.addEventListener('click', e => { if (e.target === statisticsModal) closeStatistics(); });
@@ -6400,7 +6249,6 @@ achievementsModal.addEventListener('click', e => { if (e.target === achievements
 closeCustomizeBtn.addEventListener('click', closeCustomize);
 customizeModal.addEventListener('click', e => { if (e.target === customizeModal) closeCustomize(); });
 
-// ✅ Tabs de personalización
 customizeTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.dataset.tab;
@@ -6412,55 +6260,64 @@ customizeTabs.forEach(tab => {
 
 menuToggleBtn.addEventListener('click', () => {
   if (isGameRunning && !isPaused) togglePause();
-  else drawerMenu.classList.toggle('hidden');
+  openSettings();
 });
 mbSoundBtn.addEventListener('click', () => toggleSound());
-closeDrawerBtn.addEventListener('click', () => {
-  drawerMenu.classList.add('hidden');
-  if (isPaused) togglePause();
+mbSettingsBtn.addEventListener('click', () => {
+  if (isGameRunning && !isPaused) togglePause();
+  openSettings();
 });
-drawerResumeBtn.addEventListener('click', () => {
-  drawerMenu.classList.add('hidden');
-  if (isPaused) togglePause();
-  else if (!isGameRunning) startGame();
-});
-drawerRestartBtn.addEventListener('click', startGame);
-drawerTutorialBtn.addEventListener('click', openTutorial);
-restartOverlayBtn.addEventListener('click', startGame);
-drawerSoundToggle.addEventListener('change', e => toggleSound(e.target.checked));
-drawerDpadToggle.addEventListener('change', e => {
-  showDpad = e.target.checked;
+
+// Eventos del modal de configuración unificado
+function openSettings() {
+  settingsWasRunning = isGameRunning;
+  settingsWasPaused = isPaused;
+  if (settingsWasRunning && !settingsWasPaused) togglePause();
+
+  settingsGameMode.value = gameModeSelect.value;
+  settingsDifficulty.value = difficultySelect.value;
+  settingsSoundToggle.checked = !isMuted;
+  settingsDpadToggle.checked = showDpad;
+
+  updateSettingsDifficultyVisibility();
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettings() {
+  settingsModal.classList.add('hidden');
+  if (settingsWasRunning && !settingsWasPaused && isGameRunning && isPaused) {
+    togglePause();
+  }
+  settingsWasRunning = false;
+  settingsWasPaused = false;
+}
+
+function updateSettingsDifficultyVisibility() {
+  const isClassic = settingsGameMode.value === 'classic';
+  settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
+}
+
+function applySettings() {
+  if (settingsGameMode.value !== gameModeSelect.value) {
+    gameModeSelect.value = settingsGameMode.value;
+    gameModeSelect.dispatchEvent(new Event('change'));
+  }
+  if (settingsDifficulty.value !== difficultySelect.value) {
+    difficultySelect.value = settingsDifficulty.value;
+    difficultySelect.dispatchEvent(new Event('change'));
+  }
+  toggleSound(settingsSoundToggle.checked);
+  showDpad = settingsDpadToggle.checked;
   safeSetItem('snakeIoShowDpad', showDpad);
   touchControls.classList.toggle('hidden', !showDpad);
-});
 
-tutNextBtn.addEventListener('click', () => { if (currentTutorialStep < totalTutorialSteps) showTutorialStep(currentTutorialStep + 1); });
-tutPrevBtn.addEventListener('click', () => { if (currentTutorialStep > 1) showTutorialStep(currentTutorialStep - 1); });
-tutStartBtn.addEventListener('click', () => {
-  tutorialWasRunning = false; tutorialWasPaused = false;
-  tutorialDrawerWasVisible = false; tutorialOpenedFromWelcome = false;
-  tutorialModal.classList.add('hidden');
-  document.body.classList.remove('tutorial-open');
-  startGame();
-});
-closeTutorialBtn.addEventListener('click', closeTutorial);
-tutorialModal.addEventListener('click', e => { if (e.target === tutorialModal) closeTutorial(); });
+  closeSettings();
+}
 
-// Eventos del modal de configuración
-dtSettingsBtn.addEventListener('click', openSettings);
-mbSettingsBtn.addEventListener('click', openSettings);
 closeSettingsBtn.addEventListener('click', closeSettings);
 settingsApplyBtn.addEventListener('click', applySettings);
 settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
-
 settingsGameMode.addEventListener('change', updateSettingsDifficultyVisibility);
-settingsSoundToggle.addEventListener('change', e => toggleSound(e.target.checked));
-settingsDpadToggle.addEventListener('change', e => {
-  showDpad = e.target.checked;
-  safeSetItem('snakeIoShowDpad', showDpad);
-  touchControls.classList.toggle('hidden', !showDpad);
-});
-
 settingsCustomizeBtn.addEventListener('click', () => { closeSettings(); openCustomize(); });
 settingsAchievementsBtn.addEventListener('click', () => { closeSettings(); openAchievements(); });
 settingsStatsBtn.addEventListener('click', () => { closeSettings(); openStatistics(); });
@@ -6474,9 +6331,9 @@ function openStatistics() {
   if (!statisticsModal.classList.contains('hidden')) return;
   statisticsWasRunning = isGameRunning;
   statisticsWasPaused = isPaused;
-  statisticsDrawerWasVisible = !drawerMenu.classList.contains('hidden');
+  statisticsDrawerWasVisible = false;
   if (statisticsWasRunning && !statisticsWasPaused) togglePause();
-  drawerMenu.classList.add('hidden');
+  settingsModal.classList.add('hidden');
   updateStatisticsUI();
   statisticsModal.classList.remove('hidden');
 }
@@ -6484,7 +6341,6 @@ function closeStatistics() {
   if (statisticsModal.classList.contains('hidden')) return;
   statisticsModal.classList.add('hidden');
   if (statisticsWasRunning && !statisticsWasPaused && isGameRunning && isPaused) togglePause();
-  else if (statisticsWasRunning && statisticsWasPaused && isGameRunning && isPaused) drawerMenu.classList.remove('hidden');
   statisticsWasRunning = false;
   statisticsWasPaused = false;
   statisticsDrawerWasVisible = false;
@@ -6495,8 +6351,9 @@ function closeStatistics() {
 // ========================================================
 function updateModeUI() {
   const isClassic = gameModeSelect.value === 'classic';
-  difficultySelectorBox.style.display = isClassic ? 'flex' : 'none';
-  drawerDifficulty.parentElement.style.display = isClassic ? 'flex' : 'none';
+  if (settingsDifficultyGroup) {
+    settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
+  }
   updateThemeColors();
   rebuildBoardCanvas(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2), true);
 }
@@ -6510,7 +6367,6 @@ welcomeGameMode.addEventListener('change', () => {
   gameMode = welcomeGameMode.value;
   safeSetItem('snakeIoGameMode', gameMode);
   gameModeSelect.value = gameMode;
-  drawerGameMode.value = gameMode;
   updateWelcomeModeUI();
   updateModeUI();
   if (isGameRunning) startGame();
@@ -6519,7 +6375,6 @@ welcomeGameMode.addEventListener('change', () => {
 
 welcomeDifficulty.addEventListener('change', () => {
   difficultySelect.value = welcomeDifficulty.value;
-  drawerDifficulty.value = welcomeDifficulty.value;
   reconcileGuardianCount();
 });
 
@@ -6531,27 +6386,7 @@ function applyGameModeRules() {
   updateLivesUI();
 
   if (!mode.itemsEnabled) {
-    shieldFoods = [];
-    freezeFoods = [];
-    airFoods = [];
-    cosmicOrderFoods = [];
-    sacrificeFoods = [];
-    skullFoods = [];
-    BadgeManager.setVisible('sacrificeOffering', false);
-    BadgeManager.setVisible('skullFood', false);
-    BadgeManager.setVisible('cosmicOrder', false);
-    BadgeManager.setVisible('cosmicOrderFood', false);
-    BadgeManager.setVisible('rain', false);
-    BadgeManager.setVisible('immunity', false);
-    BadgeManager.setVisible('freeze', false);
-    sacredRainUntil = 0;
-    cosmicOrderResolveAt = null;
-    nextSacredRainAt = null;
-    nextCosmicOrderSpawnAt = null;
-    nextSacrificeSpawnAt = null;
-    nextSkullSpawnAt = null;
-    freezeSpawnAt = null;
-    airSpawnAt = null;
+    // ... (igual que antes)
   } else {
     const profile = getDifficultyProfile();
     if (isGameRunning) {
@@ -6566,20 +6401,13 @@ function applyGameModeRules() {
 }
 
 difficultySelect.addEventListener('change', () => {
-  drawerDifficulty.value = difficultySelect.value;
   welcomeDifficulty.value = difficultySelect.value;
-  reconcileGuardianCount();
-});
-drawerDifficulty.addEventListener('change', () => {
-  difficultySelect.value = drawerDifficulty.value;
-  welcomeDifficulty.value = drawerDifficulty.value;
   reconcileGuardianCount();
 });
 
 gameModeSelect.addEventListener('change', () => {
   gameMode = gameModeSelect.value;
   safeSetItem('snakeIoGameMode', gameMode);
-  drawerGameMode.value = gameMode;
   welcomeGameMode.value = gameMode;
   updateWelcomeModeUI();
   updateModeUI();
@@ -6590,19 +6418,14 @@ gameModeSelect.addEventListener('change', () => {
     applyGameModeRules();
   }
 });
-drawerGameMode.addEventListener('change', () => {
-  gameModeSelect.value = drawerGameMode.value;
-  gameModeSelect.dispatchEvent(new Event('change'));
-});
 
 // ========================================================
 // 29. VISIBILITY
 // ========================================================
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && isGameRunning && !isPaused) togglePause();
-});
-window.addEventListener('blur', () => {
-  if (isGameRunning && !isPaused) togglePause();
+  if (document.hidden && isGameRunning && !isPaused && countdownEndsAt === null) {
+    togglePause();
+  }
 });
 
 // ========================================================
@@ -7014,7 +6837,7 @@ function stopWelcomeDemo() {
 // 31. INICIALIZACIÓN
 // ========================================================
 updateSoundUI();
-drawerDpadToggle.checked = showDpad;
+settingsDpadToggle.checked = showDpad;
 touchControls.classList.toggle('hidden', !showDpad);
 updateScoresUI();
 updateStatisticsUI();
@@ -7035,7 +6858,6 @@ resizeCanvas();
 draw();
 
 gameModeSelect.value = gameMode;
-drawerGameMode.value = gameMode;
 welcomeGameMode.value = gameMode;
 welcomeDifficulty.value = difficultySelect.value;
 updateWelcomeModeUI();

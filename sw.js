@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER — La Travesía de Kukulcán
 // ========================================================
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = `kukulcan-${CACHE_VERSION}`;
 
 // Recursos que se cachean durante la instalación (precache)
@@ -34,7 +34,6 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        // addAll falla si UNO solo falla. Usamos un enfoque resiliente.
         return Promise.all(
           PRECACHE_ASSETS.map(url =>
             cache.add(url).catch(err => {
@@ -80,39 +79,27 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
 
-  // Solo manejamos GET. POST, PUT, DELETE van directos a la red.
-  if (req.method !== 'GET') {
-    return;
-  }
+  if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
 
-  // Ignoramos peticiones a otros orígenes (APIs, CDNs, analytics, etc.)
-  if (url.origin !== self.location.origin) {
-    return;
-  }
+  if (url.origin !== self.location.origin) return;
 
-  // Ignoramos peticiones de extensiones del navegador u otros esquemas
-  if (!url.protocol.startsWith('http')) {
-    return;
-  }
+  if (!url.protocol.startsWith('http')) return;
 
   const pathname = url.pathname.toLowerCase();
   const ext = pathname.substring(pathname.lastIndexOf('.'));
 
-  // -------- Cache-First (imágenes, fuentes, media) --------
   if (CACHE_FIRST_EXTENSIONS.includes(ext)) {
     event.respondWith(cacheFirst(req));
     return;
   }
 
-  // -------- Network-First (HTML, CSS, JS, JSON) --------
   if (NETWORK_FIRST_EXTENSIONS.includes(ext) || pathname === '/' || pathname.endsWith('/')) {
     event.respondWith(networkFirst(req));
     return;
   }
 
-  // -------- Por defecto: Network-First (para todo lo demás) --------
   event.respondWith(networkFirst(req));
 });
 
@@ -128,7 +115,6 @@ async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const networkResponse = await fetch(request);
-    // Solo cacheamos respuestas válidas de nuestro origen
     if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
       cache.put(request, networkResponse.clone());
     }
@@ -139,12 +125,10 @@ async function networkFirst(request) {
     if (cachedResponse) {
       return cachedResponse;
     }
-    // Si no hay caché y la petición es de navegación, devolvemos el index
     if (request.mode === 'navigate') {
       const fallback = await cache.match('./index.html');
       if (fallback) return fallback;
     }
-    // Sin caché ni fallback: error
     return new Response('Recurso no disponible offline', {
       status: 503,
       statusText: 'Service Unavailable',
@@ -180,7 +164,7 @@ async function cacheFirst(request) {
 }
 
 // ========================================================
-// MENSAJES DESDE LA PÁGINA (para forzar actualización, etc.)
+// MENSAJES DESDE LA PÁGINA
 // ========================================================
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
