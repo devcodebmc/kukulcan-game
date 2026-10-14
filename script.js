@@ -1,5 +1,6 @@
 // ========================================================
-// LA TRAVESÍA DE KUKULCÁN — script.js
+// LA TRAVESÍA DE KUKULCÁN — script.js (v3)
+// Fix: pausa robusta + aplicar/reiniciar en modales
 // ========================================================
 
 // ========================================================
@@ -143,6 +144,8 @@ const customizeCoinsValue = document.getElementById('customize-coins-value');
 const customizeTabs = document.querySelectorAll('.customize-tab');
 const customizeSkinsPanel = document.getElementById('customize-skins-panel');
 const customizeThemesPanel = document.getElementById('customize-themes-panel');
+const customizeApplyBtn = document.getElementById('customize-apply-btn');
+const customizeCancelBtn = document.getElementById('customize-cancel-btn');
 
 const gameOverlay = document.getElementById('game-overlay');
 const overlayReason = document.getElementById('overlay-reason');
@@ -155,7 +158,6 @@ const closeStatisticsBtn = document.getElementById('close-statistics-btn');
 const statisticsStorageStatus = document.getElementById('statistics-storage-status');
 const countdownOverlay = document.getElementById('countdown-overlay');
 
-// Referencias del modal de configuración unificado
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 const settingsGameMode = document.getElementById('settings-game-mode');
@@ -181,37 +183,22 @@ const BadgeManager = (() => {
   const MAX_HIGH_MOBILE = 2;
   const MAX_SPECIAL_MOBILE = 1;
 
-  const mediumOrder = [
-    'cosmicOrder', 'rain', 'sacrificeOffering',
-    'cosmicOrderFood', 'skullFood', 'threat'
-  ];
+  const mediumOrder = ['cosmicOrder', 'rain', 'sacrificeOffering', 'cosmicOrderFood', 'skullFood', 'threat'];
   const highOrder = ['furia', 'air', 'immunity', 'freeze', 'respawn'];
   const specialOrder = ['timer', 'eclipse', 'xibalba', 'darkness'];
 
   const refs = {
     immunity: document.getElementById('immunity-badge'),
-    furia: furiaBadge,
-    air: airBadge,
-    respawn: respawnBadge,
-    freeze: freezeBadge,
-    rain: rainBadge,
-    cosmicOrder: cosmicOrderBadge,
-    cosmicOrderFood: cosmicOrderFoodBadge,
-    sacrificeOffering: sacrificeOfferingBadge,
-    skullFood: skullFoodBadge,
-    threat: threatBadge,
-    timer: timerBadge,
-    eclipse: eclipseBadge,
-    xibalba: xibalbaBadge,
-    darkness: darknessBadge
+    furia: furiaBadge, air: airBadge, respawn: respawnBadge, freeze: freezeBadge,
+    rain: rainBadge, cosmicOrder: cosmicOrderBadge, cosmicOrderFood: cosmicOrderFoodBadge,
+    sacrificeOffering: sacrificeOfferingBadge, skullFood: skullFoodBadge, threat: threatBadge,
+    timer: timerBadge, eclipse: eclipseBadge, xibalba: xibalbaBadge, darkness: darknessBadge
   };
 
   const logical = {
-    immunity: false, furia: false, air: false,
-    respawn: false, freeze: false, rain: false,
+    immunity: false, furia: false, air: false, respawn: false, freeze: false, rain: false,
     cosmicOrder: false, cosmicOrderFood: false, sacrificeOffering: false,
-    skullFood: false, threat: false,
-    timer: false, eclipse: false, xibalba: false, darkness: false
+    skullFood: false, threat: false, timer: false, eclipse: false, xibalba: false, darkness: false
   };
 
   function setVisible(key, visible) {
@@ -223,56 +210,41 @@ const BadgeManager = (() => {
   function apply() {
     const mobile = isMobile();
 
-    // HIGH PRIORITY
     if (mobile) {
       const activeHigh = highOrder.filter(k => logical[k]);
       const visibleHigh = new Set(activeHigh.slice(0, MAX_HIGH_MOBILE));
-      highOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
-        el.classList.toggle('hidden', !visibleHigh.has(k));
-      });
+      highOrder.forEach(k => { const el = refs[k]; if (el) el.classList.toggle('hidden', !visibleHigh.has(k)); });
     } else {
-      highOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
-        el.classList.toggle('hidden', !logical[k]);
-      });
+      highOrder.forEach(k => { const el = refs[k]; if (el) el.classList.toggle('hidden', !logical[k]); });
     }
 
-    // MEDIUM PRIORITY
     if (mobile) {
       const active = mediumOrder.filter(k => logical[k]);
       const visible = new Set(active.slice(0, MAX_MEDIUM_MOBILE));
       mediumOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
+        const el = refs[k]; if (!el) return;
         el.classList.toggle('is-visible', visible.has(k));
         el.classList.toggle('hidden', !logical[k]);
       });
     } else {
       mediumOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
+        const el = refs[k]; if (!el) return;
         el.classList.toggle('hidden', !logical[k]);
         el.classList.remove('is-visible');
       });
     }
 
-    // SPECIAL PRIORITY
     if (mobile) {
       const active = specialOrder.filter(k => logical[k]);
       const visible = new Set(active.slice(0, MAX_SPECIAL_MOBILE));
       specialOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
+        const el = refs[k]; if (!el) return;
         el.classList.toggle('is-visible', visible.has(k));
         el.classList.toggle('hidden', !logical[k]);
       });
     } else {
       specialOrder.forEach(k => {
-        const el = refs[k];
-        if (!el) return;
+        const el = refs[k]; if (!el) return;
         el.classList.toggle('hidden', !logical[k]);
         el.classList.remove('is-visible');
       });
@@ -307,243 +279,107 @@ const AIR_FURIA_RECHARGE_BONUS_MS = 2000;
 
 const DIFFICULTY_PROFILES = {
   easy: {
-    guardianTargets: 1,
-    guardianFirstSpawnMs: 18000,
-    guardianNextSpawnMs: 22000,
-    guardianLifetimeMs: 999999,
-    jadeRespawnMs: 20000,
-    freezeRespawnMs: 24000,
-    freezeDurationMs: 4000,
-    jadeImmunityMs: 12000,
-    guardianMoveInterval: 5,
-    guardianLead: 1,
-    flankerOrbitSpeed: 16,
-    cosmicFirstMs: 40000,
-    cosmicIntervalMs: 55000,
-    sacrificeFirstMs: 28000,
-    skullFirstMs: 26000,
-    rainFirstMs: 28000,
-    rainIntervalMs: 50000,
-    chaacUnlockMs: 999999,
-    chaacCooldownMs: 999999,
-    chaacLifetimeMs: 999999,
-    chaacTeleportMs: 4000,
-    guardianReward: 80,
-    bossReward: 0,
-    turboDurationMs: 3500,
-    turboCooldownMs: 4500
+    guardianTargets: 1, guardianFirstSpawnMs: 18000, guardianNextSpawnMs: 22000,
+    guardianLifetimeMs: 999999, jadeRespawnMs: 20000, freezeRespawnMs: 24000,
+    freezeDurationMs: 4000, jadeImmunityMs: 12000, guardianMoveInterval: 5,
+    guardianLead: 1, flankerOrbitSpeed: 16, cosmicFirstMs: 40000, cosmicIntervalMs: 55000,
+    sacrificeFirstMs: 28000, skullFirstMs: 26000, rainFirstMs: 28000, rainIntervalMs: 50000,
+    chaacUnlockMs: 999999, chaacCooldownMs: 999999, chaacLifetimeMs: 999999,
+    chaacTeleportMs: 4000, guardianReward: 80, bossReward: 0,
+    turboDurationMs: 3500, turboCooldownMs: 4500
   },
   medium: {
-    guardianTargets: 2,
-    guardianFirstSpawnMs: 14000,
-    guardianNextSpawnMs: 16000,
-    guardianLifetimeMs: 999999,
-    jadeRespawnMs: 14000,
-    freezeRespawnMs: 22000,
-    freezeDurationMs: 3000,
-    jadeImmunityMs: 10000,
-    guardianMoveInterval: 4,
-    guardianLead: 3,
-    flankerOrbitSpeed: 12,
-    cosmicFirstMs: 30000,
-    cosmicIntervalMs: 45000,
-    sacrificeFirstMs: 30000,
-    skullFirstMs: 20000,
-    rainFirstMs: 22000,
-    rainIntervalMs: 42000,
-    chaacUnlockMs: 999999,
-    chaacCooldownMs: 999999,
-    chaacLifetimeMs: 999999,
-    chaacTeleportMs: 3200,
-    guardianReward: 100,
-    bossReward: 0,
-    turboDurationMs: 3000,
-    turboCooldownMs: 5000
+    guardianTargets: 2, guardianFirstSpawnMs: 14000, guardianNextSpawnMs: 16000,
+    guardianLifetimeMs: 999999, jadeRespawnMs: 14000, freezeRespawnMs: 22000,
+    freezeDurationMs: 3000, jadeImmunityMs: 10000, guardianMoveInterval: 4,
+    guardianLead: 3, flankerOrbitSpeed: 12, cosmicFirstMs: 30000, cosmicIntervalMs: 45000,
+    sacrificeFirstMs: 30000, skullFirstMs: 20000, rainFirstMs: 22000, rainIntervalMs: 42000,
+    chaacUnlockMs: 999999, chaacCooldownMs: 999999, chaacLifetimeMs: 999999,
+    chaacTeleportMs: 3200, guardianReward: 100, bossReward: 0,
+    turboDurationMs: 3000, turboCooldownMs: 5000
   },
   hard: {
-    guardianTargets: 3,
-    guardianFirstSpawnMs: 11000,
-    guardianNextSpawnMs: 11000,
-    guardianLifetimeMs: 999999,
-    jadeRespawnMs: 11000,
-    freezeRespawnMs: 20000,
-    freezeDurationMs: 2500,
-    jadeImmunityMs: 8000,
-    guardianMoveInterval: 3,
-    guardianLead: 4,
-    flankerOrbitSpeed: 9,
-    cosmicFirstMs: 25000,
-    cosmicIntervalMs: 38000,
-    sacrificeFirstMs: 32000,
-    skullFirstMs: 18000,
-    rainFirstMs: 18000,
-    rainIntervalMs: 38000,
-    chaacUnlockMs: 45000,
-    chaacCooldownMs: 60000,
-    chaacLifetimeMs: 999999,
-    chaacTeleportMs: 3000,
-    guardianReward: 120,
-    bossReward: 250,
-    turboDurationMs: 2800,
-    turboCooldownMs: 5200
+    guardianTargets: 3, guardianFirstSpawnMs: 11000, guardianNextSpawnMs: 11000,
+    guardianLifetimeMs: 999999, jadeRespawnMs: 11000, freezeRespawnMs: 20000,
+    freezeDurationMs: 2500, jadeImmunityMs: 8000, guardianMoveInterval: 3,
+    guardianLead: 4, flankerOrbitSpeed: 9, cosmicFirstMs: 25000, cosmicIntervalMs: 38000,
+    sacrificeFirstMs: 32000, skullFirstMs: 18000, rainFirstMs: 18000, rainIntervalMs: 38000,
+    chaacUnlockMs: 45000, chaacCooldownMs: 60000, chaacLifetimeMs: 999999,
+    chaacTeleportMs: 3000, guardianReward: 120, bossReward: 250,
+    turboDurationMs: 2800, turboCooldownMs: 5200
   },
   extreme: {
-    guardianTargets: 4,
-    guardianFirstSpawnMs: 9000,
-    guardianNextSpawnMs: 8000,
-    guardianLifetimeMs: 999999,
-    jadeRespawnMs: 8000,
-    freezeRespawnMs: 18000,
-    freezeDurationMs: 2000,
-    jadeImmunityMs: 6000,
-    guardianMoveInterval: 2,
-    guardianLead: 5,
-    flankerOrbitSpeed: 7,
-    cosmicFirstMs: 20000,
-    cosmicIntervalMs: 32000,
-    sacrificeFirstMs: 36000,
-    skullFirstMs: 15000,
-    rainFirstMs: 15000,
-    rainIntervalMs: 32000,
-    chaacUnlockMs: 35000,
-    chaacCooldownMs: 45000,
-    chaacLifetimeMs: 999999,
-    chaacTeleportMs: 2600,
-    guardianReward: 150,
-    bossReward: 350,
-    turboDurationMs: 2500,
-    turboCooldownMs: 5500
+    guardianTargets: 4, guardianFirstSpawnMs: 9000, guardianNextSpawnMs: 8000,
+    guardianLifetimeMs: 999999, jadeRespawnMs: 8000, freezeRespawnMs: 18000,
+    freezeDurationMs: 2000, jadeImmunityMs: 6000, guardianMoveInterval: 2,
+    guardianLead: 5, flankerOrbitSpeed: 7, cosmicFirstMs: 20000, cosmicIntervalMs: 32000,
+    sacrificeFirstMs: 36000, skullFirstMs: 15000, rainFirstMs: 15000, rainIntervalMs: 32000,
+    chaacUnlockMs: 35000, chaacCooldownMs: 45000, chaacLifetimeMs: 999999,
+    chaacTeleportMs: 2600, guardianReward: 150, bossReward: 350,
+    turboDurationMs: 2500, turboCooldownMs: 5500
   }
 };
 
 const GAME_MODES = {
   classic: {
-    name: 'Clásico',
-    icon: '⚔️',
-    subtitle: 'El Viaje de Kukulcán',
-    guardianSpawnRate: 1.0,
-    guardianRewardMultiplier: 1.0,
-    itemsEnabled: true,
-    livesEnabled: true,
-    hasEclipse: true,
-    hasDarkness: false,
-    hasHuntTrail: false,
-    hasTimer: false,
-    profileOverrides: null,
+    name: 'Clásico', icon: '⚔️', subtitle: 'El Viaje de Kukulcán',
+    guardianSpawnRate: 1.0, guardianRewardMultiplier: 1.0,
+    itemsEnabled: true, livesEnabled: true, hasEclipse: true,
+    hasDarkness: false, hasHuntTrail: false, hasTimer: false, profileOverrides: null,
   },
   hunt: {
-    name: 'Cacería',
-    icon: '🎯',
-    subtitle: 'La Noche de Tezcatlipoca',
-    guardianSpawnRate: 0.6,
-    guardianRewardMultiplier: 1.5,
-    itemsEnabled: true,
-    livesEnabled: true,
-    hasEclipse: false,
-    hasDarkness: false,
-    hasHuntTrail: true,
-    hasTimer: false,
+    name: 'Cacería', icon: '🎯', subtitle: 'La Noche de Tezcatlipoca',
+    guardianSpawnRate: 0.6, guardianRewardMultiplier: 1.5,
+    itemsEnabled: true, livesEnabled: true, hasEclipse: false,
+    hasDarkness: false, hasHuntTrail: true, hasTimer: false,
     profileOverrides: {
-      guardianTargets: 3,
-      guardianFirstSpawnMs: 9000,
-      guardianNextSpawnMs: 8000,
-      guardianMoveInterval: 3,
-      guardianLead: 4,
-      guardianReward: 150,
-      bossReward: 300,
-      turboDurationMs: 2800,
-      turboCooldownMs: 5200
+      guardianTargets: 3, guardianFirstSpawnMs: 9000, guardianNextSpawnMs: 8000,
+      guardianMoveInterval: 3, guardianLead: 4, guardianReward: 150, bossReward: 300,
+      turboDurationMs: 2800, turboCooldownMs: 5200
     }
   },
   survival: {
-    name: 'Supervivencia',
-    icon: '🛡️',
-    subtitle: 'El Descenso a Xibalbá',
-    guardianSpawnRate: 1.2,
-    guardianRewardMultiplier: 1.0,
-    itemsEnabled: false,
-    livesEnabled: false,
-    hasEclipse: false,
-    hasDarkness: true,
-    hasHuntTrail: false,
-    hasTimer: false,
+    name: 'Supervivencia', icon: '🛡️', subtitle: 'El Descenso a Xibalbá',
+    guardianSpawnRate: 1.2, guardianRewardMultiplier: 1.0,
+    itemsEnabled: false, livesEnabled: false, hasEclipse: false,
+    hasDarkness: true, hasHuntTrail: false, hasTimer: false,
     profileOverrides: {
-      guardianTargets: 2,
-      guardianFirstSpawnMs: 12000,
-      guardianNextSpawnMs: 14000,
-      guardianMoveInterval: 4,
-      guardianLead: 3,
-      guardianReward: 100,
-      bossReward: 0,
-      turboDurationMs: 3000,
-      turboCooldownMs: 5000,
-      rainFirstMs: 999999,
-      rainIntervalMs: 999999,
-      cosmicFirstMs: 999999,
-      cosmicIntervalMs: 999999,
-      sacrificeFirstMs: 999999,
-      skullFirstMs: 999999,
-      freezeRespawnMs: 999999,
-      jadeRespawnMs: 999999,
+      guardianTargets: 2, guardianFirstSpawnMs: 12000, guardianNextSpawnMs: 14000,
+      guardianMoveInterval: 4, guardianLead: 3, guardianReward: 100, bossReward: 0,
+      turboDurationMs: 3000, turboCooldownMs: 5000,
+      rainFirstMs: 999999, rainIntervalMs: 999999,
+      cosmicFirstMs: 999999, cosmicIntervalMs: 999999,
+      sacrificeFirstMs: 999999, skullFirstMs: 999999,
+      freezeRespawnMs: 999999, jadeRespawnMs: 999999,
     }
   },
   zen: {
-    name: 'Zen',
-    icon: '🧘',
-    subtitle: 'Meditación en el Templo',
-    guardianSpawnRate: Infinity,
-    guardianRewardMultiplier: 1.0,
-    itemsEnabled: true,
-    livesEnabled: true,
-    hasEclipse: false,
-    hasDarkness: false,
-    hasHuntTrail: false,
-    hasTimer: false,
+    name: 'Zen', icon: '🧘', subtitle: 'Meditación en el Templo',
+    guardianSpawnRate: Infinity, guardianRewardMultiplier: 1.0,
+    itemsEnabled: true, livesEnabled: true, hasEclipse: false,
+    hasDarkness: false, hasHuntTrail: false, hasTimer: false,
     profileOverrides: {
-      guardianTargets: 0,
-      guardianFirstSpawnMs: 999999999,
-      guardianNextSpawnMs: 999999999,
-      rainFirstMs: 60000,
-      rainIntervalMs: 60000,
-      cosmicFirstMs: 999999999,
-      cosmicIntervalMs: 999999999,
-      sacrificeFirstMs: 999999999,
-      skullFirstMs: 999999999,
-      freezeRespawnMs: 999999999,
-      jadeRespawnMs: 999999999,
-      guardianReward: 0,
-      bossReward: 0,
-      turboDurationMs: 4000,
-      turboCooldownMs: 3000,
+      guardianTargets: 0, guardianFirstSpawnMs: 999999999, guardianNextSpawnMs: 999999999,
+      rainFirstMs: 60000, rainIntervalMs: 60000,
+      cosmicFirstMs: 999999999, cosmicIntervalMs: 999999999,
+      sacrificeFirstMs: 999999999, skullFirstMs: 999999999,
+      freezeRespawnMs: 999999999, jadeRespawnMs: 999999999,
+      guardianReward: 0, bossReward: 0, turboDurationMs: 4000, turboCooldownMs: 3000,
     }
   },
   timed: {
-    name: 'Contrarreloj',
-    icon: '⏱️',
-    subtitle: 'La Cuenta Regresiva del Sol',
-    guardianSpawnRate: 1.0,
-    guardianRewardMultiplier: 1.0,
-    itemsEnabled: true,
-    livesEnabled: true,
-    hasEclipse: false,
-    hasDarkness: false,
-    hasHuntTrail: false,
-    hasTimer: true,
+    name: 'Contrarreloj', icon: '⏱️', subtitle: 'La Cuenta Regresiva del Sol',
+    guardianSpawnRate: 1.0, guardianRewardMultiplier: 1.0,
+    itemsEnabled: true, livesEnabled: true, hasEclipse: false,
+    hasDarkness: false, hasHuntTrail: false, hasTimer: true,
     profileOverrides: {
-      guardianTargets: 2,
-      guardianFirstSpawnMs: 15000,
-      guardianNextSpawnMs: 18000,
-      guardianMoveInterval: 4,
-      guardianLead: 3,
-      guardianReward: 100,
-      bossReward: 250,
-      turboDurationMs: 3000,
-      turboCooldownMs: 5000,
+      guardianTargets: 2, guardianFirstSpawnMs: 15000, guardianNextSpawnMs: 18000,
+      guardianMoveInterval: 4, guardianLead: 3, guardianReward: 100, bossReward: 250,
+      turboDurationMs: 3000, turboCooldownMs: 5000,
     }
   }
 };
 
-// ✅ NUEVAS CONSTANTES DE MECÁNICAS
 const ECLIPSE_FIRST_MS = 60000;
 const ECLIPSE_INTERVAL_MS = 75000;
 const ECLIPSE_DURATION_MS = 5000;
@@ -574,78 +410,34 @@ const TEZCATLIPOCA_CONFIG = {
 };
 
 const BOARD_THEMES = {
-  classic: {
-    bg: '#141720',
-    gridLine: 'rgba(144, 153, 177, 0.13)',
-    patternColor: 'rgba(198, 164, 85, 0.07)',
-    patternType: 'diamond',
-    vignetteColor: 'rgba(0,0,0,0.42)',
-    cost: 0
-  },
-  hunt: {
-    bg: '#0a1a12',
-    gridLine: 'rgba(78, 201, 160, 0.15)',
-    patternColor: 'rgba(217, 142, 43, 0.08)',
-    patternType: 'diamond',
-    vignetteColor: 'rgba(0, 10, 5, 0.55)',
-    cost: 0
-  },
-  survival: {
-    bg: '#0a0809',
-    gridLine: 'rgba(239, 82, 97, 0.08)',
-    patternColor: 'rgba(239, 82, 97, 0.04)',
-    patternType: 'crack',
-    vignetteColor: 'rgba(0,0,0,0.7)',
-    cost: 0
-  },
-  obsidian: {
-    bg: '#0a0a0d',
-    gridLine: 'rgba(120, 120, 120, 0.12)',
-    patternColor: 'rgba(80, 80, 80, 0.08)',
-    patternType: 'diamond',
-    vignetteColor: 'rgba(0,0,0,0.7)',
-    cost: 200
-  },
-  jade: {
-    bg: '#0d1a14',
-    gridLine: 'rgba(78, 201, 160, 0.14)',
-    patternColor: 'rgba(125, 232, 196, 0.06)',
-    patternType: 'diamond',
-    vignetteColor: 'rgba(0, 20, 10, 0.6)',
-    cost: 300
-  }
+  classic: { bg: '#141720', gridLine: 'rgba(144, 153, 177, 0.13)', patternColor: 'rgba(198, 164, 85, 0.07)', patternType: 'diamond', vignetteColor: 'rgba(0,0,0,0.42)', cost: 0 },
+  hunt:    { bg: '#0a1a12', gridLine: 'rgba(78, 201, 160, 0.15)', patternColor: 'rgba(217, 142, 43, 0.08)', patternType: 'diamond', vignetteColor: 'rgba(0, 10, 5, 0.55)', cost: 0 },
+  survival:{ bg: '#0a0809', gridLine: 'rgba(239, 82, 97, 0.08)', patternColor: 'rgba(239, 82, 97, 0.04)', patternType: 'crack', vignetteColor: 'rgba(0,0,0,0.7)', cost: 0 },
+  obsidian:{ bg: '#0a0a0d', gridLine: 'rgba(120, 120, 120, 0.12)', patternColor: 'rgba(80, 80, 80, 0.08)', patternType: 'diamond', vignetteColor: 'rgba(0,0,0,0.7)', cost: 200 },
+  jade:    { bg: '#0d1a14', gridLine: 'rgba(78, 201, 160, 0.14)', patternColor: 'rgba(125, 232, 196, 0.06)', patternType: 'diamond', vignetteColor: 'rgba(0, 20, 10, 0.6)', cost: 300 }
 };
 
 function getEffectiveDifficulty() {
   const mode = gameModeSelect.value;
-  if (mode === 'classic') {
-    return difficultySelect.value;
-  }
+  if (mode === 'classic') return difficultySelect.value;
   return 'medium';
 }
 
 function getDifficultyProfile() {
   const mode = GAME_MODES[gameModeSelect.value] || GAME_MODES.classic;
   const baseProfile = DIFFICULTY_PROFILES[getEffectiveDifficulty()] || DIFFICULTY_PROFILES.medium;
-
   const profile = { ...baseProfile };
-
-  if (mode.profileOverrides) {
-    Object.assign(profile, mode.profileOverrides);
-  }
-
+  if (mode.profileOverrides) Object.assign(profile, mode.profileOverrides);
   profile.guardianFirstSpawnMs *= mode.guardianSpawnRate;
   profile.guardianNextSpawnMs *= mode.guardianSpawnRate;
   profile.guardianReward *= mode.guardianRewardMultiplier;
   profile.bossReward *= mode.guardianRewardMultiplier;
-
   return profile;
 }
 
 const FREEZE_FIRST_SPAWN_MS = 16000;
 const FREEZE_RESPAWN_DELAY_MS = 22000;
 const GUARDIAN_FREEZE_DURATION_MS = 3000;
-
 const CHAAC_UNLOCK_MS = 45000;
 const CHAAC_COOLDOWN_MS = 60000;
 const CHAAC_LIFETIME_MS = 999999;
@@ -654,50 +446,26 @@ const CHAAC_RETRY_MS = 3000;
 const CHAAC_VULNERABLE_MS = 2200;
 
 const GUARDIAN_DEFS = [
-  {
-    behavior: 'hunter',
-    name: 'Ahalpuh',
-    title: 'El Putrefactor',
+  { behavior: 'hunter', name: 'Ahalpuh', title: 'El Putrefactor',
     lore: 'Demonio que causa la putrefacción. Te persigue sin descanso.',
     palette: { head: '#e2574c', body: '#9b2929', crest: '#ff9b83', eye: '#fff0c6' },
     traits: { fangs: true, crestCount: 1, eyeMark: false },
-    ambientParticles: { color: '#ff6b4c', rate: 0.35, size: 1.5 }
-  },
-  {
-    behavior: 'interceptor',
-    name: 'Ixtab',
-    title: 'La Vidente',
+    ambientParticles: { color: '#ff6b4c', rate: 0.35, size: 1.5 } },
+  { behavior: 'interceptor', name: 'Ixtab', title: 'La Vidente',
     lore: 'Diosa de la adivinación. Anticipa tu rumbo antes de que lo tomes.',
     palette: { head: '#a65bd4', body: '#64328e', crest: '#d4a0f0', eye: '#f0e0ff' },
     traits: { fangs: false, crestCount: 1, eyeMark: true },
-    ambientParticles: { color: '#c89bf0', rate: 0.4, size: 1.8 }
-  },
-  {
-    behavior: 'flanker',
-    name: 'Camazotz',
-    title: 'El Murciélago de la Muerte',
+    ambientParticles: { color: '#c89bf0', rate: 0.4, size: 1.8 } },
+  { behavior: 'flanker', name: 'Camazotz', title: 'El Murciélago de la Muerte',
     lore: 'Señor de los murciélagos. Intenta rodearte desde las sombras.',
     palette: { head: '#f28c28', body: '#a64b1b', crest: '#ffc078', eye: '#fff0c6' },
     traits: { fangs: true, crestCount: 2, eyeMark: false },
-    ambientParticles: { color: '#ff9b3c', rate: 0.45, size: 1.6 }
-  },
-  {
-    behavior: 'ambusher',
-    name: 'Tezcatlipoca',
-    title: 'El Jaguar de Obsidiana',
+    ambientParticles: { color: '#ff9b3c', rate: 0.45, size: 1.6 } },
+  { behavior: 'ambusher', name: 'Tezcatlipoca', title: 'El Jaguar de Obsidiana',
     lore: 'Dios de la noche y los espejos. Se teletransporta entre las sombras.',
-    palette: {
-      head: '#d98e2b',
-      body: '#a8561b',
-      crest: '#14110f',
-      eye: '#f2e2b8',
-      jade: '#4ec9a0',
-      obsidian: '#14110f',
-      ember: '#f2e2b8'
-    },
+    palette: { head: '#d98e2b', body: '#a8561b', crest: '#14110f', eye: '#f2e2b8', jade: '#4ec9a0', obsidian: '#14110f', ember: '#f2e2b8' },
     traits: { fangs: true, crestCount: 4, eyeMark: false, isBoss: true, isTezcatlipoca: true },
-    ambientParticles: { color: '#d98e2b', rate: 0.6, size: 2 }
-  }
+    ambientParticles: { color: '#d98e2b', rate: 0.6, size: 2 } }
 ];
 
 let usedGuardianPalettes = [];
@@ -763,22 +531,15 @@ function safeSetItem(key, value) {
 }
 
 // ========================================================
-// 5. SISTEMA DE PROGRESIÓN
+// 5. PROGRESIÓN
 // ========================================================
 let progression = {
-  totalMaize: 0,
-  totalCacao: 0,
-  totalGuardiansDefeated: 0,
-  totalTezcatlipocaDefeated: 0,
-  totalGamesPlayed: 0,
-  totalSurvivalMs: 0,
-  bestTimedScore: 0,
-  achievements: {},
+  totalMaize: 0, totalCacao: 0, totalGuardiansDefeated: 0,
+  totalTezcatlipocaDefeated: 0, totalGamesPlayed: 0, totalSurvivalMs: 0,
+  bestTimedScore: 0, achievements: {},
   unlockedSkins: ['default'],
   unlockedThemes: ['classic', 'hunt', 'survival'],
-  selectedSkin: 'default',
-  selectedTheme: 'classic',
-  maizeCoins: 0
+  selectedSkin: 'default', selectedTheme: 'classic', maizeCoins: 0
 };
 
 function loadProgression() {
@@ -790,36 +551,28 @@ function loadProgression() {
       progression = { ...progression, ...parsed };
       if (!Array.isArray(progression.unlockedSkins)) progression.unlockedSkins = ['default'];
       if (!Array.isArray(progression.unlockedThemes)) progression.unlockedThemes = ['classic', 'hunt', 'survival'];
-      if (!progression.achievements || typeof progression.achievements !== 'object') {
-        progression.achievements = {};
-      }
+      if (!progression.achievements || typeof progression.achievements !== 'object') progression.achievements = {};
     }
-  } catch (e) {
-    console.warn('No se pudo cargar la progresión:', e);
-  }
+  } catch (e) { console.warn('No se pudo cargar la progresión:', e); }
 }
-
-function saveProgression() {
-  safeSetItem(PROGRESSION_STORAGE_KEY, JSON.stringify(progression));
-}
-
+function saveProgression() { safeSetItem(PROGRESSION_STORAGE_KEY, JSON.stringify(progression)); }
 loadProgression();
 
 // ========================================================
 // 5.1. LOGROS
 // ========================================================
 const ACHIEVEMENTS = [
-  { id: 'first_maize',    name: 'Primera Ofrenda',       description: 'Recoge tu primer maíz.',                          icon: '🌽', check: (p) => p.totalMaize >= 1 },
-  { id: 'maize_100',      name: 'Agricultor Sagrado',    description: 'Recoge 100 maíces en total.',                     icon: '🌽', check: (p) => p.totalMaize >= 100 },
-  { id: 'maize_1000',     name: 'Señor del Maíz',        description: 'Recoge 1000 maíces en total.',                    icon: '🌽', check: (p) => p.totalMaize >= 1000 },
-  { id: 'cacao_50',       name: 'Mercader de Cacao',     description: 'Recoge 50 ofrendas de cacao.',                    icon: '🍫', check: (p) => p.totalCacao >= 50 },
-  { id: 'guardian_10',    name: 'Cazador de Demonios',   description: 'Derrota 10 guardianes.',                          icon: '⚔️', check: (p) => p.totalGuardiansDefeated >= 10 },
-  { id: 'guardian_100',   name: 'Guerrero Jaguar',       description: 'Derrota 100 guardianes.',                         icon: '🐆', check: (p) => p.totalGuardiansDefeated >= 100 },
-  { id: 'tezcat_1',       name: 'El Primer Espejo',      description: 'Derrota a Tezcatlipoca por primera vez.',         icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 1 },
-  { id: 'tezcat_10',      name: 'Rompe-Espejos',         description: 'Derrota a Tezcatlipoca 10 veces.',                icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 10 },
-  { id: 'survive_5min',   name: 'Viajero del Inframundo',description: 'Sobrevive 5 minutos acumulados.',                 icon: '⏳', check: (p) => p.totalSurvivalMs >= 300000 },
-  { id: 'games_50',       name: 'Devoto de Kukulcán',    description: 'Juega 50 partidas.',                              icon: '🐍', check: (p) => p.totalGamesPlayed >= 50 },
-  { id: 'timed_500',      name: 'Contra el Sol',         description: 'Consigue 500 puntos en Contrarreloj.',            icon: '⏱️', check: (p) => p.bestTimedScore >= 500 }
+  { id: 'first_maize',    name: 'Primera Ofrenda',       description: 'Recoge tu primer maíz.',           icon: '🌽', check: (p) => p.totalMaize >= 1 },
+  { id: 'maize_100',      name: 'Agricultor Sagrado',    description: 'Recoge 100 maíces en total.',      icon: '🌽', check: (p) => p.totalMaize >= 100 },
+  { id: 'maize_1000',     name: 'Señor del Maíz',        description: 'Recoge 1000 maíces en total.',     icon: '🌽', check: (p) => p.totalMaize >= 1000 },
+  { id: 'cacao_50',       name: 'Mercader de Cacao',     description: 'Recoge 50 ofrendas de cacao.',     icon: '🍫', check: (p) => p.totalCacao >= 50 },
+  { id: 'guardian_10',    name: 'Cazador de Demonios',   description: 'Derrota 10 guardianes.',           icon: '⚔️', check: (p) => p.totalGuardiansDefeated >= 10 },
+  { id: 'guardian_100',   name: 'Guerrero Jaguar',       description: 'Derrota 100 guardianes.',          icon: '🐆', check: (p) => p.totalGuardiansDefeated >= 100 },
+  { id: 'tezcat_1',       name: 'El Primer Espejo',      description: 'Derrota a Tezcatlipoca por primera vez.', icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 1 },
+  { id: 'tezcat_10',      name: 'Rompe-Espejos',         description: 'Derrota a Tezcatlipoca 10 veces.', icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 10 },
+  { id: 'survive_5min',   name: 'Viajero del Inframundo',description: 'Sobrevive 5 minutos acumulados.',  icon: '⏳', check: (p) => p.totalSurvivalMs >= 300000 },
+  { id: 'games_50',       name: 'Devoto de Kukulcán',    description: 'Juega 50 partidas.',               icon: '🐍', check: (p) => p.totalGamesPlayed >= 50 },
+  { id: 'timed_500',      name: 'Contra el Sol',         description: 'Consigue 500 puntos en Contrarreloj.', icon: '⏱️', check: (p) => p.bestTimedScore >= 500 }
 ];
 
 function checkAchievements() {
@@ -833,9 +586,7 @@ function checkAchievements() {
   });
   if (newlyUnlocked.length > 0) {
     saveProgression();
-    newlyUnlocked.forEach((ach, idx) => {
-      setTimeout(() => showAchievementToast(ach), idx * 1200);
-    });
+    newlyUnlocked.forEach((ach, idx) => setTimeout(() => showAchievementToast(ach), idx * 1200));
   }
   return newlyUnlocked;
 }
@@ -876,7 +627,6 @@ function renderAchievementsUI() {
   const unlockedCount = ACHIEVEMENTS.filter(a => progression.achievements[a.id]).length;
   if (achievementsCount) achievementsCount.textContent = `${unlockedCount} / ${total}`;
   if (achievementsFill) achievementsFill.style.width = `${(unlockedCount / total) * 100}%`;
-
   achievementsList.innerHTML = '';
   ACHIEVEMENTS.forEach(ach => {
     const unlocked = !!progression.achievements[ach.id];
@@ -892,72 +642,74 @@ function renderAchievementsUI() {
 }
 
 // ========================================================
-// 5.2. SKINS Y TEMAS DESBLOQUEABLES
+// 5.2. SKINS Y TEMAS
 // ========================================================
 const KUKULKAN_SKINS = {
-  default: {
-    name: 'Jade Clásico',
-    description: 'El aspecto tradicional de Kukulcán.',
-    head: '#4ec9a0',
-    body: '#1a7a5e',
-    border: 'rgba(213, 189, 112, 0.55)',
-    inner: 'rgba(182, 242, 209, 0.28)',
-    plate: null,
-    cost: 0
-  },
-  golden: {
-    name: 'Oro de Itzamná',
-    description: 'Un tributo al dios creador.',
-    head: '#d4b45c',
-    body: '#a8924a',
-    border: '#f5e9b8',
-    inner: 'rgba(245, 235, 190, 0.4)',
-    plate: '#c2b06a',
-    cost: 100
-  },
-  obsidian: {
-    name: 'Obsidiana Negra',
-    description: 'Forjado en las profundidades de Xibalbá.',
-    head: '#3a3a3a',
-    body: '#1a1a1a',
-    border: 'rgba(120, 120, 120, 0.6)',
-    inner: 'rgba(80, 80, 80, 0.3)',
-    plate: '#2a2a2a',
-    cost: 250
-  },
-  blood: {
-    name: 'Sangre de Sacrificio',
-    description: 'Para los que ofrecen todo a los dioses.',
-    head: '#ef5261',
-    body: '#9b2929',
-    border: 'rgba(255, 200, 200, 0.5)',
-    inner: 'rgba(255, 150, 150, 0.25)',
-    plate: '#c23434',
-    cost: 500
-  }
+  default: { name: 'Jade Clásico', description: 'El aspecto tradicional de Kukulcán.', head: '#4ec9a0', body: '#1a7a5e', border: 'rgba(213, 189, 112, 0.55)', inner: 'rgba(182, 242, 209, 0.28)', plate: null, cost: 0 },
+  golden:  { name: 'Oro de Itzamná', description: 'Un tributo al dios creador.', head: '#d4b45c', body: '#a8924a', border: '#f5e9b8', inner: 'rgba(245, 235, 190, 0.4)', plate: '#c2b06a', cost: 100 },
+  obsidian:{ name: 'Obsidiana Negra', description: 'Forjado en las profundidades de Xibalbá.', head: '#3a3a3a', body: '#1a1a1a', border: 'rgba(120, 120, 120, 0.6)', inner: 'rgba(80, 80, 80, 0.3)', plate: '#2a2a2a', cost: 250 },
+  blood:   { name: 'Sangre de Sacrificio', description: 'Para los que ofrecen todo a los dioses.', head: '#ef5261', body: '#9b2929', border: 'rgba(255, 200, 200, 0.5)', inner: 'rgba(255, 150, 150, 0.25)', plate: '#c23434', cost: 500 }
 };
 
 function isSkinUnlocked(skinId) {
   return progression.unlockedSkins.includes(skinId) || (KUKULKAN_SKINS[skinId] && KUKULKAN_SKINS[skinId].cost === 0);
 }
-
 function isThemeUnlocked(themeId) {
   return progression.unlockedThemes.includes(themeId) || !(BOARD_THEMES[themeId] && BOARD_THEMES[themeId].cost);
 }
-
 function getActiveSkin() {
   return KUKULKAN_SKINS[progression.selectedSkin] || KUKULKAN_SKINS.default;
 }
 
+// ---- Selección temporal (para el modal de personalización) ----
+let pendingSkin = null;
+let pendingTheme = null;
+let pendingUnlockedSkins = null;
+let pendingUnlockedThemes = null;
+let pendingCoins = 0;
+
+function beginCustomizeSession() {
+  pendingSkin = progression.selectedSkin;
+  pendingTheme = progression.selectedTheme;
+  pendingUnlockedSkins = [...progression.unlockedSkins];
+  pendingUnlockedThemes = [...progression.unlockedThemes];
+  pendingCoins = progression.maizeCoins;
+}
+function cancelCustomizeSession() {
+  pendingSkin = null; pendingTheme = null;
+  pendingUnlockedSkins = null; pendingUnlockedThemes = null;
+  pendingCoins = 0;
+}
+function commitCustomizeSession() {
+  if (pendingSkin === null) return;
+  progression.selectedSkin = pendingSkin;
+  progression.selectedTheme = pendingTheme;
+  progression.unlockedSkins = [...pendingUnlockedSkins];
+  progression.unlockedThemes = [...pendingUnlockedThemes];
+  progression.maizeCoins = pendingCoins;
+  saveProgression();
+  updateScoresUI();
+  updateThemeColors();
+  cancelCustomizeSession();
+}
+function isSkinUnlockedPending(skinId) {
+  if (!pendingUnlockedSkins) return isSkinUnlocked(skinId);
+  return pendingUnlockedSkins.includes(skinId) || (KUKULKAN_SKINS[skinId] && KUKULKAN_SKINS[skinId].cost === 0);
+}
+function isThemeUnlockedPending(themeId) {
+  if (!pendingUnlockedThemes) return isThemeUnlocked(themeId);
+  return pendingUnlockedThemes.includes(themeId) || !(BOARD_THEMES[themeId] && BOARD_THEMES[themeId].cost);
+}
+
 function renderCustomizeUI() {
   if (!skinsGrid || !themesGrid) return;
-  if (customizeCoinsValue) customizeCoinsValue.textContent = progression.maizeCoins;
+  if (!pendingUnlockedSkins) beginCustomizeSession();
+  if (customizeCoinsValue) customizeCoinsValue.textContent = pendingCoins;
 
-  // SKINS
   skinsGrid.innerHTML = '';
   Object.entries(KUKULKAN_SKINS).forEach(([id, skin]) => {
-    const unlocked = isSkinUnlocked(id);
-    const selected = progression.selectedSkin === id;
+    const unlocked = isSkinUnlockedPending(id);
+    const selected = pendingSkin === id;
     const item = document.createElement('div');
     item.className = `skin-item ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
     const gradient = `radial-gradient(circle at 35% 35%, ${skin.head}, ${skin.body} 80%)`;
@@ -965,19 +717,16 @@ function renderCustomizeUI() {
       <div class="skin-preview" style="background: ${gradient};"></div>
       <div class="skin-name">${skin.name}</div>
       <div class="skin-desc">${skin.description}</div>
-      ${!selected && unlocked ? '' : ''}
       ${!unlocked ? `<div class="skin-cost">${skin.cost}</div>` : ''}
       ${unlocked && !selected ? `<div class="skin-cost" style="background: transparent; border-color: rgba(78,201,160,0.4); color: #7de8c4;">✓ Usar</div>` : ''}
     `;
     item.addEventListener('click', () => {
       if (!unlocked) {
-        if (progression.maizeCoins >= skin.cost) {
-          progression.maizeCoins -= skin.cost;
-          progression.unlockedSkins.push(id);
-          progression.selectedSkin = id;
-          saveProgression();
+        if (pendingCoins >= skin.cost) {
+          pendingCoins -= skin.cost;
+          pendingUnlockedSkins.push(id);
+          pendingSkin = id;
           renderCustomizeUI();
-          updateScoresUI();
           playAchievementSound();
         } else {
           vibrate([30, 40, 30]);
@@ -985,20 +734,17 @@ function renderCustomizeUI() {
           setTimeout(() => item.classList.remove('shake'), 400);
         }
       } else {
-        progression.selectedSkin = id;
-        saveProgression();
+        pendingSkin = id;
         renderCustomizeUI();
-        updateThemeColors();
       }
     });
     skinsGrid.appendChild(item);
   });
 
-  // TEMAS
   themesGrid.innerHTML = '';
   Object.entries(BOARD_THEMES).forEach(([id, theme]) => {
-    const unlocked = isThemeUnlocked(id);
-    const selected = progression.selectedTheme === id;
+    const unlocked = isThemeUnlockedPending(id);
+    const selected = pendingTheme === id;
     const item = document.createElement('div');
     item.className = `theme-item ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
     item.innerHTML = `
@@ -1012,24 +758,20 @@ function renderCustomizeUI() {
     `;
     item.addEventListener('click', () => {
       if (!unlocked) {
-        if (progression.maizeCoins >= theme.cost) {
-          progression.maizeCoins -= theme.cost;
-          progression.unlockedThemes.push(id);
-          progression.selectedTheme = id;
-          saveProgression();
+        if (pendingCoins >= theme.cost) {
+          pendingCoins -= theme.cost;
+          pendingUnlockedThemes.push(id);
+          pendingTheme = id;
           renderCustomizeUI();
-          updateScoresUI();
-          updateThemeColors();
+          playAchievementSound();
         } else {
           vibrate([30, 40, 30]);
           item.classList.add('shake');
           setTimeout(() => item.classList.remove('shake'), 400);
         }
       } else {
-        progression.selectedTheme = id;
-        saveProgression();
+        pendingTheme = id;
         renderCustomizeUI();
-        updateThemeColors();
       }
     });
     themesGrid.appendChild(item);
@@ -1065,6 +807,7 @@ let gameTime = 0;
 let simulationAccumulator = 0;
 let lastFrameTimestamp = null;
 let animationFrameId = null;
+let isLoopRunning = false;
 let countdownEndsAt = null;
 let countdownValue = 0;
 let renderInterpolation = 1;
@@ -1176,25 +919,7 @@ const tutorialTitles = [
   'Poderes y sacrificios',
   'Modalidades de Juego'
 ];
-let tutorialWasRunning = false;
-let tutorialWasPaused = false;
-let tutorialDrawerWasVisible = false;
 let tutorialOpenedFromWelcome = false;
-
-let statisticsWasRunning = false;
-let statisticsWasPaused = false;
-let statisticsDrawerWasVisible = false;
-
-let achievementsWasRunning = false;
-let achievementsWasPaused = false;
-let customizeWasRunning = false;
-let customizeWasPaused = false;
-
-let loreWasRunning = false;
-let loreWasPaused = false;
-
-let settingsWasRunning = false;
-let settingsWasPaused = false;
 
 let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
 let gameMode = safeGetItem('snakeIoGameMode', 'classic');
@@ -1281,7 +1006,7 @@ function finishRunStatistics() {
 }
 
 // ========================================================
-// 8. ESCALADO ADAPTATIVO
+// 8. ESCALADO
 // ========================================================
 function resizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1305,12 +1030,9 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
   boardCanvas = document.createElement('canvas');
   boardCanvas.width = Math.max(1, Math.floor(width * dpr));
   boardCanvas.height = Math.max(1, Math.floor(height * dpr));
-  boardWidth = width;
-  boardHeight = height;
-  boardTheme = themeId;
+  boardWidth = width; boardHeight = height; boardTheme = themeId;
   boardContext = boardCanvas.getContext('2d', { alpha: false });
   boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
-
   const theme = BOARD_THEMES[themeId] || BOARD_THEMES.classic;
 
   boardContext.fillStyle = theme.bg;
@@ -1321,16 +1043,10 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
   const offsetY = (height % TILE_SIZE) / 2;
 
   for (let x = offsetX; x <= width; x += TILE_SIZE) {
-    boardContext.beginPath();
-    boardContext.moveTo(x, 0);
-    boardContext.lineTo(x, height);
-    boardContext.stroke();
+    boardContext.beginPath(); boardContext.moveTo(x, 0); boardContext.lineTo(x, height); boardContext.stroke();
   }
   for (let y = offsetY; y <= height; y += TILE_SIZE) {
-    boardContext.beginPath();
-    boardContext.moveTo(0, y);
-    boardContext.lineTo(width, y);
-    boardContext.stroke();
+    boardContext.beginPath(); boardContext.moveTo(0, y); boardContext.lineTo(width, y); boardContext.stroke();
   }
 
   boardContext.fillStyle = theme.patternColor;
@@ -1338,12 +1054,9 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
     for (let x = offsetX + TILE_SIZE * 2; x <= width; x += TILE_SIZE * 4) {
       for (let y = offsetY + TILE_SIZE * 2; y <= height; y += TILE_SIZE * 4) {
         boardContext.beginPath();
-        boardContext.moveTo(x, y - 3);
-        boardContext.lineTo(x + 3, y);
-        boardContext.lineTo(x, y + 3);
-        boardContext.lineTo(x - 3, y);
-        boardContext.closePath();
-        boardContext.fill();
+        boardContext.moveTo(x, y - 3); boardContext.lineTo(x + 3, y);
+        boardContext.lineTo(x, y + 3); boardContext.lineTo(x - 3, y);
+        boardContext.closePath(); boardContext.fill();
       }
     }
   } else if (theme.patternType === 'crack') {
@@ -1352,8 +1065,7 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
     for (let i = 0; i < 12; i++) {
       const cx = Math.random() * width;
       const cy = Math.random() * height;
-      boardContext.beginPath();
-      boardContext.moveTo(cx, cy);
+      boardContext.beginPath(); boardContext.moveTo(cx, cy);
       let lx = cx, ly = cy;
       for (let s = 0; s < 4; s++) {
         lx += (Math.random() - 0.5) * TILE_SIZE * 3;
@@ -1364,24 +1076,20 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
     }
   }
 
-  const centerGlow = boardContext.createRadialGradient(
-    width / 2, height / 2, 0,
-    width / 2, height / 2, Math.max(width, height) * 0.55
-  );
+  const centerGlow = boardContext.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height) * 0.55);
   centerGlow.addColorStop(0, 'rgba(255, 200, 100, 0.06)');
   centerGlow.addColorStop(0.5, 'rgba(255, 150, 50, 0.02)');
   centerGlow.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
   boardContext.fillStyle = centerGlow;
   boardContext.fillRect(0, 0, width, height);
 
-  const centerX = width / 2;
-  const centerY = height / 2;
+  const centerX = width / 2, centerY = height / 2;
   boardContext.strokeStyle = theme.patternColor;
   boardContext.lineWidth = 2;
   for (let i = 0; i < 3; i++) {
     const size = TILE_SIZE * (6 + i * 2);
     boardContext.beginPath();
-    boardContext.rect(centerX - size / 2, centerY - size / 2, size, size);
+    boardContext.rect(centerX - size/2, centerY - size/2, size, size);
     boardContext.stroke();
   }
 }
@@ -1396,11 +1104,16 @@ function updateThemeColors() {
   if (!isGameRunning) draw(1, false);
 }
 
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
+let resizeTimeout = null;
+function debouncedResizeCanvas() {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => { resizeCanvas(); resizeWelcomeDemo(); }, 200);
+}
+window.addEventListener('resize', debouncedResizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(debouncedResizeCanvas, 200));
 
 // ========================================================
-// 9. AUDIO — MÚSICA TEMÁTICA MAYA
+// 9. AUDIO
 // ========================================================
 let audioCtx = null;
 let musicTimer = null;
@@ -1428,10 +1141,8 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
     o.frequency.setValueAtTime(freq, a.currentTime);
     g.gain.setValueAtTime(vol, a.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur / 1000);
-    o.connect(g);
-    g.connect(a.destination);
-    o.start();
-    o.stop(a.currentTime + dur / 1000);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur / 1000);
     return o;
   } catch (e) { return null; }
 }
@@ -1439,34 +1150,10 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
 const PENTATONIC_MINOR = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00, 466.16];
 
 const MUSIC_LAYERS = {
-  1: {
-    notes: [130.81, 155.56, 174.61, 196.00],
-    interval: 950,
-    type: 'sine',
-    vol: 0.045,
-    drumEvery: 4
-  },
-  2: {
-    notes: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63],
-    interval: 640,
-    type: 'triangle',
-    vol: 0.055,
-    drumEvery: 3
-  },
-  3: {
-    notes: [174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00],
-    interval: 440,
-    type: 'sawtooth',
-    vol: 0.05,
-    drumEvery: 2
-  },
-  4: {
-    notes: [233.08, 261.63, 311.13, 349.23, 392.00, 466.16, 523.25],
-    interval: 290,
-    type: 'square',
-    vol: 0.045,
-    drumEvery: 1
-  }
+  1: { notes: [130.81, 155.56, 174.61, 196.00], interval: 950, type: 'sine', vol: 0.045, drumEvery: 4 },
+  2: { notes: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63], interval: 640, type: 'triangle', vol: 0.055, drumEvery: 3 },
+  3: { notes: [174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00], interval: 440, type: 'sawtooth', vol: 0.05, drumEvery: 2 },
+  4: { notes: [233.08, 261.63, 311.13, 349.23, 392.00, 466.16, 523.25], interval: 290, type: 'square', vol: 0.045, drumEvery: 1 }
 };
 
 function getDesiredMusicLayer() {
@@ -1490,7 +1177,6 @@ function playMusicTick() {
     const noteIndex = musicTick % layer.notes.length;
     const freq = layer.notes[noteIndex];
     playTone(freq, layer.interval * 0.85, layer.vol, layer.type);
-
     if (musicLayer >= 2) {
       setTimeout(() => {
         if (!isGameRunning || isPaused || isMuted) return;
@@ -1513,21 +1199,11 @@ function playMusicTick() {
   musicTimer = setTimeout(playMusicTick, interval);
 }
 
-function startMusic() {
-  stopMusic();
-  musicTick = 0;
-  musicLayer = 1;
-  playMusicTick();
-}
-function stopMusic() {
-  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
-}
+function startMusic() { stopMusic(); musicTick = 0; musicLayer = 1; playMusicTick(); }
+function stopMusic() { if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; } }
 function updateMusicLayer() {
   const desired = getDesiredMusicLayer();
-  if (desired !== musicLayer) {
-    musicLayer = desired;
-    musicTick = 0;
-  }
+  if (desired !== musicLayer) { musicLayer = desired; musicTick = 0; }
 }
 
 function playEatSound(type = 'normal') {
@@ -1556,11 +1232,9 @@ function playEatSound(type = 'normal') {
 function playFuriaStartSound() {
   if (isMuted) return;
   try {
-    const a = getAudioContext();
-    if (!a) return;
+    const a = getAudioContext(); if (!a) return;
     const now = a.currentTime;
-    const o1 = a.createOscillator();
-    const g1 = a.createGain();
+    const o1 = a.createOscillator(); const g1 = a.createGain();
     o1.type = 'sawtooth';
     o1.frequency.setValueAtTime(180, now);
     o1.frequency.exponentialRampToValueAtTime(60, now + 0.5);
@@ -1577,11 +1251,9 @@ function playFuriaStartSound() {
 function playAirSound() {
   if (isMuted) return;
   try {
-    const a = getAudioContext();
-    if (!a) return;
+    const a = getAudioContext(); if (!a) return;
     const now = a.currentTime;
-    const o1 = a.createOscillator();
-    const g1 = a.createGain();
+    const o1 = a.createOscillator(); const g1 = a.createGain();
     o1.type = 'sine';
     o1.frequency.setValueAtTime(440, now);
     o1.frequency.exponentialRampToValueAtTime(1320, now + 0.45);
@@ -1591,26 +1263,6 @@ function playAirSound() {
     g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
     o1.connect(g1); g1.connect(a.destination);
     o1.start(now); o1.stop(now + 0.75);
-    const o2 = a.createOscillator();
-    const g2 = a.createGain();
-    o2.type = 'triangle';
-    o2.frequency.setValueAtTime(880, now + 0.1);
-    o2.frequency.linearRampToValueAtTime(990, now + 0.35);
-    o2.frequency.linearRampToValueAtTime(770, now + 0.65);
-    g2.gain.setValueAtTime(0.0001, now + 0.1);
-    g2.gain.exponentialRampToValueAtTime(0.09, now + 0.18);
-    g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
-    o2.connect(g2); g2.connect(a.destination);
-    o2.start(now + 0.1); o2.stop(now + 0.7);
-    const o3 = a.createOscillator();
-    const g3 = a.createGain();
-    o3.type = 'sawtooth';
-    o3.frequency.setValueAtTime(110, now);
-    o3.frequency.exponentialRampToValueAtTime(55, now + 0.6);
-    g3.gain.setValueAtTime(0.06, now);
-    g3.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
-    o3.connect(g3); g3.connect(a.destination);
-    o3.start(now); o3.stop(now + 0.65);
   } catch (e) {}
 }
 
@@ -1628,8 +1280,7 @@ function playEnemyDefeatedSound() {
 function playCosmicOrderSound() {
   if (isMuted) return;
   try {
-    const a = getAudioContext();
-    if (!a) return;
+    const a = getAudioContext(); if (!a) return;
     const now = a.currentTime;
     const layers = [
       { f: 82, ef: 34, d: 0.72, v: 0.3, t: 'sawtooth' },
@@ -1637,8 +1288,7 @@ function playCosmicOrderSound() {
       { f: 523, ef: 131, d: 0.34, v: 0.13, t: 'square' }
     ];
     layers.forEach(l => {
-      const o = a.createOscillator();
-      const g = a.createGain();
+      const o = a.createOscillator(); const g = a.createGain();
       o.type = l.t;
       o.frequency.setValueAtTime(l.f, now);
       o.frequency.exponentialRampToValueAtTime(l.ef, now + l.d);
@@ -1649,15 +1299,12 @@ function playCosmicOrderSound() {
     });
   } catch (e) {}
 }
-
 function playEclipseSound() {
   if (isMuted) return;
   try {
-    const a = getAudioContext();
-    if (!a) return;
+    const a = getAudioContext(); if (!a) return;
     const now = a.currentTime;
-    const o = a.createOscillator();
-    const g = a.createGain();
+    const o = a.createOscillator(); const g = a.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(220, now);
     o.frequency.exponentialRampToValueAtTime(55, now + 1.2);
@@ -1678,16 +1325,13 @@ function playTimerWarningSound() {
   setTimeout(() => playTone(880, 100, 0.18, 'square'), 120);
   setTimeout(() => playTone(660, 100, 0.18, 'square'), 240);
 }
-
 function playGameOverSound() {
   if (isMuted) return;
   const notes = [311, 293, 261, 220, 155, 110];
   notes.forEach((n, i) => setTimeout(() => playTone(n, 220, 0.16, 'sawtooth'), i * 120));
 }
 function vibrate(pattern) {
-  if (navigator.vibrate && !isMuted) {
-    try { navigator.vibrate(pattern); } catch (e) {}
-  }
+  if (navigator.vibrate && !isMuted) { try { navigator.vibrate(pattern); } catch (e) {} }
 }
 function updateSoundUI() {
   const icon = isMuted ? '🔇' : '🔊';
@@ -1699,28 +1343,22 @@ function toggleSound(forceState = null) {
   isMuted = forceState !== null ? !forceState : !isMuted;
   safeSetItem('snakeIoMuted', isMuted);
   updateSoundUI();
-  if (!isMuted && isGameRunning && !isPaused) {
-    getAudioContext();
-    startMusic();
-  } else {
-    stopMusic();
-  }
+  if (!isMuted && isGameRunning && !isPaused) { getAudioContext(); startMusic(); }
+  else stopMusic();
 }
 
 // ========================================================
-// 10. FURIA (FUEGO + VELOCIDAD)
+// 10. FURIA
 // ========================================================
 function triggerFuria() {
   if (isFuria || getFuriaCooldownRemaining() > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
   isFuria = true;
   furiaReadyAt = gameTime + FURIA_DURATION_MS;
   furiaCooldownUntil = furiaReadyAt + FURIA_COOLDOWN_MS;
-  isOnFire = false;
-  fireExpiresAt = 0;
+  isOnFire = false; fireExpiresAt = 0;
   updateFuriaUI();
   playFuriaStartSound();
   vibrate([30, 20, 30]);
-
   const head = snake[0];
   if (head) {
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
@@ -1729,23 +1367,10 @@ function triggerFuria() {
       const a = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
       const sp = 2 + Math.random() * 3;
       particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         size: 2.5 + Math.random() * 3,
         color: ['#ef4c24', '#ff7a24', '#ffc04d', '#fff0a3'][i % 4],
         alpha: 1, decay: 0.022
-      });
-    }
-    for (let i = 0; i < 12; i++) {
-      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
-      const sp = 1.5 + Math.random() * 2;
-      particles.push({
-        x: hx + (Math.random() - 0.5) * TILE_SIZE,
-        y: hy + (Math.random() - 0.5) * TILE_SIZE,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        size: 2 + Math.random() * 2,
-        color: ['#ff6b2c', '#ffb347', '#fff0a3'][i % 3],
-        alpha: 1, decay: 0.028
       });
     }
     spawnFloatingText('🔥 ¡FURIA!', hx, hy - TILE_SIZE, '#ff6b2c');
@@ -1757,14 +1382,11 @@ function triggerFuria() {
   updateMusicLayer();
 }
 
-function getFuriaCooldownRemaining() {
-  return Math.max(0, furiaCooldownUntil - gameTime);
-}
+function getFuriaCooldownRemaining() { return Math.max(0, furiaCooldownUntil - gameTime); }
 
 function updateFuriaUI() {
   const cooldownRemaining = getFuriaCooldownRemaining();
   const charge = isFuria ? 1 : cooldownRemaining > 0 ? 1 - cooldownRemaining / FURIA_COOLDOWN_MS : 1;
-
   btnTurbo.classList.toggle('active', isFuria);
   btnTurbo.classList.toggle('cooldown', cooldownRemaining > 0 && !isFuria);
   btnTurbo.disabled = (cooldownRemaining > 0 && !isFuria) || !isGameRunning || isPaused || countdownEndsAt !== null;
@@ -1777,20 +1399,14 @@ function updateFuriaUI() {
 // ========================================================
 // 11. EFECTOS VISUALES
 // ========================================================
-function triggerHeadPulse(color = '#d5bd70') {
-  headPulse = 1;
-  headPulseColor = color;
-}
+function triggerHeadPulse(color = '#d5bd70') { headPulse = 1; headPulseColor = color; }
+
 function spawnFloatingText(text, x, y, color = '#4ec9a0') {
   const max = window.innerWidth <= 768 ? 3 : 8;
   if (floatingTexts.length >= max) floatingTexts.splice(0, floatingTexts.length - max + 1);
-  let ty = y - 38;
-  let tx = x;
+  let ty = y - 38; let tx = x;
   for (const ft of floatingTexts) {
-    if (Math.abs(ft.x - tx) < 48 && Math.abs(ft.y - ty) < 32) {
-      ty -= 22;
-      tx += (Math.random() > 0.5 ? 24 : -24);
-    }
+    if (Math.abs(ft.x - tx) < 48 && Math.abs(ft.y - ty) < 32) { ty -= 22; tx += (Math.random() > 0.5 ? 24 : -24); }
   }
   tx = Math.max(50, Math.min(window.innerWidth - 50, tx));
   ty = Math.max(35, ty);
@@ -1802,12 +1418,7 @@ function spawnWorldCrossingEffect(x, y) {
   for (let i = 0; i < 5; i++) {
     const a = (Math.PI * 2 * i) / 5;
     const s = 0.7 + (i % 2) * 0.35;
-    particles.push({
-      x, y,
-      vx: Math.cos(a) * s, vy: Math.sin(a) * s,
-      size: 2.2, color: colors[i % colors.length],
-      alpha: 0.8, decay: 0.09
-    });
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, size: 2.2, color: colors[i % colors.length], alpha: 0.8, decay: 0.09 });
   }
 }
 function spawnFuriaTrail(x, y) {
@@ -1817,23 +1428,11 @@ function spawnFuriaTrail(x, y) {
     const a = back + (Math.random() - 0.5) * 0.8;
     const s = Math.random() * 1.5 + 0.8;
     particles.push({
-      x: x + (Math.random() - 0.5) * 6,
-      y: y + (Math.random() - 0.5) * 6,
+      x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 6,
       vx: Math.cos(a) * s, vy: Math.sin(a) * s,
       size: Math.random() * 1.8 + 1.8,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 0.9, decay: 0.045
-    });
-  }
-  if (Math.random() < 0.3) {
-    particles.push({
-      x: x + (Math.random() - 0.5) * 8,
-      y: y + (Math.random() - 0.5) * 8,
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: -0.8 - Math.random() * 0.8,
-      size: 1.8 + Math.random() * 1.5,
-      color: '#fff0a3',
-      alpha: 0.85, decay: 0.03
     });
   }
 }
@@ -1841,10 +1440,8 @@ function spawnAirTrail(x, y) {
   const colors = ['#b3e5ff', '#d9f0ff', '#ffffff'];
   for (let i = 0; i < 3; i++) {
     particles.push({
-      x: x + (Math.random() - 0.5) * 12,
-      y: y + (Math.random() - 0.5) * 12,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5,
+      x: x + (Math.random() - 0.5) * 12, y: y + (Math.random() - 0.5) * 12,
+      vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5,
       size: Math.random() * 1.8 + 1.2,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 0.7, decay: 0.05
@@ -1855,10 +1452,8 @@ function spawnJadeTrail(x, y) {
   const colors = ['#7de8c4', '#4ec9a0', '#fff0b0'];
   for (let i = 0; i < 2; i++) {
     particles.push({
-      x: x + (Math.random() - 0.5) * 8,
-      y: y + (Math.random() - 0.5) * 8,
-      vx: (Math.random() - 0.5) * 0.6,
-      vy: (Math.random() - 0.5) * 0.6 - 0.2,
+      x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6 - 0.2,
       size: Math.random() * 1.5 + 1.5,
       color: colors[Math.floor(Math.random() * colors.length)],
       alpha: 0.85, decay: 0.035
@@ -1870,8 +1465,7 @@ function spawnEatBurst(x, y, color = '#d5bd70', count = 6) {
     const a = (Math.PI * 2 * i) / count + Math.random() * 0.4;
     const sp = 1 + Math.random() * 1.8;
     particles.push({
-      x, y,
-      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
       size: 1.8 + Math.random() * 1.8,
       color: Math.random() > 0.5 ? color : '#fff8dc',
       alpha: 1, decay: 0.035
@@ -1881,52 +1475,32 @@ function spawnEatBurst(x, y, color = '#d5bd70', count = 6) {
 
 function updateAndDrawParticles(updateState = true) {
   const MAX_PARTICLES = window.innerWidth <= 768 ? 60 : 150;
-  const screenW = window.innerWidth;
-  const screenH = window.innerHeight;
-
-  if (particles.length > MAX_PARTICLES) {
-    particles.splice(0, particles.length - MAX_PARTICLES);
-  }
+  const screenW = window.innerWidth, screenH = window.innerHeight;
+  if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES);
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (updateState) { p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; }
-
-    const isOffScreen = p.x < -50 || p.x > screenW + 50 ||
-                        p.y < -50 || p.y > screenH + 50;
-
-    if (p.alpha <= 0 || isOffScreen) {
-      particles.splice(i, 1);
-      continue;
-    }
-
+    const isOffScreen = p.x < -50 || p.x > screenW + 50 || p.y < -50 || p.y > screenH + 50;
+    if (p.alpha <= 0 || isOffScreen) { particles.splice(i, 1); continue; }
     ctx.globalAlpha = p.alpha;
     ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
   for (let i = floatingTexts.length - 1; i >= 0; i--) {
     const ft = floatingTexts[i];
-    if (updateState) {
-      ft.y += ft.vy;
-      ft.alpha -= 0.028;
-      ft.life += 1;
-      ft.scale = Math.min(1, ft.scale + 0.15);
-    }
+    if (updateState) { ft.y += ft.vy; ft.alpha -= 0.028; ft.life += 1; ft.scale = Math.min(1, ft.scale + 0.15); }
     if (ft.alpha <= 0) { floatingTexts.splice(i, 1); continue; }
     ctx.globalAlpha = ft.alpha;
     const fontSize = Math.round(13 * ft.scale);
     ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const m = ctx.measureText(ft.text);
     const w = m.width + 14;
     ctx.fillStyle = 'rgba(20, 23, 32, 0.85)';
-    roundRect(ctx, ft.x - w / 2, ft.y - 11, w, 22, 7);
-    ctx.fill();
+    roundRect(ctx, ft.x - w / 2, ft.y - 11, w, 22, 7); ctx.fill();
     ctx.fillStyle = ft.color;
     ctx.fillText(ft.text, ft.x, ft.y);
   }
@@ -1934,7 +1508,7 @@ function updateAndDrawParticles(updateState = true) {
 }
 
 // ========================================================
-// 12. INMUNIDAD / FREEZE / AIRE / FUEGO
+// 12. INMUNIDAD / FREEZE / AIRE
 // ========================================================
 function activateImmunity(seconds = 10) {
   isImmune = true;
@@ -1950,27 +1524,19 @@ function activateImmunity(seconds = 10) {
     for (let i = 0; i < 12; i++) {
       const a = (Math.PI * 2 * i) / 12;
       const sp = 1.2 + Math.random() * 1.5;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        size: 1.8 + Math.random() * 1.5,
-        color: ['#7de8c4', '#4ec9a0', '#fff0b0'][i % 3],
-        alpha: 1, decay: 0.03
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 1.8 + Math.random() * 1.5, color: ['#7de8c4', '#4ec9a0', '#fff0b0'][i % 3], alpha: 1, decay: 0.03 });
     }
   }
   updateMusicLayer();
 }
-
 function deactivateImmunity() {
   isImmune = false;
   immunityExpiresAt = 0;
   BadgeManager.setVisible('immunity', false);
   clearFireBreath();
 }
-function hasGuardianProtection() {
-  return isImmune || gameTime < respawnProtectedUntil;
-}
+function hasGuardianProtection() { return isImmune || gameTime < respawnProtectedUntil; }
+
 function activateGuardianFreeze() {
   const profile = getDifficultyProfile();
   guardiansFrozenUntil = gameTime + profile.freezeDurationMs;
@@ -1985,13 +1551,7 @@ function activateGuardianFreeze() {
     for (let i = 0; i < 18; i++) {
       const a = (Math.PI * 2 * i) / 18;
       const sp = 2 + Math.random() * 2;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        size: 1.5 + Math.random() * 1.5,
-        color: ['#8be7ff', '#d7f6ff', '#4fc3f7'][i % 3],
-        alpha: 1, decay: 0.03
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 1.5 + Math.random() * 1.5, color: ['#8be7ff', '#d7f6ff', '#4fc3f7'][i % 3], alpha: 1, decay: 0.03 });
     }
     spawnFloatingText('❄️ ¡Congelados!', hx, hy - TILE_SIZE, '#8be7ff');
   }
@@ -2003,7 +1563,6 @@ function activateAirBoost() {
   BadgeManager.setVisible('air', true);
   vibrate(20);
   updateMusicLayer();
-
   const head = snake[0];
   if (head) {
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
@@ -2011,20 +1570,11 @@ function activateAirBoost() {
     for (let i = 0; i < 16; i++) {
       const a = (Math.PI * 2 * i) / 16;
       const sp = 2 + Math.random() * 2.5;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        size: 2 + Math.random() * 2,
-        color: ['#b3e5ff', '#d9f0ff', '#ffffff'][i % 3],
-        alpha: 0.9, decay: 0.035
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 2 + Math.random() * 2, color: ['#b3e5ff', '#d9f0ff', '#ffffff'][i % 3], alpha: 0.9, decay: 0.035 });
     }
   }
 }
-function deactivateAirBoost() {
-  airBoostUntil = 0;
-  BadgeManager.setVisible('air', false);
-}
+function deactivateAirBoost() { airBoostUntil = 0; BadgeManager.setVisible('air', false); }
 
 // ========================================================
 // 13. GUARDIANES
@@ -2034,14 +1584,9 @@ function scheduleEnemySpawn(retryDelay = null) {
   const target = profile.guardianTargets;
   const normalGuardians = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   updateGuardianBadge();
-  if (!isGameRunning || normalGuardians >= target || cosmicOrderResolveAt !== null) {
-    enemySpawnAt = null;
-    return;
-  }
+  if (!isGameRunning || normalGuardians >= target || cosmicOrderResolveAt !== null) { enemySpawnAt = null; return; }
   if (isPaused || countdownEndsAt !== null) return;
-  const delay = retryDelay ?? (hasSpawnedGuardian
-    ? profile.guardianNextSpawnMs
-    : profile.guardianFirstSpawnMs);
+  const delay = retryDelay ?? (hasSpawnedGuardian ? profile.guardianNextSpawnMs : profile.guardianFirstSpawnMs);
   enemySpawnAt = gameTime + delay;
 }
 
@@ -2074,39 +1619,23 @@ function spawnEnemySnake() {
     if (minX > maxX || minY > maxY) break;
     const x = minX + Math.floor(Math.random() * (maxX - minX + 1));
     const y = minY + Math.floor(Math.random() * (maxY - minY + 1));
-    const candidate = Array.from({ length: 4 }, (_, i) => ({
-      x: (x - i + gridCols) % gridCols,
-      y
-    }));
+    const candidate = Array.from({ length: 4 }, (_, i) => ({ x: (x - i + gridCols) % gridCols, y }));
     const dx = Math.min(Math.abs(x - snake[0].x), gridCols - Math.abs(x - snake[0].x));
     const dy = Math.min(Math.abs(y - snake[0].y), gridRows - Math.abs(y - snake[0].y));
     if (dx + dy < 8) continue;
     if (candidate.some(c => !isCellFreeForNewGuardian(c.x, c.y))) continue;
-    if (enemyGuardians.some(g => g.segments.some(s =>
-      Math.abs(s.x - x) + Math.abs(s.y - y) < 5
-    ))) continue;
+    if (enemyGuardians.some(g => g.segments.some(s => Math.abs(s.x - x) + Math.abs(s.y - y) < 5))) continue;
 
     const id = nextEnemyId++;
     const def = getUniqueGuardianDef();
     const guardian = {
-      id,
-      segments: candidate,
-      direction: { x: 1, y: 0 },
-      tickCounter: 0,
+      id, segments: candidate, direction: { x: 1, y: 0 }, tickCounter: 0,
       expiresAt: gameTime + profile.guardianLifetimeMs,
       frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
-      palette: def.palette,
-      behavior: { id: def.behavior, name: def.name },
-      traits: def.traits,
-      ambientParticles: def.ambientParticles,
-      lastMoveTick: -1,
-      targetIndicator: null,
-      recentCells: [],
-      personality: {
-        aggression: 0.7 + Math.random() * 0.6,
-        caution: Math.random() * 0.4,
-        preferredDistance: 3 + Math.floor(Math.random() * 4)
-      }
+      palette: def.palette, behavior: { id: def.behavior, name: def.name },
+      traits: def.traits, ambientParticles: def.ambientParticles,
+      lastMoveTick: -1, targetIndicator: null, recentCells: [],
+      personality: { aggression: 0.7 + Math.random() * 0.6, caution: Math.random() * 0.4, preferredDistance: 3 + Math.floor(Math.random() * 4) }
     };
     enemyGuardians.push(guardian);
     hasSpawnedGuardian = true;
@@ -2115,11 +1644,7 @@ function spawnEnemySnake() {
     const hy = y * TILE_SIZE + TILE_SIZE / 2;
     for (let i = 0; i < 10; i++) {
       const a = (Math.PI * 2 * i) / 10;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * 2, vy: Math.sin(a) * 2,
-        size: 2, color: def.palette.head, alpha: 1, decay: 0.03
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, size: 2, color: def.palette.head, alpha: 1, decay: 0.03 });
     }
     spawnFloatingText('⚠️ ' + def.name, hx, hy - TILE_SIZE, def.palette.head);
     updateMusicLayer();
@@ -2132,7 +1657,6 @@ function spawnChaac() {
   const difficulty = getEffectiveDifficulty();
   const config = TEZCATLIPOCA_CONFIG[difficulty] || TEZCATLIPOCA_CONFIG.medium;
   const profile = getDifficultyProfile();
-
   const normalGuardians = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalGuardians < 2) return false;
   if (enemyGuardians.some(g => g.behavior.id === 'ambusher')) return false;
@@ -2156,25 +1680,14 @@ function spawnChaac() {
     const id = nextEnemyId++;
     const def = GUARDIAN_DEFS.find(d => d.behavior === 'ambusher');
     const guardian = {
-      id,
-      segments: [{ x, y }],
-      direction: { x: 1, y: 0 },
-      tickCounter: 0,
+      id, segments: [{ x, y }], direction: { x: 1, y: 0 }, tickCounter: 0,
       expiresAt: gameTime + profile.chaacLifetimeMs,
       frozenAt: guardiansFrozenUntil > gameTime ? gameTime : null,
-      palette: def.palette,
-      behavior: { id: def.behavior, name: def.name },
-      traits: def.traits,
-      ambientParticles: def.ambientParticles,
-      nextTeleportAt: gameTime + config.teleportMs,
-      teleportFlash: 0,
-      teleportDest: null,
-      smokeParticles: [],
-      lastMoveTick: -1,
-      targetIndicator: null,
-      recentCells: [],
-      vulnerableUntil: 0,
-      config: config
+      palette: def.palette, behavior: { id: def.behavior, name: def.name },
+      traits: def.traits, ambientParticles: def.ambientParticles,
+      nextTeleportAt: gameTime + config.teleportMs, teleportFlash: 0, teleportDest: null,
+      smokeParticles: [], lastMoveTick: -1, targetIndicator: null, recentCells: [],
+      vulnerableUntil: 0, config: config
     };
     enemyGuardians.push(guardian);
     nextChaacSpawnAt = gameTime + config.cooldownMs;
@@ -2184,13 +1697,7 @@ function spawnChaac() {
     for (let i = 0; i < 20; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 1 + Math.random() * 3;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
-        size: 2 + Math.random() * 2,
-        color: ['#d98e2b', '#f2e2b8', '#14110f'][i % 3],
-        alpha: 1, decay: 0.022
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, size: 2 + Math.random() * 2, color: ['#d98e2b', '#f2e2b8', '#14110f'][i % 3], alpha: 1, decay: 0.022 });
     }
     spawnFloatingText('👁️ ¡TEZCATLIPOCA DESCIENDE!', hx, hy - TILE_SIZE, '#d98e2b');
     screenShake = 8;
@@ -2215,25 +1722,15 @@ function isGuardianCellOccupied(x, y) {
 
 function updateGuardianBadge() {
   const count = enemyGuardians.length;
-  if (count === 0) {
-    BadgeManager.setVisible('threat', false);
-    return;
-  }
-
+  if (count === 0) { BadgeManager.setVisible('threat', false); return; }
   const hasTezcatlipoca = enemyGuardians.some(g => g.behavior.id === 'ambusher');
   const names = [...new Set(enemyGuardians.map(g => g.behavior.name))];
-  const desktopText = hasTezcatlipoca
-    ? `👁️ ¡TEZCATLIPOCA al acecho!`
-    : (count === 1
-      ? `${names[0]} al acecho`
-      : `${count} guardianes: ${names.join(' · ')}`);
+  const desktopText = hasTezcatlipoca ? `👁️ ¡TEZCATLIPOCA al acecho!` : (count === 1 ? `${names[0]} al acecho` : `${count} guardianes: ${names.join(' · ')}`);
   const mobileText = hasTezcatlipoca ? '¡Tezcatlipoca!' : (count === 1 ? names[0] : `${count} guardianes`);
-
   const desktopSpan = threatBadge.querySelector('.badge-text-desktop');
   const mobileSpan = threatBadge.querySelector('.badge-text-mobile');
   if (desktopSpan) desktopSpan.textContent = desktopText;
   if (mobileSpan) mobileSpan.textContent = mobileText;
-
   const dot = document.getElementById('threat-dot');
   if (dot) {
     const first = enemyGuardians[0];
@@ -2242,41 +1739,25 @@ function updateGuardianBadge() {
     dot.style.boxShadow = `0 0 8px ${color}`;
     dot.style.color = color;
   }
-
   const firstPalette = enemyGuardians[0].palette;
   threatBadge.style.background = `linear-gradient(135deg, ${firstPalette.body}cc, ${firstPalette.head}aa)`;
   threatBadge.style.borderColor = firstPalette.head;
-
   BadgeManager.setVisible('threat', true);
 }
 
 function updateGuardianAmbientParticles() {
   if (isPaused || cosmicOrderResolveAt !== null) return;
-
   enemyGuardians.forEach(guardian => {
     if (!guardian.ambientParticles) return;
     if (guardiansFrozenUntil > gameTime) return;
-
     const { color, rate, size } = guardian.ambientParticles;
     if (Math.random() > rate * 0.1) return;
-
     const head = guardian.segments[0];
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
     const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-
     const a = Math.random() * Math.PI * 2;
     const dist = TILE_SIZE * (0.3 + Math.random() * 0.5);
-
-    particles.push({
-      x: hx + Math.cos(a) * dist,
-      y: hy + Math.sin(a) * dist,
-      vx: Math.cos(a) * 0.3,
-      vy: Math.sin(a) * 0.3 - 0.4,
-      size: size * (0.7 + Math.random() * 0.6),
-      color: color,
-      alpha: 0.7,
-      decay: 0.025
-    });
+    particles.push({ x: hx + Math.cos(a) * dist, y: hy + Math.sin(a) * dist, vx: Math.cos(a) * 0.3, vy: Math.sin(a) * 0.3 - 0.4, size: size * (0.7 + Math.random() * 0.6), color: color, alpha: 0.7, decay: 0.025 });
   });
 }
 
@@ -2284,19 +1765,13 @@ function getGuardianTarget(g, playerHead, difficulty) {
   const profile = getDifficultyProfile();
   if (g.behavior.id === 'interceptor') {
     const lead = profile.guardianLead;
-    return {
-      x: (playerHead.x + direction.x * lead + gridCols) % gridCols,
-      y: (playerHead.y + direction.y * lead + gridRows) % gridRows
-    };
+    return { x: (playerHead.x + direction.x * lead + gridCols) % gridCols, y: (playerHead.y + direction.y * lead + gridRows) % gridRows };
   }
   if (g.behavior.id === 'flanker') {
     const orbit = Math.floor(g.tickCounter / profile.flankerOrbitSpeed + g.id) % 4;
     const offsets = [{ x: 0, y: -5 }, { x: 5, y: 0 }, { x: 0, y: 5 }, { x: -5, y: 0 }];
     const o = offsets[orbit];
-    return {
-      x: (playerHead.x + o.x + gridCols) % gridCols,
-      y: (playerHead.y + o.y + gridRows) % gridRows
-    };
+    return { x: (playerHead.x + o.x + gridCols) % gridCols, y: (playerHead.y + o.y + gridRows) % gridRows };
   }
   return playerHead;
 }
@@ -2304,18 +1779,13 @@ function getGuardianTarget(g, playerHead, difficulty) {
 function reconcileGuardianCount() {
   const profile = getDifficultyProfile();
   const target = profile.guardianTargets;
-
   let normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalCount > target) {
     for (let i = enemyGuardians.length - 1; i >= 0 && normalCount > target; i--) {
-      if (enemyGuardians[i] && enemyGuardians[i].behavior.id !== 'ambusher') {
-        enemyGuardians.splice(i, 1);
-        normalCount--;
-      }
+      if (enemyGuardians[i] && enemyGuardians[i].behavior.id !== 'ambusher') { enemyGuardians.splice(i, 1); normalCount--; }
     }
     updateGuardianBadge();
   }
-
   shieldFoods.length = Math.min(shieldFoods.length, target);
   maybeSpawnShieldFood();
   scheduleEnemySpawn();
@@ -2325,44 +1795,20 @@ function destroyEnemySnake(id, spawnBonus = true) {
   const idx = enemyGuardians.findIndex(g => g.id === id);
   if (idx === -1) return;
   const [g] = enemyGuardians.splice(idx, 1);
-
   previousGuardianPositions.delete(id);
-
   if (g.smokeParticles) g.smokeParticles = [];
-
   if (spawnBonus) {
-    g.segments.forEach(s => {
-      bonusFoods.push({
-        x: s.x,
-        y: s.y,
-        expiresAt: gameTime + 12000
-      });
-    });
+    g.segments.forEach(s => { bonusFoods.push({ x: s.x, y: s.y, expiresAt: gameTime + 12000 }); });
     if (g.behavior.id === 'ambusher') {
       const head = g.segments[0];
-      bonusFoods.push({
-        x: head.x,
-        y: head.y,
-        expiresAt: gameTime + 15000,
-        isBossDrop: true
-      });
+      bonusFoods.push({ x: head.x, y: head.y, expiresAt: gameTime + 15000, isBossDrop: true });
       progression.totalTezcatlipocaDefeated++;
       saveProgression();
       checkAchievements();
-
       for (let p = 0; p < 8; p++) {
         const a = (Math.PI * 2 * p) / 8;
         const sp = 1.5 + Math.random() * 2;
-        particles.push({
-          x: head.x * TILE_SIZE + TILE_SIZE / 2,
-          y: head.y * TILE_SIZE + TILE_SIZE / 2,
-          vx: Math.cos(a) * sp,
-          vy: Math.sin(a) * sp,
-          size: 2 + Math.random() * 1.5,
-          color: ['#d98e2b', '#f2e2b8', '#14110f'][p % 3],
-          alpha: 1,
-          decay: 0.06
-        });
+        particles.push({ x: head.x * TILE_SIZE + TILE_SIZE / 2, y: head.y * TILE_SIZE + TILE_SIZE / 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 2 + Math.random() * 1.5, color: ['#d98e2b', '#f2e2b8', '#14110f'][p % 3], alpha: 1, decay: 0.06 });
       }
       const diff = getEffectiveDifficulty();
       const config = TEZCATLIPOCA_CONFIG[diff] || TEZCATLIPOCA_CONFIG.medium;
@@ -2378,18 +1824,13 @@ function floodFillCount(startX, startY, maxCells, occupiedByGuardians) {
   const queue = [{ x: startX, y: startY }];
   visited.add(`${startX},${startY}`);
   let count = 0;
-
   while (queue.length > 0 && count < maxCells) {
     const { x, y } = queue.shift();
     count++;
-
     const neighbors = [
-      { x: (x + 1) % gridCols, y },
-      { x: (x - 1 + gridCols) % gridCols, y },
-      { x, y: (y + 1) % gridRows },
-      { x, y: (y - 1 + gridRows) % gridRows }
+      { x: (x + 1) % gridCols, y }, { x: (x - 1 + gridCols) % gridCols, y },
+      { x, y: (y + 1) % gridRows }, { x, y: (y - 1 + gridRows) % gridRows }
     ];
-
     for (const n of neighbors) {
       const key = `${n.x},${n.y}`;
       if (visited.has(key)) continue;
@@ -2399,7 +1840,6 @@ function floodFillCount(startX, startY, maxCells, occupiedByGuardians) {
       queue.push(n);
     }
   }
-
   return count;
 }
 
@@ -2411,11 +1851,7 @@ function updateEnemySnakeAI() {
   const isFleeing = hasGuardianProtection() || isFuria;
 
   const occupiedByGuardians = {};
-  enemyGuardians.forEach(g => {
-    g.segments.forEach(s => {
-      occupiedByGuardians[`${s.x},${s.y}`] = true;
-    });
-  });
+  enemyGuardians.forEach(g => { g.segments.forEach(s => { occupiedByGuardians[`${s.x},${s.y}`] = true; }); });
 
   for (const g of [...enemyGuardians]) {
     if (g.destroyed) continue;
@@ -2424,7 +1860,6 @@ function updateEnemySnakeAI() {
     if (g.behavior.id === 'ambusher') {
       const isVulnerable = gameTime < g.vulnerableUntil;
       const config = g.config || TEZCATLIPOCA_CONFIG.medium;
-
       if (!isVulnerable && gameTime >= g.nextTeleportAt) {
         const total = gridCols * gridRows;
         const start = Math.floor(Math.random() * total);
@@ -2445,31 +1880,18 @@ function updateEnemySnakeAI() {
             g.nextTeleportAt = gameTime + config.teleportMs;
             for (let p = 0; p < 12; p++) {
               const a = Math.random() * Math.PI * 2;
-              particles.push({
-                x: tx * TILE_SIZE + TILE_SIZE / 2,
-                y: ty * TILE_SIZE + TILE_SIZE / 2,
-                vx: Math.cos(a) * 2,
-                vy: Math.sin(a) * 2,
-                size: 2 + Math.random() * 2,
-                color: '#14110f',
-                alpha: 0.9,
-                decay: 0.04
-              });
+              particles.push({ x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, size: 2 + Math.random() * 2, color: '#14110f', alpha: 0.9, decay: 0.04 });
             }
             break;
           }
         }
       }
       if (g.teleportFlash > 0) g.teleportFlash = Math.max(0, g.teleportFlash - 0.05);
-      if (g.smokeParticles) {
-        g.smokeParticles = g.smokeParticles.filter(sp => gameTime - sp.bornAt < 800);
-      }
+      if (g.smokeParticles) g.smokeParticles = g.smokeParticles.filter(sp => gameTime - sp.bornAt < 800);
 
       if (isVulnerable) {
         const head = g.segments[0];
-        const touches = snake.some(s =>
-          Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1
-        );
+        const touches = snake.some(s => Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1);
         if (touches) {
           if (hasGuardianProtection() || isFuria || guardiansFrozenUntil > gameTime) {
             const frozen = guardiansFrozenUntil > gameTime;
@@ -2483,12 +1905,7 @@ function updateEnemySnakeAI() {
             vibrate([40, 30, 40, 30, 60]);
             runGuardiansDefeated++;
             score += reward;
-            const label = furia
-              ? `+${reward} ${symbol} ¡TEZCATLIPOCA INCINERADO!`
-              : frozen
-                ? `+${reward} ${symbol} ¡TEZCATLIPOCA CONGELADO!`
-                : `+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`;
-            spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+            spawnFloatingText(`+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
             updateScoresUI();
             destroyEnemySnake(g.id);
             continue;
@@ -2507,23 +1924,14 @@ function updateEnemySnakeAI() {
       if (Math.abs(dx) > gridCols / 2) dx = -Math.sign(dx) * (gridCols - Math.abs(dx));
       if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
       if (isFleeing) { dx = -dx; dy = -dy; }
-
       const cands = Math.abs(dx) >= Math.abs(dy)
         ? [{ x: Math.sign(dx) || 1, y: 0 }, { x: 0, y: Math.sign(dy) || 1 }]
         : [{ x: 0, y: Math.sign(dy) || 1 }, { x: Math.sign(dx) || 1, y: 0 }];
       cands.push({ x: -cands[0].x, y: -cands[0].y });
-      const dir = cands.find(c =>
-        !((c.x !== 0 && c.x === -g.direction.x) || (c.y !== 0 && c.y === -g.direction.y))
-      ) || g.direction;
+      const dir = cands.find(c => !((c.x !== 0 && c.x === -g.direction.x) || (c.y !== 0 && c.y === -g.direction.y))) || g.direction;
       g.direction = dir;
-
-      const newHead = {
-        x: (enemyHead.x + dir.x + gridCols) % gridCols,
-        y: (enemyHead.y + dir.y + gridRows) % gridRows
-      };
-      const touches = snake.some(s =>
-        Math.abs(s.x - newHead.x) <= 1 && Math.abs(s.y - newHead.y) <= 1
-      );
+      const newHead = { x: (enemyHead.x + dir.x + gridCols) % gridCols, y: (enemyHead.y + dir.y + gridRows) % gridRows };
+      const touches = snake.some(s => Math.abs(s.x - newHead.x) <= 1 && Math.abs(s.y - newHead.y) <= 1);
       if (touches) {
         if (hasGuardianProtection() || isFuria || guardiansFrozenUntil > gameTime) {
           const frozen = guardiansFrozenUntil > gameTime;
@@ -2537,12 +1945,7 @@ function updateEnemySnakeAI() {
           vibrate([40, 30, 40, 30, 60]);
           runGuardiansDefeated++;
           score += reward;
-          const label = furia
-            ? `+${reward} ${symbol} ¡TEZCATLIPOCA INCINERADO!`
-            : frozen
-              ? `+${reward} ${symbol} ¡TEZCATLIPOCA CONGELADO!`
-              : `+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`;
-          spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+          spawnFloatingText(`+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
           updateScoresUI();
           destroyEnemySnake(g.id);
           continue;
@@ -2557,17 +1960,12 @@ function updateEnemySnakeAI() {
       continue;
     }
 
-    // === IA de guardianes normales ===
     const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
     if ((g.tickCounter + g.id) % interval !== 0) continue;
-
     g.lastMoveTick = g.tickCounter;
 
     const enemyHead = g.segments[0];
-    const possibleDirs = [
-      { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
-    ];
-
+    const possibleDirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
     let bestDir = null;
     let bestScore = -Infinity;
     const candidates = [];
@@ -2583,7 +1981,6 @@ function updateEnemySnakeAI() {
       }
       candidates.push({ dir, newX, newY, key });
     }
-
     if (candidates.length === 0) {
       const allDirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
       for (const dir of allDirs) {
@@ -2598,77 +1995,43 @@ function updateEnemySnakeAI() {
     for (const cand of candidates) {
       const { dir, newX, newY } = cand;
       let score = 0;
-
       const target = getGuardianTarget(g, playerHead, null);
       let dx = target.x - newX;
       let dy = target.y - newY;
       if (Math.abs(dx) > gridCols / 2) dx = -Math.sign(dx) * (gridCols - Math.abs(dx));
       if (Math.abs(dy) > gridRows / 2) dy = -Math.sign(dy) * (gridRows - Math.abs(dy));
       const dist = Math.abs(dx) + Math.abs(dy);
-
-      if (isFleeing) {
-        score -= dist * 10;
-      } else {
-        score -= dist * 10;
-      }
-
+      if (isFleeing) score -= dist * 10;
+      else score -= dist * 10;
       const freeSpace = floodFillCount(newX, newY, 12, occupiedByGuardians);
       score += freeSpace * 1.5;
-
-      if (g.recentCells.includes(cand.key)) {
-        score -= 50;
-      }
-
+      if (g.recentCells.includes(cand.key)) score -= 50;
       const difficulty = getEffectiveDifficulty();
       let errorChance = 0;
       if (difficulty === 'easy') errorChance = 0.35;
       else if (difficulty === 'medium') errorChance = 0.2;
       else if (difficulty === 'hard') errorChance = 0.1;
       else if (difficulty === 'extreme') errorChance = 0.05;
-      if (Math.random() < errorChance) {
-        score += (Math.random() - 0.5) * 200;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestDir = dir;
-      }
+      if (Math.random() < errorChance) score += (Math.random() - 0.5) * 200;
+      if (score > bestScore) { bestScore = score; bestDir = dir; }
     }
 
     if (!bestDir) bestDir = g.direction;
     g.direction = bestDir;
 
-    const newHead = {
-      x: (enemyHead.x + bestDir.x + gridCols) % gridCols,
-      y: (enemyHead.y + bestDir.y + gridRows) % gridRows
-    };
-
+    const newHead = { x: (enemyHead.x + bestDir.x + gridCols) % gridCols, y: (enemyHead.y + bestDir.y + gridRows) % gridRows };
     g.recentCells.push(`${newHead.x},${newHead.y}`);
     if (g.recentCells.length > 5) g.recentCells.shift();
 
     delete occupiedByGuardians[`${enemyHead.x},${enemyHead.y}`];
     occupiedByGuardians[`${newHead.x},${newHead.y}`] = true;
 
-    const headDist = Math.min(
-      Math.abs(newHead.x - playerHead.x),
-      gridCols - Math.abs(newHead.x - playerHead.x)
-    ) + Math.min(
-      Math.abs(newHead.y - playerHead.y),
-      gridRows - Math.abs(newHead.y - playerHead.y)
-    );
-    if (headDist < 8 && headDist > 2) {
-      g.targetIndicator = { x: playerHead.x, y: playerHead.y };
-    } else {
-      g.targetIndicator = null;
-    }
+    const headDist = Math.min(Math.abs(newHead.x - playerHead.x), gridCols - Math.abs(newHead.x - playerHead.x)) +
+                     Math.min(Math.abs(newHead.y - playerHead.y), gridRows - Math.abs(newHead.y - playerHead.y));
+    g.targetIndicator = (headDist < 8 && headDist > 2) ? { x: playerHead.x, y: playerHead.y } : null;
 
     if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail) {
-      huntTrail.push({
-        x: enemyHead.x,
-        y: enemyHead.y,
-        expiresAt: gameTime + HUNT_TRAIL_LIFETIME_MS,
-        ownerId: g.id
-      });
+      huntTrail.push({ x: enemyHead.x, y: enemyHead.y, expiresAt: gameTime + HUNT_TRAIL_LIFETIME_MS, ownerId: g.id });
     }
 
     const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
@@ -2676,20 +2039,16 @@ function updateEnemySnakeAI() {
       if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isOnFire) {
         const shield = isImmune;
         const frozen = guardiansFrozenUntil > gameTime;
-        const onFire = isOnFire;
         const furia = isFuria;
-        const color = furia ? '#ff6b2c' : onFire ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
-        const symbol = furia ? '🔥' : onFire ? '🔥' : shield ? '💎' : frozen ? '❄️' : '🪶';
+        const color = furia ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec9a0';
+        const symbol = furia ? '🔥' : shield ? '💎' : frozen ? '❄️' : '🪶';
         const reward = furia ? FURIA_GUARDIAN_REWARD : profile.guardianReward;
         screenShake = 10;
         playEnemyDefeatedSound();
         vibrate(35);
         runGuardiansDefeated++;
         score += reward;
-        const label = furia
-          ? `+${reward} ${symbol} ¡INCINERADO POR LA FURIA!`
-          : `+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`;
-        spawnFloatingText(label, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+        spawnFloatingText(`+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
         updateScoresUI();
         destroyEnemySnake(g.id);
         continue;
@@ -2742,14 +2101,8 @@ function spawnSkullFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
   if (skullFoods.length > 0) return false;
   const available = [];
-  for (let y = 0; y < gridRows; y++) {
-    for (let x = 0; x < gridCols; x++) {
-      if (!isGuardianCellOccupied(x, y)) available.push({ x, y });
-    }
-  }
-  const different = available.filter(p =>
-    !lastSkullPosition || p.x !== lastSkullPosition.x || p.y !== lastSkullPosition.y
-  );
+  for (let y = 0; y < gridRows; y++) for (let x = 0; x < gridCols; x++) if (!isGuardianCellOccupied(x, y)) available.push({ x, y });
+  const different = available.filter(p => !lastSkullPosition || p.x !== lastSkullPosition.x || p.y !== lastSkullPosition.y);
   const cells = different.length > 0 ? different : available;
   if (cells.length === 0) return false;
   const pos = cells[Math.floor(Math.random() * cells.length)];
@@ -2779,10 +2132,7 @@ function maybeSpawnFreezeFood() {
     const y = (head.y + Math.floor(Math.random() * 17) - 8 + gridRows) % gridRows;
     const dx = Math.min(Math.abs(x - head.x), gridCols - Math.abs(x - head.x));
     const dy = Math.min(Math.abs(y - head.y), gridRows - Math.abs(y - head.y));
-    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) {
-      freezeFoods.push({ x, y });
-      return true;
-    }
+    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) { freezeFoods.push({ x, y }); return true; }
   }
   for (let i = 0; i < gridCols * gridRows; i++) {
     const x = Math.floor(Math.random() * gridCols);
@@ -2793,7 +2143,6 @@ function maybeSpawnFreezeFood() {
   }
   return false;
 }
-
 function maybeSpawnAirFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
   if (airFoods.length > 0) return true;
@@ -2803,10 +2152,7 @@ function maybeSpawnAirFood() {
     const y = (head.y + Math.floor(Math.random() * 17) - 8 + gridRows) % gridRows;
     const dx = Math.min(Math.abs(x - head.x), gridCols - Math.abs(x - head.x));
     const dy = Math.min(Math.abs(y - head.y), gridRows - Math.abs(y - head.y));
-    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) {
-      airFoods.push({ x, y });
-      return true;
-    }
+    if (dx + dy <= 8 && !isGuardianCellOccupied(x, y)) { airFoods.push({ x, y }); return true; }
   }
   for (let i = 0; i < gridCols * gridRows; i++) {
     const x = Math.floor(Math.random() * gridCols);
@@ -2821,13 +2167,8 @@ function maybeSpawnAirFood() {
 function resolveCosmicOrder() {
   cosmicOrderResolveAt = null;
   BadgeManager.setVisible('cosmicOrder', false);
-
   const cleared = enemyGuardians.length;
-  if (cleared === 0) {
-    enemySpawnAt = null;
-    scheduleEnemySpawn();
-    return;
-  }
+  if (cleared === 0) { enemySpawnAt = null; scheduleEnemySpawn(); return; }
   cosmicOrderFlashStartedAt = gameTime;
   const defeated = enemyGuardians;
   runGuardiansDefeated += cleared;
@@ -2838,13 +2179,7 @@ function resolveCosmicOrder() {
       for (let p = 0; p < 5; p++) {
         const a = (Math.PI * 2 * p) / 5 + Math.random() * 0.3;
         const sp = 1.8 + Math.random() * 2.2;
-        particles.push({
-          x, y,
-          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-          size: 2.5 + Math.random() * 2,
-          color: Math.random() > 0.5 ? '#d5bd70' : '#8be7ff',
-          alpha: 1, decay: 0.025 + Math.random() * 0.015
-        });
+        particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 2.5 + Math.random() * 2, color: Math.random() > 0.5 ? '#d5bd70' : '#8be7ff', alpha: 1, decay: 0.025 + Math.random() * 0.015 });
       }
     });
   });
@@ -2852,7 +2187,6 @@ function resolveCosmicOrder() {
   previousGuardianPositions.clear();
   particles = particles.filter(p => p.decay > 0.03 || p.alpha > 0.5);
   updateGuardianBadge();
-
   screenShake = 10;
   playCosmicOrderSound();
   vibrate([30, 50, 30]);
@@ -2862,37 +2196,30 @@ function resolveCosmicOrder() {
   triggerHeadPulse('#d5bd70');
   const head = snake[0];
   spawnFloatingText(`🌀 Orden +${reward}`, head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#d5bd70');
-
   enemySpawnAt = null;
   scheduleEnemySpawn();
   updateMusicLayer();
 }
 
 // ========================================================
-// 15. LOOP
+// 15. LOOP (ROBUSTO)
 // ========================================================
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const base = SPEEDS[sel] || SPEEDS.medium;
   const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
   let adaptive = Math.max(base * 0.78, base - lengthPenalty);
-  if (isFuria) {
-    adaptive *= 0.55;
-  } else if (airBoostUntil > gameTime) {
-    adaptive *= AIR_BOOST_MULTIPLIER;
-  }
+  if (isFuria) adaptive *= 0.55;
+  else if (airBoostUntil > gameTime) adaptive *= AIR_BOOST_MULTIPLIER;
   if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
     const head = snake[0];
-    const onTrail = huntTrail.some(t => t.x === head.x && t.y === head.y);
-    if (onTrail) adaptive *= HUNT_TRAIL_SLOW_FACTOR;
+    if (huntTrail.some(t => t.x === head.x && t.y === head.y)) adaptive *= HUNT_TRAIL_SLOW_FACTOR;
   }
   return adaptive;
 }
 function snapshotRenderPositions() {
   previousSnakePositions = snake.map(s => ({ ...s }));
-  previousGuardianPositions = new Map(enemyGuardians.map(g => [
-    g.id, g.segments.map(s => ({ ...s }))
-  ]));
+  previousGuardianPositions = new Map(enemyGuardians.map(g => [g.id, g.segments.map(s => ({ ...s }))]));
 }
 function startCountdown() {
   countdownEndsAt = performance.now() + 3000;
@@ -2907,57 +2234,86 @@ function cancelCountdown() {
   countdownOverlay.innerHTML = '';
   countdownOverlay.classList.add('hidden');
 }
+
 function gameLoopFrame(timestamp) {
   animationFrameId = null;
+
   if (!isGameRunning) {
+    isLoopRunning = false;
     draw(1, false);
     lastFrameTimestamp = null;
     return;
   }
+
+  // Pausa: seguir pidiendo frames pero sin avanzar
+  if (isPaused) {
+    lastFrameTimestamp = null;
+    draw(renderInterpolation, false);
+    animationFrameId = requestAnimationFrame(gameLoopFrame);
+    return;
+  }
+
   const elapsedMs = lastFrameTimestamp === null ? 0 : Math.max(0, timestamp - lastFrameTimestamp);
   lastFrameTimestamp = timestamp;
   let updateEffects = false;
 
-  if (!isPaused) {
-    if (countdownEndsAt !== null) {
-      const remaining = Math.max(0, countdownEndsAt - timestamp);
-      const next = Math.ceil(remaining / 1000);
-      if (next > 0 && next !== countdownValue) {
-        countdownValue = next;
-        const mode = GAME_MODES[gameModeSelect.value];
-        countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
-      }
-      if (remaining === 0) {
-        cancelCountdown();
-        simulationAccumulator = 0;
-        snapshotRenderPositions();
-        renderInterpolation = 1;
-        scheduleEnemySpawn();
-      }
-    } else {
-      updateEffects = true;
-      updateGameTimers(elapsedMs);
-      simulationAccumulator = Math.min(simulationAccumulator + elapsedMs, getCurrentSpeed() * 3);
-      let ticks = 0;
-      while (isGameRunning && !isPaused && countdownEndsAt === null && ticks < 3 && simulationAccumulator >= getCurrentSpeed()) {
-        const tickDuration = getCurrentSpeed();
-        snapshotRenderPositions();
-        gameUpdate();
-        simulationAccumulator -= tickDuration;
-        ticks++;
-      }
-      renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
+  if (countdownEndsAt !== null) {
+    const remaining = Math.max(0, countdownEndsAt - timestamp);
+    const next = Math.ceil(remaining / 1000);
+    if (next > 0 && next !== countdownValue) {
+      countdownValue = next;
+      const mode = GAME_MODES[gameModeSelect.value];
+      countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
     }
+    if (remaining === 0) {
+      cancelCountdown();
+      simulationAccumulator = 0;
+      snapshotRenderPositions();
+      renderInterpolation = 1;
+      scheduleEnemySpawn();
+    }
+  } else {
+    updateEffects = true;
+    updateGameTimers(elapsedMs);
+    simulationAccumulator = Math.min(simulationAccumulator + elapsedMs, getCurrentSpeed() * 3);
+    let ticks = 0;
+    while (isGameRunning && !isPaused && countdownEndsAt === null && ticks < 3 && simulationAccumulator >= getCurrentSpeed()) {
+      const tickDuration = getCurrentSpeed();
+      snapshotRenderPositions();
+      gameUpdate();
+      simulationAccumulator -= tickDuration;
+      ticks++;
+    }
+    renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
   }
+
   draw(renderInterpolation, updateEffects);
-  if (isGameRunning) animationFrameId = requestAnimationFrame(gameLoopFrame);
-  else lastFrameTimestamp = null;
-}
-function startGameLoop() {
-  if (animationFrameId === null) {
-    lastFrameTimestamp = null;
+
+  if (isGameRunning) {
     animationFrameId = requestAnimationFrame(gameLoopFrame);
+  } else {
+    isLoopRunning = false;
+    lastFrameTimestamp = null;
   }
+}
+
+function startGameLoop() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  isLoopRunning = true;
+  lastFrameTimestamp = null;
+  animationFrameId = requestAnimationFrame(gameLoopFrame);
+}
+
+function stopGameLoop() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  isLoopRunning = false;
+  lastFrameTimestamp = null;
 }
 
 // ========================================================
@@ -2966,16 +2322,11 @@ function startGameLoop() {
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
   if (headPulse > 0) headPulse = Math.max(0, headPulse - elapsedMs / 240);
-
   updateMusicLayer();
 
-  // ✅ Manejo de congelamiento de guardianes
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
-      // Descongelar a todos los guardianes
-      enemyGuardians.forEach(g => {
-        g.frozenAt = null;
-      });
+      enemyGuardians.forEach(g => { g.frozenAt = null; });
       guardiansFrozenUntil = 0;
       BadgeManager.setVisible('freeze', false);
     } else {
@@ -3032,16 +2383,12 @@ function updateGameTimers(elapsedMs) {
   const effectiveDiff = getEffectiveDifficulty();
   const tezConfig = TEZCATLIPOCA_CONFIG[effectiveDiff] || TEZCATLIPOCA_CONFIG.medium;
 
-  if (
-    gameTime >= tezConfig.unlockMs &&
-    enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length >= 2 &&
-    !enemyGuardians.some(g => g.behavior.id === 'ambusher')
-  ) {
+  if (gameTime >= tezConfig.unlockMs &&
+      enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length >= 2 &&
+      !enemyGuardians.some(g => g.behavior.id === 'ambusher')) {
     if (!nextChaacSpawnAt || gameTime >= nextChaacSpawnAt) {
       const spawned = spawnChaac();
-      if (!spawned) {
-        nextChaacSpawnAt = gameTime + CHAAC_RETRY_MS;
-      }
+      if (!spawned) nextChaacSpawnAt = gameTime + CHAAC_RETRY_MS;
     }
   }
 
@@ -3051,26 +2398,19 @@ function updateGameTimers(elapsedMs) {
     particles.push({
       x: head.x * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * TILE_SIZE * 1.4,
       y: head.y * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * TILE_SIZE * 1.4,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: -0.5 - Math.random() * 0.5,
+      vx: (Math.random() - 0.5) * 0.4, vy: -0.5 - Math.random() * 0.5,
       size: 1.5 + Math.random() * 1.5,
       color: Math.random() > 0.5 ? '#d98e2b' : '#14110f',
-      alpha: 0.8,
-      decay: 0.03
+      alpha: 0.8, decay: 0.03
     });
   }
 
   updateGuardianAmbientParticles();
 
-  if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) {
-    jadeSpawnAt = null;
-    maybeSpawnShieldFood();
-  }
+  if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) { jadeSpawnAt = null; maybeSpawnShieldFood(); }
   if (freezeSpawnAt !== null && gameTime >= freezeSpawnAt) {
     freezeSpawnAt = null;
-    if (enemyGuardians.length === 0 || !maybeSpawnFreezeFood()) {
-      freezeSpawnAt = gameTime + 1500;
-    }
+    if (enemyGuardians.length === 0 || !maybeSpawnFreezeFood()) freezeSpawnAt = gameTime + 1500;
   }
 
   if (nextSacredRainAt !== null && gameTime >= nextSacredRainAt) {
@@ -3103,10 +2443,8 @@ function updateGameTimers(elapsedMs) {
   if (nextSkullSpawnAt !== null && gameTime >= nextSkullSpawnAt && skullFoods.length > 0) {
     nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
   } else if (nextSkullSpawnAt !== null && gameTime >= nextSkullSpawnAt && skullFoods.length === 0 && nextSkullMoveAt === null) {
-    if (spawnSkullFood()) {
-      nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS;
-      nextSkullMoveAt = gameTime + SKULL_MOVE_INTERVAL_MS;
-    } else nextSkullSpawnAt = gameTime + 1000;
+    if (spawnSkullFood()) { nextSkullSpawnAt = gameTime + SKULL_RESPAWN_DELAY_MS; nextSkullMoveAt = gameTime + SKULL_MOVE_INTERVAL_MS; }
+    else nextSkullSpawnAt = gameTime + 1000;
   }
   if (nextSkullMoveAt !== null && gameTime >= nextSkullMoveAt) {
     if (skullFoods.length > 0) {
@@ -3142,14 +2480,8 @@ function updateGameTimers(elapsedMs) {
   if (cosmicOrderFlashStartedAt !== null && gameTime - cosmicOrderFlashStartedAt >= COSMIC_ORDER_FLASH_DURATION_MS) {
     cosmicOrderFlashStartedAt = null;
   }
-
-  if (bonusFoods.length > 0) {
-    bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
-  }
-
-  if (huntTrail.length > 0) {
-    huntTrail = huntTrail.filter(t => t.expiresAt > gameTime);
-  }
+  if (bonusFoods.length > 0) bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
+  if (huntTrail.length > 0) huntTrail = huntTrail.filter(t => t.expiresAt > gameTime);
 
   if (isImmune && snake.length > 0) {
     jadeTrailAccumulator += elapsedMs;
@@ -3164,13 +2496,12 @@ function updateGameTimers(elapsedMs) {
 }
 
 // ========================================================
-// 17. NUEVAS MECÁNICAS POR MODO
+// 17. MECÁNICAS POR MODO
 // ========================================================
 function updateModeMechanics(elapsedMs) {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode) return;
 
-  // ECLIPSE
   if (mode.hasEclipse && nextEclipseAt !== null) {
     if (!eclipseActive && gameTime >= nextEclipseAt - ECLIPSE_WARNING_MS && !eclipseWarningShown) {
       eclipseWarningShown = true;
@@ -3197,7 +2528,6 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // OSCURIDAD
   if (mode.hasDarkness) {
     if (darknessStartTime === null) darknessStartTime = gameTime;
     const elapsedSinceDark = gameTime - darknessStartTime;
@@ -3211,7 +2541,6 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // CONTRARRELOJ
   if (mode.hasTimer) {
     timedRemainingMs -= elapsedMs;
     BadgeManager.setVisible('timer', true);
@@ -3228,7 +2557,6 @@ function updateModeMechanics(elapsedMs) {
     }
   }
 
-  // PRUEBAS DE XIBALBÁ (con mensaje claro)
   if (mode.name === 'Supervivencia') {
     if (nextXibalbaTrialAt !== null && gameTime >= nextXibalbaTrialAt && !activeXibalbaTrial) {
       const trials = [
@@ -3244,7 +2572,6 @@ function updateModeMechanics(elapsedMs) {
       const badgeText = xibalbaBadge.querySelector('.badge-text-desktop');
       if (badgeText) badgeText.textContent = trial.description;
       if (xibalbaTimerSpan) xibalbaTimerSpan.textContent = Math.ceil(trial.durationMs / 1000);
-      // Mensaje grande y claro que se desvanece
       spawnFloatingText(trial.description, window.innerWidth / 2, 100, '#ff8fa3');
     }
     if (activeXibalbaTrial) {
@@ -3276,21 +2603,14 @@ function ensureFoodCount(count = 6) {
     const x = Math.floor(Math.random() * gridCols);
     const y = Math.floor(Math.random() * gridRows);
     if (isGuardianCellOccupied(x, y)) continue;
-    foods.push({
-      x, y,
-      shape: Math.floor(Math.random() * 6),
-      offering: Math.random() < 0.35 ? 'cacao' : 'common'
-    });
+    foods.push({ x, y, shape: Math.floor(Math.random() * 6), offering: Math.random() < 0.35 ? 'cacao' : 'common' });
   }
   if (sacredRainUntil > gameTime) ensureMaizeOffering();
 }
 
 function ensureMaizeOffering() {
   let count = foods.filter(f => f.offering === 'maize').length;
-  if (count >= SACRED_RAIN_MAIZE_COUNT) {
-    maizeSpawnRetryAt = null;
-    return true;
-  }
+  if (count >= SACRED_RAIN_MAIZE_COUNT) { maizeSpawnRetryAt = null; return true; }
   while (count < SACRED_RAIN_MAIZE_COUNT) {
     const total = gridCols * gridRows;
     const start = Math.floor(Math.random() * total);
@@ -3300,21 +2620,12 @@ function ensureMaizeOffering() {
       const x = c % gridCols;
       const y = Math.floor(c / gridCols);
       if (isGuardianCellOccupied(x, y)) continue;
-      foods.push({
-        x, y,
-        shape: 2,
-        offering: 'maize',
-        landingAt: gameTime + MAIZE_FALL_DURATION_MS,
-        meteorOffsetX: (Math.random() - 0.5) * TILE_SIZE * 4
-      });
+      foods.push({ x, y, shape: 2, offering: 'maize', landingAt: gameTime + MAIZE_FALL_DURATION_MS, meteorOffsetX: (Math.random() - 0.5) * TILE_SIZE * 4 });
       count++;
       spawned = true;
       break;
     }
-    if (!spawned) {
-      maizeSpawnRetryAt = gameTime + 500;
-      return false;
-    }
+    if (!spawned) { maizeSpawnRetryAt = gameTime + 500; return false; }
   }
   maizeSpawnRetryAt = null;
   return true;
@@ -3335,84 +2646,47 @@ function resetGame() {
   previousSnakePositions = snake.map(s => ({ ...s }));
   previousGuardianPositions.clear();
   score = 0;
-  foods = [];
-  bonusFoods = [];
-  shieldFoods = [];
-  freezeFoods = [];
-  cosmicOrderFoods = [];
-  sacrificeFoods = [];
-  skullFoods = [];
-  lastSkullPosition = null;
-  nextSkullMoveAt = null;
-  isOnFire = false;
-  fireExpiresAt = 0;
+  foods = []; bonusFoods = []; shieldFoods = []; freezeFoods = []; cosmicOrderFoods = []; sacrificeFoods = []; skullFoods = [];
+  lastSkullPosition = null; nextSkullMoveAt = null;
+  isOnFire = false; fireExpiresAt = 0;
   BadgeManager.setVisible('sacrificeOffering', false);
   BadgeManager.setVisible('skullFood', false);
   BadgeManager.setVisible('cosmicOrder', false);
   BadgeManager.setVisible('cosmicOrderFood', false);
   BadgeManager.setVisible('rain', false);
 
-  isFuria = false;
-  furiaReadyAt = 0;
-  furiaCooldownUntil = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
   BadgeManager.setVisible('furia', false);
-  airFoods = [];
-  airSpawnAt = AIR_FIRST_SPAWN_MS;
-  airBoostUntil = 0;
+  airFoods = []; airSpawnAt = AIR_FIRST_SPAWN_MS; airBoostUntil = 0;
   BadgeManager.setVisible('air', false);
 
   const profile = getDifficultyProfile();
-  sacredRainUntil = 0;
-  nextSacredRainAt = profile.rainFirstMs;
-  maizeSpawnRetryAt = null;
-  nextCosmicOrderSpawnAt = profile.cosmicFirstMs;
-  cosmicOrderResolveAt = null;
-  cosmicOrderFlashStartedAt = null;
-  nextSacrificeSpawnAt = profile.sacrificeFirstMs;
-  nextSkullSpawnAt = profile.skullFirstMs;
+  sacredRainUntil = 0; nextSacredRainAt = profile.rainFirstMs; maizeSpawnRetryAt = null;
+  nextCosmicOrderSpawnAt = profile.cosmicFirstMs; cosmicOrderResolveAt = null; cosmicOrderFlashStartedAt = null;
+  nextSacrificeSpawnAt = profile.sacrificeFirstMs; nextSkullSpawnAt = profile.skullFirstMs;
 
-  particles = [];
-  floatingTexts = [];
-  screenShake = 0;
-  headPulse = 0;
-  headPulseColor = '#d5bd70';
-  clearFireBreath();
-  jadeTrailAccumulator = 0;
+  particles = []; floatingTexts = []; screenShake = 0; headPulse = 0; headPulseColor = '#d5bd70';
+  clearFireBreath(); jadeTrailAccumulator = 0;
 
-  enemySpawnAt = null;
-  jadeSpawnAt = null;
-  freezeSpawnAt = FREEZE_FIRST_SPAWN_MS;
-  guardiansFrozenUntil = 0;
-  nextChaacSpawnAt = null;
+  enemySpawnAt = null; jadeSpawnAt = null; freezeSpawnAt = FREEZE_FIRST_SPAWN_MS;
+  guardiansFrozenUntil = 0; nextChaacSpawnAt = null;
   BadgeManager.setVisible('freeze', false);
-  enemyGuardians = [];
-  hasSpawnedGuardian = false;
-  usedGuardianPalettes = [];
+  enemyGuardians = []; hasSpawnedGuardian = false; usedGuardianPalettes = [];
   updateGuardianBadge();
-
   updateFuriaUI();
-
-  updateScoresUI();
-  updateLivesUI();
+  updateScoresUI(); updateLivesUI();
   deactivateImmunity();
   ensureFoodCount(6);
   maybeSpawnShieldFood();
   gameOverlay.classList.add('hidden');
 
-  eclipseActive = false;
-  eclipseUntil = 0;
-  eclipseWarningShown = false;
+  eclipseActive = false; eclipseUntil = 0; eclipseWarningShown = false;
   const mode = GAME_MODES[gameModeSelect.value];
   nextEclipseAt = mode.hasEclipse ? ECLIPSE_FIRST_MS : null;
-
   darknessRadius = DARKNESS_MAX_RADIUS;
-  darknessStartTime = mode.hasDarkness ? null : null;
-
+  darknessStartTime = null;
   huntTrail = [];
-
-  timedRemainingMs = TIMED_INITIAL_MS;
-  timedWarningShown = false;
-
+  timedRemainingMs = TIMED_INITIAL_MS; timedWarningShown = false;
   activeXibalbaTrial = null;
   nextXibalbaTrialAt = mode.name === 'Supervivencia' ? XIBALBA_FIRST_MS : null;
   xibalbaMaizeBlocked = false;
@@ -3432,22 +2706,15 @@ function findRespawnPosition() {
   for (let o = 0; o < gridCols * gridRows; o++) {
     const x = (cx + o % gridCols) % gridCols;
     const y = (cy + Math.floor(o / gridCols)) % gridRows;
-    const segs = [0, 1, 2].map(d => ({
-      x: (x - d + gridCols) % gridCols, y
-    }));
-    const overlap = segs.some(p =>
-      enemyGuardians.some(g => g.segments.some(s => s.x === p.x && s.y === p.y))
-    );
+    const segs = [0, 1, 2].map(d => ({ x: (x - d + gridCols) % gridCols, y }));
+    const overlap = segs.some(p => enemyGuardians.some(g => g.segments.some(s => s.x === p.x && s.y === p.y)));
     if (!overlap) return { x, y };
   }
   return null;
 }
 
 function loseLife(reason) {
-  if (!GAME_MODES[gameModeSelect.value].livesEnabled) {
-    gameOver(reason);
-    return;
-  }
+  if (!GAME_MODES[gameModeSelect.value].livesEnabled) { gameOver(reason); return; }
   lives = Math.max(0, lives - 1);
   updateLivesUI();
   screenShake = 8;
@@ -3460,25 +2727,13 @@ function loseLife(reason) {
     for (let i = 0; i < 14; i++) {
       const a = (Math.PI * 2 * i) / 14;
       const sp = 1.5 + Math.random() * 2;
-      particles.push({
-        x: hx, y: hy,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        size: 2 + Math.random() * 2,
-        color: ['#ef5261', '#9b2929', '#f5efdc'][i % 3],
-        alpha: 1, decay: 0.03
-      });
+      particles.push({ x: hx, y: hy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: 2 + Math.random() * 2, color: ['#ef5261', '#9b2929', '#f5efdc'][i % 3], alpha: 1, decay: 0.03 });
     }
   }
 
-  if (lives === 0) {
-    gameOver(`${reason} Se agotaron los tres sacrificios.`);
-    return;
-  }
+  if (lives === 0) { gameOver(`${reason} Se agotaron los tres sacrificios.`); return; }
   const spawn = findRespawnPosition();
-  if (!spawn) {
-    gameOver('Los guardianes han cerrado todos los caminos.');
-    return;
-  }
+  if (!spawn) { gameOver('Los guardianes han cerrado todos los caminos.'); return; }
   snake = [
     { x: spawn.x, y: spawn.y },
     { x: (spawn.x - 1 + gridCols) % gridCols, y: spawn.y },
@@ -3488,12 +2743,9 @@ function loseLife(reason) {
   directionQueue = [];
   previousSnakePositions = snake.map(s => ({ ...s }));
   deactivateImmunity();
-  isFuria = false;
-  furiaReadyAt = 0;
-  furiaCooldownUntil = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
   BadgeManager.setVisible('furia', false);
-  isOnFire = false;
-  fireExpiresAt = 0;
+  isOnFire = false; fireExpiresAt = 0;
   airBoostUntil = 0;
   BadgeManager.setVisible('air', false);
   updateFuriaUI();
@@ -3501,10 +2753,7 @@ function loseLife(reason) {
   respawnTimerSpan.textContent = String(Math.ceil(RESPAWN_PROTECTION_MS / 1000));
   BadgeManager.setVisible('respawn', true);
   triggerHeadPulse('#4ec9a0');
-
-  if (prevHead) {
-    spawnFloatingText('🫀 Sacrificio perdido', prevHead.x * TILE_SIZE + TILE_SIZE / 2, prevHead.y * TILE_SIZE, '#ef5261');
-  }
+  if (prevHead) spawnFloatingText('🫀 Sacrificio perdido', prevHead.x * TILE_SIZE + TILE_SIZE / 2, prevHead.y * TILE_SIZE, '#ef5261');
   updateScoresUI();
   if (sacrificeFoods.length === 0) nextSacrificeSpawnAt = gameTime + SACRIFICE_RESPAWN_DELAY_MS;
   updateMusicLayer();
@@ -3515,13 +2764,10 @@ function loseLife(reason) {
 // ========================================================
 function gameUpdate() {
   if (isPaused || !isGameRunning || countdownEndsAt !== null) return;
-
   if (directionQueue.length > 0) direction = directionQueue.shift();
 
   let moveDir = direction;
-  if (eclipseActive) {
-    moveDir = { x: -direction.x, y: -direction.y };
-  }
+  if (eclipseActive) moveDir = { x: -direction.x, y: -direction.y };
 
   const crossed =
     (moveDir.x > 0 && snake[0].x === gridCols - 1) ||
@@ -3535,7 +2781,6 @@ function gameUpdate() {
 
   const canEatMaize = !xibalbaMaizeBlocked;
 
-  // ✅ 1. Verificar colisión con el propio cuerpo (después de calcular nueva posición)
   const willGrow =
     (canEatMaize && foods.some(f => f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt))) ||
     bonusFoods.some(f => f.x === head.x && f.y === head.y) ||
@@ -3546,12 +2791,8 @@ function gameUpdate() {
     sacrificeFoods.some(f => f.x === head.x && f.y === head.y);
 
   const bodyCheck = willGrow ? snake : snake.slice(0, -1);
-  if (bodyCheck.some(s => s.x === head.x && s.y === head.y)) {
-    loseLife('Kukulcán se enredó con su propio cuerpo.');
-    return;
-  }
+  if (bodyCheck.some(s => s.x === head.x && s.y === head.y)) { loseLife('Kukulcán se enredó con su propio cuerpo.'); return; }
 
-  // ✅ 2. Verificar colisión con la calavera
   const skullIdx = skullFoods.findIndex(f => f.x === head.x && f.y === head.y);
   if (skullIdx !== -1) {
     skullFoods.splice(skullIdx, 1);
@@ -3562,14 +2803,9 @@ function gameUpdate() {
     return;
   }
 
-  // ✅ 3. Verificar colisión con guardianes (antes de comer, para evitar bugs)
   const hitG = enemyGuardians.find(g => {
     if (g.destroyed) return false;
-    if (g.behavior.id === 'ambusher') {
-      return g.segments.some(s =>
-        Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1
-      );
-    }
+    if (g.behavior.id === 'ambusher') return g.segments.some(s => Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1);
     return g.segments.some(s => s.x === head.x && s.y === head.y);
   });
   if (hitG && !hitG.destroyed) {
@@ -3588,42 +2824,19 @@ function gameUpdate() {
       vibrate(isBoss ? [40, 30, 40, 30, 60] : 35);
       runGuardiansDefeated++;
       score += reward;
-      const label = furia
-        ? `+${reward} ${symbol} ¡INCINERADO!`
-        : isBoss
-          ? `+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`
-          : `+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`;
-      spawnFloatingText(label, head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, color);
-      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      for (let i = 0; i < (isBoss ? 20 : 12); i++) {
-        const a = (Math.PI * 2 * i) / (isBoss ? 20 : 12);
-        const sp = 2 + Math.random() * 2.5;
-        particles.push({
-          x: hx, y: hy,
-          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-          size: 2.5 + Math.random() * 2,
-          color: furia ? '#ff6b2c' : isBoss ? '#d98e2b' : hitG.palette.head,
-          alpha: 1, decay: 0.025
-        });
-      }
+      spawnFloatingText(`+${reward} ${symbol} ${isBoss ? '¡TEZCATLIPOCA VENCIDO!' : '¡GUARDIÁN VENCIDO!'}`, head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, color);
       updateScoresUI();
       destroyEnemySnake(hitG.id);
     } else {
       screenShake = isBoss ? 12 : 8;
-      loseLife(isBoss
-        ? '¡Tezcatlipoca, el jaguar de obsidiana, te devoró!'
-        : `¡El ${hitG.behavior.name} te alcanzó!`);
+      loseLife(isBoss ? '¡Tezcatlipoca, el jaguar de obsidiana, te devoró!' : `¡El ${hitG.behavior.name} te alcanzó!`);
       return;
     }
   }
 
-  // ✅ 4. Mover la serpiente (solo si no hubo colisión)
   snake.unshift(head);
-
   let ateItem = false;
 
-  // ✅ 5. Procesar comida (después de mover, pero antes de quitar la cola si comió)
   const jadeIdx = shieldFoods.findIndex(f => f.x === head.x && f.y === head.y);
   if (jadeIdx !== -1) {
     const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
@@ -3673,7 +2886,6 @@ function gameUpdate() {
       if (furiaCooldownUntil > gameTime) {
         const remaining = furiaCooldownUntil - gameTime;
         furiaCooldownUntil = gameTime + Math.max(0, remaining - AIR_FURIA_RECHARGE_BONUS_MS);
-        spawnFloatingText('⚡ Furia acelerada', hx, hy - 22, '#5cc8ff');
       }
       updateScoresUI();
       airSpawnAt = gameTime + AIR_RESPAWN_DELAY_MS;
@@ -3744,57 +2956,38 @@ function gameUpdate() {
   }
 
   if (!ateItem) {
-    const foodIdx = foods.findIndex(f =>
-      f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt)
-    );
-    if (foodIdx !== -1) {
-      if (xibalbaMaizeBlocked) {
-        // No come
-      } else {
-        const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-        const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-        const [food] = foods.splice(foodIdx, 1);
-        const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime ? MAIZE_RAIN_BONUS : 0;
-        const foodScore = 10 + maizeBonus;
-        score += foodScore;
+    const foodIdx = foods.findIndex(f => f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt));
+    if (foodIdx !== -1 && !xibalbaMaizeBlocked) {
+      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+      const [food] = foods.splice(foodIdx, 1);
+      const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime ? MAIZE_RAIN_BONUS : 0;
+      const foodScore = 10 + maizeBonus;
+      score += foodScore;
+      if (food.offering === 'maize') progression.totalMaize++;
+      else if (food.offering === 'cacao') progression.totalCacao++;
+      progression.maizeCoins += 1;
 
-        if (food.offering === 'maize') {
-          progression.totalMaize++;
-        } else if (food.offering === 'cacao') {
-          progression.totalCacao++;
-        }
-        progression.maizeCoins += 1;
+      triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
+      spawnFloatingText(maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`, hx, hy, maizeBonus ? '#facc15' : '#d5bd70');
 
-        triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
-        spawnFloatingText(
-          maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`,
-          hx, hy,
-          maizeBonus ? '#facc15' : '#d5bd70'
-        );
-
-        if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
-          timedRemainingMs += TIMED_MAIZE_BONUS_MS;
-          spawnFloatingText(`+${TIMED_MAIZE_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
-        }
-
-        playEatSound('normal');
-        spawnEatBurst(hx, hy, maizeBonus ? '#facc15' : '#d5bd70', maizeBonus ? 10 : 6);
-        ensureFoodCount(6);
-        updateScoresUI();
-        saveProgression();
-        ateItem = true;
+      if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
+        timedRemainingMs += TIMED_MAIZE_BONUS_MS;
+        spawnFloatingText(`+${TIMED_MAIZE_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
       }
+
+      playEatSound('normal');
+      spawnEatBurst(hx, hy, maizeBonus ? '#facc15' : '#d5bd70', maizeBonus ? 10 : 6);
+      ensureFoodCount(6);
+      updateScoresUI();
+      saveProgression();
+      ateItem = true;
     }
   }
 
-  // ✅ 6. Si no comió, quitar la cola
-  if (!ateItem) {
-    snake.pop();
-  }
+  if (!ateItem) snake.pop();
 
-  if (crossed) {
-    spawnWorldCrossingEffect(head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE + TILE_SIZE / 2);
-  }
+  if (crossed) spawnWorldCrossingEffect(head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE + TILE_SIZE / 2);
   if (isFuria && snake.length > 0) {
     const tail = snake[snake.length - 1];
     spawnFuriaTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
@@ -3828,12 +3021,8 @@ function updateScoresUI() {
 function updateLivesUI() {
   if (livesFixedPipEls && livesFixedPipEls.length > 0) {
     livesFixedPipEls.forEach((pip, i) => {
-      if (i >= maxLives) {
-        pip.style.display = 'none';
-      } else {
-        pip.style.display = '';
-        pip.classList.toggle('spent', i >= lives);
-      }
+      if (i >= maxLives) pip.style.display = 'none';
+      else { pip.style.display = ''; pip.classList.toggle('spent', i >= lives); }
     });
   }
   if (livesFixedContainer) {
@@ -3842,12 +3031,8 @@ function updateLivesUI() {
   }
   if (livesMobilePipEls && livesMobilePipEls.length > 0) {
     livesMobilePipEls.forEach((pip, i) => {
-      if (i >= maxLives) {
-        pip.style.display = 'none';
-      } else {
-        pip.style.display = '';
-        pip.classList.toggle('spent', i >= lives);
-      }
+      if (i >= maxLives) pip.style.display = 'none';
+      else { pip.style.display = ''; pip.classList.toggle('spent', i >= lives); }
     });
   }
 }
@@ -3863,10 +3048,8 @@ function interpolateGridPosition(current, previous, progress) {
   else if (dx < -gridCols / 2) dx += gridCols;
   if (dy > gridRows / 2) dy -= gridRows;
   else if (dy < -gridRows / 2) dy += gridRows;
-
   const rawX = previous.x + dx * progress;
   const rawY = previous.y + dy * progress;
-
   return {
     x: Math.max(0, Math.min(gridCols - 1, (rawX + gridCols) % gridCols)),
     y: Math.max(0, Math.min(gridRows - 1, (rawY + gridRows) % gridRows))
@@ -3886,40 +3069,31 @@ function roundRect(c, x, y, w, h, r) {
   c.closePath();
 }
 function drawVignette() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const w = window.innerWidth, h = window.innerHeight;
   const theme = BOARD_THEMES[progression.selectedTheme || 'classic'] || BOARD_THEMES.classic;
-  const gradient = ctx.createRadialGradient(
-    w / 2, h / 2, Math.min(w, h) * 0.35,
-    w / 2, h / 2, Math.max(w, h) * 0.75
-  );
+  const gradient = ctx.createRadialGradient(w/2, h/2, Math.min(w, h) * 0.35, w/2, h/2, Math.max(w, h) * 0.75);
   gradient.addColorStop(0, 'rgba(0,0,0,0)');
   gradient.addColorStop(1, theme.vignetteColor);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, w, h);
 }
-
 function drawDarkness() {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode || !mode.hasDarkness) return;
   if (darknessRadius >= DARKNESS_MAX_RADIUS) return;
   if (snake.length === 0) return;
-
   const head = snake[0];
   const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
   const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
   const radiusPx = darknessRadius * TILE_SIZE;
-
   const gradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.2, hx, hy, radiusPx * 1.2);
   gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
   gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
   gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.85)');
   gradient.addColorStop(1, 'rgba(0, 0, 0, 0.98)');
-
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 }
-
 function drawEclipseTint() {
   if (!eclipseActive) return;
   const remaining = Math.max(0, eclipseUntil - gameTime);
@@ -3930,7 +3104,6 @@ function drawEclipseTint() {
   ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
   ctx.restore();
 }
-
 function drawHuntTrail() {
   if (huntTrail.length === 0) return;
   ctx.save();
@@ -3945,9 +3118,7 @@ function drawHuntTrail() {
     grad.addColorStop(0, `rgba(120, 120, 140, ${alpha})`);
     grad.addColorStop(1, `rgba(80, 80, 100, 0)`);
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
   });
   ctx.restore();
 }
@@ -3958,44 +3129,27 @@ function drawFeatherScale(segment, index, guardian) {
   const size = TILE_SIZE < 22 ? 3 : 4;
   const type = guardian.behavior.id;
   const pal = guardian.palette;
-
   ctx.save();
-
   if (type === 'hunter') {
     if (index % 2 === 0) {
       ctx.globalAlpha = 0.55;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath();
-      ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = pal.head;
-      ctx.beginPath();
-      ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2); ctx.fill();
     } else {
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath();
-      ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2); ctx.fill();
     }
   } else if (type === 'interceptor') {
     ctx.globalAlpha = index % 2 === 0 ? 0.7 : 0.45;
     ctx.fillStyle = pal.crest;
     const s = size * 0.5;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - s);
-    ctx.lineTo(cx + s * 0.6, cy);
-    ctx.lineTo(cx, cy + s);
-    ctx.lineTo(cx - s * 0.6, cy);
-    ctx.closePath();
-    ctx.fill();
-    if (index % 2 === 0) {
-      ctx.fillStyle = '#1a0830';
-      ctx.beginPath();
-      ctx.arc(cx, cy, s * 0.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s * 0.6, cy); ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s * 0.6, cy);
+    ctx.closePath(); ctx.fill();
+    if (index % 2 === 0) { ctx.fillStyle = '#1a0830'; ctx.beginPath(); ctx.arc(cx, cy, s * 0.3, 0, Math.PI * 2); ctx.fill(); }
   } else if (type === 'flanker') {
     ctx.globalAlpha = index % 2 === 0 ? 0.65 : 0.4;
     ctx.strokeStyle = pal.crest;
@@ -4010,14 +3164,9 @@ function drawFeatherScale(segment, index, guardian) {
     ctx.globalAlpha = index % 2 === 0 ? 0.75 : 0.5;
     ctx.fillStyle = pal.crest;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - size);
-    ctx.lineTo(cx + size * 0.55, cy);
-    ctx.lineTo(cx, cy + size);
-    ctx.lineTo(cx - size * 0.55, cy);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size * 0.55, cy); ctx.lineTo(cx, cy + size); ctx.lineTo(cx - size * 0.55, cy);
+    ctx.closePath(); ctx.fill();
   }
-
   ctx.restore();
 }
 
@@ -4026,87 +3175,39 @@ function drawBodyDiamond(segment, index, isGolden = false) {
   const cy = segment.y * TILE_SIZE + TILE_SIZE / 2;
   const isEven = index % 2 === 0;
   const size = TILE_SIZE < 22 ? 3 : 3.8;
-
   const diamondColor = isGolden ? '#e8dca0' : '#d5bd70';
   const diamondStroke = isGolden ? '#c2b06a' : '#fff2c2';
   const diamondCenter = isGolden ? '#f5eecd' : '#fff8dc';
   const wingColor = isGolden ? '#c2b06a' : '#d5bd70';
-
   ctx.save();
-
   ctx.globalAlpha = isEven ? 0.9 : 0.6;
   ctx.fillStyle = diamondColor;
   ctx.beginPath();
-  ctx.moveTo(cx, cy - size);
-  ctx.lineTo(cx + size * 0.7, cy);
-  ctx.lineTo(cx, cy + size);
-  ctx.lineTo(cx - size * 0.7, cy);
-  ctx.closePath();
-  ctx.fill();
-
+  ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size * 0.7, cy); ctx.lineTo(cx, cy + size); ctx.lineTo(cx - size * 0.7, cy);
+  ctx.closePath(); ctx.fill();
   ctx.globalAlpha = isEven ? 0.8 : 0.55;
   ctx.strokeStyle = diamondStroke;
   ctx.lineWidth = isGolden ? 0.9 : 0.7;
   ctx.stroke();
-
   ctx.globalAlpha = 0.9;
   ctx.fillStyle = diamondCenter;
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.22, 0, Math.PI * 2); ctx.fill();
   if (isEven) {
     ctx.globalAlpha = isGolden ? 0.7 : 0.5;
     ctx.fillStyle = wingColor;
     for (let side = -1; side <= 1; side += 2) {
       ctx.beginPath();
       ctx.moveTo(cx + side * size * 0.5, cy);
-      ctx.quadraticCurveTo(
-        cx + side * size * 1.25, cy - size * 0.55,
-        cx + side * size * 1.15, cy + size * 0.4
-      );
-      ctx.quadraticCurveTo(
-        cx + side * size * 0.8, cy + size * 0.15,
-        cx + side * size * 0.5, cy
-      );
-      ctx.closePath();
-      ctx.fill();
+      ctx.quadraticCurveTo(cx + side * size * 1.25, cy - size * 0.55, cx + side * size * 1.15, cy + size * 0.4);
+      ctx.quadraticCurveTo(cx + side * size * 0.8, cy + size * 0.15, cx + side * size * 0.5, cy);
+      ctx.closePath(); ctx.fill();
     }
   }
-
-  if (isGolden) {
-    const sparklePhase = (gameTime * 0.003 + index * 1.3) % (Math.PI * 2);
-    const sparkleIntensity = Math.max(0, Math.sin(sparklePhase));
-    if (sparkleIntensity > 0.7) {
-      const sparkAlpha = (sparkleIntensity - 0.7) / 0.3;
-      const sparkSize = size * (0.5 + sparkleIntensity * 0.3);
-      ctx.globalAlpha = sparkAlpha * 0.6;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 0.7;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - sparkSize, cy); ctx.lineTo(cx + sparkSize, cy);
-      ctx.moveTo(cx, cy - sparkSize); ctx.lineTo(cx, cy + sparkSize);
-      ctx.stroke();
-
-      ctx.globalAlpha = sparkAlpha * 0.5;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-  }
-
   ctx.restore();
 }
 
-function startFireBreath() {
-  fireBreath = { startedAt: gameTime };
-}
-function clearFireBreath() {
-  fireBreath = null;
-}
+function startFireBreath() { fireBreath = { startedAt: gameTime }; }
+function clearFireBreath() { fireBreath = null; }
 function drawFireBreath() {
   if (!fireBreath || !isImmune || snake.length === 0) return;
   const cycle = (gameTime - fireBreath.startedAt) % FIRE_BREATH_CYCLE_MS;
@@ -4118,12 +3219,10 @@ function drawFireBreath() {
   const fy = head.y * TILE_SIZE + TILE_SIZE / 2 + direction.y * TILE_SIZE * 0.4;
   const angle = Math.atan2(direction.y, direction.x);
   const flicker = Math.sin(gameTime * 0.045);
-
   ctx.save();
   ctx.globalAlpha = fade;
   ctx.translate(fx, fy);
   ctx.rotate(angle);
-
   const len = TILE_SIZE * (0.72 + (flicker + 1) * 0.13);
   const w = TILE_SIZE * (0.48 + (1 - Math.abs(flicker)) * 0.12);
   ctx.fillStyle = '#ef4c24';
@@ -4132,17 +3231,14 @@ function drawFireBreath() {
   ctx.quadraticCurveTo(len * 0.45, -w * 0.14, len, -w * 0.52);
   ctx.quadraticCurveTo(len * 0.88, 0, len, w * 0.52);
   ctx.quadraticCurveTo(len * 0.42, w * 0.16, 0, w * 0.3);
-  ctx.closePath();
-  ctx.fill();
-
+  ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#ffc04d';
   ctx.beginPath();
   ctx.moveTo(0, -w * 0.16);
   ctx.quadraticCurveTo(len * 0.35, -w * 0.06, len * 0.72, -w * 0.22);
   ctx.quadraticCurveTo(len * 0.62, 0, len * 0.72, w * 0.22);
   ctx.quadraticCurveTo(len * 0.32, w * 0.08, 0, w * 0.16);
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 
@@ -4150,10 +3246,8 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
   const perp = { x: -dir.y, y: dir.x };
-
   const skin = getActiveSkin();
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
-
   const GOLD_MAIN = isGolden ? '#d4b45c' : '#d5bd70';
   const GOLD_DEEP = isGolden ? '#a8924a' : '#a8843a';
   const GOLD_PALE = isGolden ? '#f5e9b8' : '#fff2c2';
@@ -4178,22 +3272,18 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const helmCenterY = cy - dir.y * TILE_SIZE * 0.02;
   const helmW = TILE_SIZE * 0.7;
   const helmH = TILE_SIZE * 0.22;
-
   ctx.translate(helmCenterX, helmCenterY);
   ctx.rotate(Math.atan2(dir.y, dir.x));
   ctx.fillStyle = GOLD_MAIN;
   ctx.strokeStyle = GOLD_DEEP;
   ctx.lineWidth = 0.9;
   roundRect(ctx, -helmW / 2, -helmH / 2 - TILE_SIZE * 0.15, helmW, helmH, 2);
-  ctx.fill();
-  ctx.stroke();
-
+  ctx.fill(); ctx.stroke();
   ctx.fillStyle = GOLD_PALE;
   ctx.globalAlpha = 0.7;
   roundRect(ctx, -helmW / 2 + 1, -helmH / 2 - TILE_SIZE * 0.15 + 1, helmW - 2, helmH * 0.4, 1);
   ctx.fill();
   ctx.globalAlpha = 1;
-
   ctx.fillStyle = JADE_EYE;
   ctx.shadowColor = JADE_EYE;
   ctx.shadowBlur = isGolden ? 7 : 4;
@@ -4202,13 +3292,11 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.lineTo(2.5, -helmH / 2 - TILE_SIZE * 0.15 + 1.5);
   ctx.lineTo(0, -helmH / 2 - TILE_SIZE * 0.15 + 5);
   ctx.lineTo(-2.5, -helmH / 2 - TILE_SIZE * 0.15 + 1.5);
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = GOLD_PALE;
   ctx.lineWidth = 0.8;
   ctx.stroke();
-
   ctx.fillStyle = GOLD_DEEP;
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
@@ -4218,95 +3306,43 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   ctx.restore();
 
   if (!isBlinking) {
-    const eyeW = 5.5;
-    const eyeH = 3.2;
-    const eo = 5;
-    let e1x = rs.x * TILE_SIZE + eo;
-    let e1y = rs.y * TILE_SIZE + eo;
-    let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - eyeW;
-    let e2y = e1y;
-
-    if (dir.y !== 0) {
-      e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - eyeH : eo);
-      e2y = e1y;
-    } else if (dir.x !== 0) {
+    const eyeW = 5.5, eyeH = 3.2, eo = 5;
+    let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo;
+    let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - eyeW, e2y = e1y;
+    if (dir.y !== 0) { e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - eyeH : eo); e2y = e1y; }
+    else if (dir.x !== 0) {
       e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - eyeW : eo);
       e2x = e1x;
       e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - eyeH;
     }
-
     const drawGemEye = (gx, gy) => {
-      const gcx = gx + eyeW / 2;
-      const gcy = gy + eyeH / 2;
+      const gcx = gx + eyeW / 2, gcy = gy + eyeH / 2;
       ctx.fillStyle = '#0e1a14';
-      ctx.beginPath();
-      ctx.ellipse(gcx, gcy, eyeW / 2 + 0.6, eyeH / 2 + 0.6, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.ellipse(gcx, gcy, eyeW / 2 + 0.6, eyeH / 2 + 0.6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = JADE_EYE;
-      ctx.shadowColor = JADE_EYE;
-      ctx.shadowBlur = 5;
-      ctx.beginPath();
-      ctx.ellipse(gcx, gcy, eyeW / 2, eyeH / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.shadowColor = JADE_EYE; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.ellipse(gcx, gcy, eyeW / 2, eyeH / 2, 0, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.fillStyle = '#0e1a14';
-      ctx.beginPath();
-      ctx.ellipse(gcx, gcy, eyeW * 0.1, eyeH * 0.42, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.ellipse(gcx, gcy, eyeW * 0.1, eyeH * 0.42, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.beginPath();
-      ctx.ellipse(gcx - 0.8, gcy - 1, eyeW * 0.22, eyeH * 0.22, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.beginPath();
-      ctx.arc(gcx + 1, gcy + 0.8, 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = GOLD_MAIN;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(gcx, gcy, eyeW / 2 + 0.6, eyeH / 2 + 0.6, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(gcx - 0.8, gcy - 1, eyeW * 0.22, eyeH * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = GOLD_MAIN; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(gcx, gcy, eyeW / 2 + 0.6, eyeH / 2 + 0.6, 0, 0, Math.PI * 2); ctx.stroke();
     };
-
-    drawGemEye(e1x, e1y);
-    drawGemEye(e2x, e2y);
-
-    ctx.strokeStyle = GOLD_DEEP;
-    ctx.lineWidth = 1.4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(e1x - 1, e1y - 1.4);
-    ctx.lineTo(e1x + eyeW + 1, e1y - 1.4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(e2x - 1, e2y - 1.4);
-    ctx.lineTo(e2x + eyeW + 1, e2y - 1.4);
-    ctx.stroke();
+    drawGemEye(e1x, e1y); drawGemEye(e2x, e2y);
+    ctx.strokeStyle = GOLD_DEEP; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(e1x - 1, e1y - 1.4); ctx.lineTo(e1x + eyeW + 1, e1y - 1.4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(e2x - 1, e2y - 1.4); ctx.lineTo(e2x + eyeW + 1, e2y - 1.4); ctx.stroke();
   } else {
-    const eo = 5;
-    const eyeW = 5.5;
-    let e1x = rs.x * TILE_SIZE + eo;
-    let e1y = rs.y * TILE_SIZE + eo + 1.5;
-    let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - eyeW;
-    let e2y = e1y;
-    if (dir.y !== 0) {
-      e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - 2 : eo + 1.5);
-      e2y = e1y;
-    } else if (dir.x !== 0) {
-      e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - eyeW : eo);
-      e2x = e1x;
-      e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - 2;
-    }
-    ctx.strokeStyle = GOLD_MAIN;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(e1x - 1, e1y);
-    ctx.lineTo(e1x + eyeW + 1, e1y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(e2x - 1, e2y);
-    ctx.lineTo(e2x + eyeW + 1, e2y);
-    ctx.stroke();
+    const eo = 5, eyeW = 5.5;
+    let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo + 1.5;
+    let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - eyeW, e2y = e1y;
+    if (dir.y !== 0) { e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - 2 : eo + 1.5); e2y = e1y; }
+    else if (dir.x !== 0) { e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - eyeW : eo); e2x = e1x; e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - 2; }
+    ctx.strokeStyle = GOLD_MAIN; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(e1x - 1, e1y); ctx.lineTo(e1x + eyeW + 1, e1y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(e2x - 1, e2y); ctx.lineTo(e2x + eyeW + 1, e2y); ctx.stroke();
   }
 
   ctx.save();
@@ -4315,36 +3351,21 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const frx = cx - dir.x * TILE_SIZE * 0.05;
   const fry = cy - dir.y * TILE_SIZE * 0.05;
   ctx.beginPath();
-  ctx.moveTo(frx, fry - 2);
-  ctx.lineTo(frx + 1.6, fry);
-  ctx.lineTo(frx, fry + 2);
-  ctx.lineTo(frx - 1.6, fry);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(frx, fry - 2); ctx.lineTo(frx + 1.6, fry); ctx.lineTo(frx, fry + 2); ctx.lineTo(frx - 1.6, fry);
+  ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(frx, fry, 0.7, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.beginPath(); ctx.arc(frx, fry, 0.7, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = GOLD_MAIN;
   const lx1 = cx + perp.x * TILE_SIZE * 0.28 - dir.x * 2;
   const ly1 = cy + perp.y * TILE_SIZE * 0.28 - dir.y * 2;
   ctx.beginPath();
-  ctx.moveTo(lx1, ly1 - 1.4);
-  ctx.lineTo(lx1 + 1.1, ly1);
-  ctx.lineTo(lx1, ly1 + 1.4);
-  ctx.lineTo(lx1 - 1.1, ly1);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(lx1, ly1 - 1.4); ctx.lineTo(lx1 + 1.1, ly1); ctx.lineTo(lx1, ly1 + 1.4); ctx.lineTo(lx1 - 1.1, ly1);
+  ctx.closePath(); ctx.fill();
   const lx2 = cx - perp.x * TILE_SIZE * 0.28 - dir.x * 2;
   const ly2 = cy - perp.y * TILE_SIZE * 0.28 - dir.y * 2;
   ctx.beginPath();
-  ctx.moveTo(lx2, ly2 - 1.4);
-  ctx.lineTo(lx2 + 1.1, ly2);
-  ctx.lineTo(lx2, ly2 + 1.4);
-  ctx.lineTo(lx2 - 1.1, ly2);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(lx2, ly2 - 1.4); ctx.lineTo(lx2 + 1.1, ly2); ctx.lineTo(lx2, ly2 + 1.4); ctx.lineTo(lx2 - 1.1, ly2);
+  ctx.closePath(); ctx.fill();
   ctx.restore();
 
   ctx.save();
@@ -4357,30 +3378,8 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
       const baseY = cy + perp.y * side * TILE_SIZE * 0.38 - dir.y * (f * 2.5 - 2);
       const tipX = baseX + perp.x * side * (4 + f * 0.5) - dir.x * 1.5;
       const tipY = baseY + perp.y * side * (4 + f * 0.5) - dir.y * 1.5;
-      ctx.beginPath();
-      ctx.moveTo(baseX, baseY);
-      ctx.lineTo(tipX, tipY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
     }
-  }
-  ctx.restore();
-
-  ctx.save();
-  ctx.fillStyle = '#f5efdc';
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-  ctx.lineWidth = 0.6;
-  const mouthX = cx + dir.x * TILE_SIZE * 0.44;
-  const mouthY = cy + dir.y * TILE_SIZE * 0.44;
-  for (let side = -1; side <= 1; side += 2) {
-    const bx = mouthX + perp.x * side * 3;
-    const by = mouthY + perp.y * side * 3;
-    ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.lineTo(bx + dir.x * 2, by + dir.y * 2);
-    ctx.lineTo(bx + perp.x * side * 1.2, by + perp.y * side * 1.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
   }
   ctx.restore();
 
@@ -4390,24 +3389,14 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
     ctx.strokeStyle = isGolden ? '#d4703a' : '#ef5261';
     ctx.lineCap = 'round';
     ctx.lineWidth = 1.6;
-
     const tongueWave = Math.sin(gameTime * 0.012) * 1.4;
     const tb = { x: cx + dir.x * TILE_SIZE * 0.42, y: cy + dir.y * TILE_SIZE * 0.42 };
-    const tm = {
-      x: cx + dir.x * TILE_SIZE * 0.68 + perp.x * tongueWave,
-      y: cy + dir.y * TILE_SIZE * 0.68 + perp.y * tongueWave
-    };
-    ctx.beginPath();
-    ctx.moveTo(tb.x, tb.y);
-    ctx.lineTo(tm.x, tm.y);
-    ctx.stroke();
-
+    const tm = { x: cx + dir.x * TILE_SIZE * 0.68 + perp.x * tongueWave, y: cy + dir.y * TILE_SIZE * 0.68 + perp.y * tongueWave };
+    ctx.beginPath(); ctx.moveTo(tb.x, tb.y); ctx.lineTo(tm.x, tm.y); ctx.stroke();
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(tm.x, tm.y);
-    ctx.lineTo(tm.x + perp.x * 2.6 + dir.x * 2.6, tm.y + perp.y * 2.6 + dir.y * 2.6);
-    ctx.moveTo(tm.x, tm.y);
-    ctx.lineTo(tm.x - perp.x * 2.6 + dir.x * 2.6, tm.y - perp.y * 2.6 + dir.y * 2.6);
+    ctx.moveTo(tm.x, tm.y); ctx.lineTo(tm.x + perp.x * 2.6 + dir.x * 2.6, tm.y + perp.y * 2.6 + dir.y * 2.6);
+    ctx.moveTo(tm.x, tm.y); ctx.lineTo(tm.x - perp.x * 2.6 + dir.x * 2.6, tm.y - perp.y * 2.6 + dir.y * 2.6);
     ctx.stroke();
     ctx.restore();
   }
@@ -4418,16 +3407,13 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
   const perp = { x: -dir.y, y: dir.x };
   const rear = { x: cx - dir.x * TILE_SIZE * 0.34, y: cy - dir.y * TILE_SIZE * 0.34 };
-
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
   const GOLD_MAIN = isGolden ? '#d4b45c' : '#d5bd70';
   const GOLD_DEEP = isGolden ? '#a8924a' : '#a8843a';
   const GOLD_PALE = isGolden ? '#f5e9b8' : '#fff2c2';
   const JADE_EYE = '#4ec9a0';
-
   ctx.save();
   ctx.lineCap = 'round';
-
   ctx.lineWidth = 3;
   ctx.strokeStyle = GOLD_DEEP;
   for (let f = -2; f <= 2; f++) {
@@ -4437,17 +3423,10 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
     const len = 16 - Math.abs(f) * 2.2;
     const tipX = rear.x - dir.x * len + perp.x * (f * 6);
     const tipY = rear.y - dir.y * len + perp.y * (f * 6);
-    ctx.beginPath();
-    ctx.moveTo(baseX, baseY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
     ctx.fillStyle = GOLD_MAIN;
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(tipX, tipY, 2, 0, Math.PI * 2); ctx.fill();
   }
-
   ctx.lineWidth = 2.6;
   ctx.strokeStyle = GOLD_MAIN;
   for (let f = -1; f <= 1; f++) {
@@ -4457,43 +3436,23 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
     const len = 12 - Math.abs(f) * 1.5;
     const tipX = rear.x - dir.x * len + perp.x * (f * 4.5);
     const tipY = rear.y - dir.y * len + perp.y * (f * 4.5);
-    ctx.beginPath();
-    ctx.moveTo(baseX, baseY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
     ctx.fillStyle = GOLD_PALE;
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 1.6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(tipX, tipY, 1.6, 0, Math.PI * 2); ctx.fill();
   }
-
   ctx.lineWidth = 3.4;
   ctx.strokeStyle = GOLD_PALE;
-  const centerLen = 22;
-  const tipCX = rear.x - dir.x * centerLen;
-  const tipCY = rear.y - dir.y * centerLen;
-  ctx.beginPath();
-  ctx.moveTo(rear.x, rear.y);
-  ctx.lineTo(tipCX, tipCY);
-  ctx.stroke();
-
+  const tipCX = rear.x - dir.x * 22;
+  const tipCY = rear.y - dir.y * 22;
+  ctx.beginPath(); ctx.moveTo(rear.x, rear.y); ctx.lineTo(tipCX, tipCY); ctx.stroke();
   ctx.fillStyle = protectedFlag || isGolden ? JADE_EYE : '#ef5261';
   ctx.strokeStyle = GOLD_PALE;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(tipCX, tipCY - 3.2);
-  ctx.lineTo(tipCX + 2.8, tipCY);
-  ctx.lineTo(tipCX, tipCY + 3.2);
-  ctx.lineTo(tipCX - 2.8, tipCY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
+  ctx.moveTo(tipCX, tipCY - 3.2); ctx.lineTo(tipCX + 2.8, tipCY); ctx.lineTo(tipCX, tipCY + 3.2); ctx.lineTo(tipCX - 2.8, tipCY);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(tipCX - 0.6, tipCY - 0.6, 0.9, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(tipCX - 0.6, tipCY - 0.6, 0.9, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -4503,26 +3462,14 @@ function drawGuardianHead(rs, guardian) {
   const dir = guardian.direction || { x: 1, y: 0 };
   const perp = { x: -dir.y, y: dir.x };
   const rear = { x: cx - dir.x * TILE_SIZE * 0.35, y: cy - dir.y * TILE_SIZE * 0.35 };
-
-  if (guardian.behavior.id === 'ambusher') {
-    drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear);
-    return;
-  }
-
+  if (guardian.behavior.id === 'ambusher') { drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear); return; }
   const pal = guardian.palette;
   const type = guardian.behavior.id;
-
   const eo = 5, es = 4;
   let e1x = rs.x * TILE_SIZE + eo, e1y = rs.y * TILE_SIZE + eo;
   let e2x = rs.x * TILE_SIZE + TILE_SIZE - eo - es, e2y = e1y;
-  if (dir.y !== 0) {
-    e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - es : eo);
-    e2y = e1y;
-  } else if (dir.x !== 0) {
-    e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - es : eo);
-    e2x = e1x;
-    e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - es;
-  }
+  if (dir.y !== 0) { e1y = rs.y * TILE_SIZE + (dir.y > 0 ? TILE_SIZE - eo - es : eo); e2y = e1y; }
+  else if (dir.x !== 0) { e1x = rs.x * TILE_SIZE + (dir.x > 0 ? TILE_SIZE - eo - es : eo); e2x = e1x; e2y = rs.y * TILE_SIZE + TILE_SIZE - eo - es; }
 
   if (type === 'hunter') {
     ctx.save();
@@ -4530,9 +3477,7 @@ function drawGuardianHead(rs, guardian) {
     ctx.strokeStyle = 'rgba(0,0,0,0.6)';
     ctx.lineWidth = 1.5;
     roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fill(); ctx.stroke();
     ctx.fillStyle = pal.head;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 1;
@@ -4543,54 +3488,34 @@ function drawGuardianHead(rs, guardian) {
       ctx.moveTo(earX, earY);
       ctx.lineTo(earX - dir.x * TILE_SIZE * 0.05 + perp.x * side * TILE_SIZE * 0.15, earY - dir.y * TILE_SIZE * 0.05 + perp.y * side * TILE_SIZE * 0.15);
       ctx.lineTo(earX - dir.x * TILE_SIZE * 0.25 - perp.x * side * TILE_SIZE * 0.05, earY - dir.y * TILE_SIZE * 0.25 - perp.y * side * TILE_SIZE * 0.05);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = pal.crest;
       ctx.beginPath();
       ctx.moveTo(earX, earY);
       ctx.lineTo(earX - dir.x * TILE_SIZE * 0.07 + perp.x * side * TILE_SIZE * 0.09, earY - dir.y * TILE_SIZE * 0.07 + perp.y * side * TILE_SIZE * 0.09);
       ctx.lineTo(earX - dir.x * TILE_SIZE * 0.16 - perp.x * side * TILE_SIZE * 0.03, earY - dir.y * TILE_SIZE * 0.16 - perp.y * side * TILE_SIZE * 0.03);
-      ctx.closePath();
-      ctx.fill();
+      ctx.closePath(); ctx.fill();
       ctx.fillStyle = pal.head;
     }
-
     for (let side = -1; side <= 1; side += 2) {
       const rx = cx + dir.x * TILE_SIZE * 0.1 + perp.x * side * TILE_SIZE * 0.22;
       const ry = cy + dir.y * TILE_SIZE * 0.1 + perp.y * side * TILE_SIZE * 0.22;
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.beginPath();
-      ctx.arc(rx, ry, TILE_SIZE * 0.1, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, ry, TILE_SIZE * 0.1, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = pal.head;
-      ctx.beginPath();
-      ctx.arc(rx, ry, TILE_SIZE * 0.05, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, ry, TILE_SIZE * 0.05, 0, Math.PI * 2); ctx.fill();
     }
-
     ctx.fillStyle = pal.crest;
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 0.8;
-    roundRect(
-      ctx,
-      cx + dir.x * TILE_SIZE * 0.18 - TILE_SIZE * 0.12,
-      cy + dir.y * TILE_SIZE * 0.18 - TILE_SIZE * 0.1,
-      TILE_SIZE * 0.24,
-      TILE_SIZE * 0.2,
-      3
-    );
-    ctx.fill();
-    ctx.stroke();
-
+    roundRect(ctx, cx + dir.x * TILE_SIZE * 0.18 - TILE_SIZE * 0.12, cy + dir.y * TILE_SIZE * 0.18 - TILE_SIZE * 0.1, TILE_SIZE * 0.24, TILE_SIZE * 0.2, 3);
+    ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1a1008';
     ctx.beginPath();
     ctx.moveTo(cx + dir.x * TILE_SIZE * 0.35, cy + dir.y * TILE_SIZE * 0.35);
     ctx.lineTo(cx + dir.x * TILE_SIZE * 0.22 + perp.x * 2, cy + dir.y * TILE_SIZE * 0.22 + perp.y * 2);
     ctx.lineTo(cx + dir.x * TILE_SIZE * 0.22 - perp.x * 2, cy + dir.y * TILE_SIZE * 0.22 - perp.y * 2);
-    ctx.closePath();
-    ctx.fill();
-
+    ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#fff8dc';
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.6;
@@ -4598,48 +3523,15 @@ function drawGuardianHead(rs, guardian) {
       const fx = cx + dir.x * TILE_SIZE * 0.28 + perp.x * side * 4;
       const fy = cy + dir.y * TILE_SIZE * 0.28 + perp.y * side * 4;
       ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx + dir.x * 4, fy + dir.y * 4);
-      ctx.lineTo(fx + perp.x * side * 1.5, fy + perp.y * side * 1.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      ctx.moveTo(fx, fy); ctx.lineTo(fx + dir.x * 4, fy + dir.y * 4); ctx.lineTo(fx + perp.x * side * 1.5, fy + perp.y * side * 1.5);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
     }
-
-    ctx.strokeStyle = pal.crest;
-    ctx.lineWidth = 0.5;
-    ctx.globalAlpha = 0.6;
-    for (let side = -1; side <= 1; side += 2) {
-      for (let w = 0; w < 2; w++) {
-        ctx.beginPath();
-        ctx.moveTo(cx + dir.x * TILE_SIZE * 0.25 + perp.x * side * 3, cy + dir.y * TILE_SIZE * 0.25 + perp.y * side * 3 + w * 1.5);
-        ctx.lineTo(cx + dir.x * TILE_SIZE * 0.5 + perp.x * side * 5, cy + dir.y * TILE_SIZE * 0.5 + perp.y * side * 5 + w * 1.5);
-        ctx.stroke();
-      }
-    }
-    ctx.globalAlpha = 1;
-
-    ctx.strokeStyle = '#9b2929';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(cx - dir.x * TILE_SIZE * 0.2 + perp.x * TILE_SIZE * 0.35, cy - dir.y * TILE_SIZE * 0.2 + perp.y * TILE_SIZE * 0.35);
-    ctx.lineTo(cx - dir.x * TILE_SIZE * 0.2 - perp.x * TILE_SIZE * 0.35, cy - dir.y * TILE_SIZE * 0.2 - perp.y * TILE_SIZE * 0.35);
-    ctx.stroke();
-
-    ctx.fillStyle = '#fff0c6';
-    ctx.beginPath();
-    ctx.arc(cx - dir.x * TILE_SIZE * 0.2, cy - dir.y * TILE_SIZE * 0.2, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
     ctx.restore();
-
     ctx.fillStyle = pal.eye;
     ctx.fillRect(e1x, e1y, es, es);
     ctx.fillRect(e2x, e2y, es, es);
     ctx.fillStyle = '#1a1008';
-    for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
-      ctx.fillRect(eye.x + 1.5, eye.y + 0.5, 1, 3);
-    }
+    for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) ctx.fillRect(eye.x + 1.5, eye.y + 0.5, 1, 3);
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.8;
     ctx.strokeRect(e1x, e1y, es, es);
@@ -4652,87 +3544,52 @@ function drawGuardianHead(rs, guardian) {
     ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 1.5;
     roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fill(); ctx.stroke();
     const thirdEyeX = cx + dir.x * TILE_SIZE * 0.12;
     const thirdEyeY = cy + dir.y * TILE_SIZE * 0.12;
     ctx.fillStyle = '#1a0830';
     ctx.beginPath();
-    ctx.moveTo(thirdEyeX, thirdEyeY - 3.5);
-    ctx.lineTo(thirdEyeX + 3, thirdEyeY);
-    ctx.lineTo(thirdEyeX, thirdEyeY + 3.5);
-    ctx.lineTo(thirdEyeX - 3, thirdEyeY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = pal.crest;
-    ctx.lineWidth = 0.9;
-    ctx.stroke();
+    ctx.moveTo(thirdEyeX, thirdEyeY - 3.5); ctx.lineTo(thirdEyeX + 3, thirdEyeY); ctx.lineTo(thirdEyeX, thirdEyeY + 3.5); ctx.lineTo(thirdEyeX - 3, thirdEyeY);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = pal.crest; ctx.lineWidth = 0.9; ctx.stroke();
     ctx.fillStyle = '#f0e0ff';
-    ctx.beginPath();
-    ctx.arc(thirdEyeX, thirdEyeY, 0.9, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = pal.crest;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(thirdEyeX, thirdEyeY, 0.9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = pal.crest; ctx.lineWidth = 2; ctx.lineCap = 'round';
     for (let f = -1; f <= 1; f++) {
       const baseX = rear.x + perp.x * f * 3.5;
       const baseY = rear.y + perp.y * f * 3.5;
       const len = 20 - Math.abs(f) * 3;
       const tipX = rear.x - dir.x * len + perp.x * (f * 5);
       const tipY = rear.y - dir.y * len + perp.y * (f * 5);
-      ctx.beginPath();
-      ctx.moveTo(baseX, baseY);
-      ctx.lineTo(tipX, tipY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
       ctx.fillStyle = pal.crest;
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(tipX, tipY, 1.5, 0, Math.PI * 2); ctx.fill();
     }
-
     for (let side = -1; side <= 1; side += 2) {
       const orX = cx + perp.x * side * TILE_SIZE * 0.32 - dir.x * TILE_SIZE * 0.05;
       const orY = cy + perp.y * side * TILE_SIZE * 0.32 - dir.y * TILE_SIZE * 0.05;
       ctx.fillStyle = '#1a0830';
       ctx.strokeStyle = pal.crest;
       ctx.lineWidth = 0.9;
-      ctx.beginPath();
-      ctx.arc(orX, orY, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(orX, orY, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#4ec9a0';
-      ctx.beginPath();
-      ctx.arc(orX, orY, 1, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(orX, orY, 1, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
-
     ctx.fillStyle = pal.eye;
     for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
-      const ecx = eye.x + 2;
-      const ecy = eye.y + 2;
+      const ecx = eye.x + 2, ecy = eye.y + 2;
       ctx.beginPath();
-      ctx.moveTo(ecx, ecy - 3);
-      ctx.lineTo(ecx + 3, ecy);
-      ctx.lineTo(ecx, ecy + 3);
-      ctx.lineTo(ecx - 3, ecy);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(ecx, ecy - 3); ctx.lineTo(ecx + 3, ecy); ctx.lineTo(ecx, ecy + 3); ctx.lineTo(ecx - 3, ecy);
+      ctx.closePath(); ctx.fill();
     }
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 1;
     for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
-      const ecx = eye.x + 2;
-      const ecy = eye.y + 2;
+      const ecx = eye.x + 2, ecy = eye.y + 2;
       ctx.beginPath();
-      ctx.moveTo(ecx, ecy - 3);
-      ctx.lineTo(ecx + 3, ecy);
-      ctx.lineTo(ecx, ecy + 3);
-      ctx.lineTo(ecx - 3, ecy);
-      ctx.closePath();
-      ctx.stroke();
+      ctx.moveTo(ecx, ecy - 3); ctx.lineTo(ecx + 3, ecy); ctx.lineTo(ecx, ecy + 3); ctx.lineTo(ecx - 3, ecy);
+      ctx.closePath(); ctx.stroke();
     }
   }
 
@@ -4742,60 +3599,32 @@ function drawGuardianHead(rs, guardian) {
     ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 1.5;
     roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fill(); ctx.stroke();
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.9;
-    ctx.beginPath();
     const noseTipX = cx + dir.x * TILE_SIZE * 0.48;
     const noseTipY = cy + dir.y * TILE_SIZE * 0.48;
     const noseBaseX = cx + dir.x * TILE_SIZE * 0.25;
     const noseBaseY = cy + dir.y * TILE_SIZE * 0.25;
+    ctx.beginPath();
     ctx.moveTo(noseBaseX + perp.x * 2.5, noseBaseY + perp.y * 2.5);
     ctx.lineTo(noseTipX, noseTipY);
     ctx.lineTo(noseBaseX - perp.x * 2.5, noseBaseY - perp.y * 2.5);
     ctx.lineTo(noseBaseX - perp.x * 1, noseBaseY - perp.y * 1);
     ctx.lineTo(noseBaseX + perp.x * 1, noseBaseY + perp.y * 1);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1a0806';
-    ctx.beginPath();
-    ctx.arc(noseTipX - dir.x * 2, noseTipY - dir.y * 2, 0.9, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = pal.body;
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 0.7;
-    roundRect(
-      ctx,
-      cx + dir.x * TILE_SIZE * 0.05 - TILE_SIZE * 0.14,
-      cy + dir.y * TILE_SIZE * 0.05 - TILE_SIZE * 0.06,
-      TILE_SIZE * 0.28,
-      TILE_SIZE * 0.16,
-      2
-    );
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.arc(noseTipX - dir.x * 2, noseTipY - dir.y * 2, 0.9, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff8dc';
     for (let i = 0; i < 3; i++) {
-      const dx = cx + dir.x * TILE_SIZE * (0.08 + i * 0.07) + perp.x * 0;
-      const dy = cy + dir.y * TILE_SIZE * (0.08 + i * 0.07) + perp.y * 0;
+      const dx = cx + dir.x * TILE_SIZE * (0.08 + i * 0.07);
+      const dy = cy + dir.y * TILE_SIZE * (0.08 + i * 0.07);
       ctx.beginPath();
-      ctx.moveTo(dx, dy);
-      ctx.lineTo(dx + dir.x * 2 + perp.x * 1, dy + dir.y * 2 + perp.y * 1);
-      ctx.lineTo(dx + perp.x * 2, dy + perp.y * 2);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(dx, dy); ctx.lineTo(dx + dir.x * 2 + perp.x * 1, dy + dir.y * 2 + perp.y * 1); ctx.lineTo(dx + perp.x * 2, dy + perp.y * 2);
+      ctx.closePath(); ctx.fill();
     }
-
-    ctx.strokeStyle = pal.crest;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
+    ctx.strokeStyle = pal.crest; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
     for (let side = -1; side <= 1; side += 2) {
       for (let f = -1; f <= 1; f++) {
         const baseX = cx - dir.x * TILE_SIZE * 0.15 + perp.x * side * TILE_SIZE * 0.32;
@@ -4803,41 +3632,27 @@ function drawGuardianHead(rs, guardian) {
         const len = 14 - Math.abs(f) * 2;
         const tipX = baseX - dir.x * len + perp.x * side * (6 + f * 1.5);
         const tipY = baseY - dir.y * len + perp.y * side * (6 + f * 1.5);
-        ctx.beginPath();
-        ctx.moveTo(baseX, baseY);
-        ctx.lineTo(tipX, tipY);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
         ctx.fillStyle = pal.crest;
-        ctx.beginPath();
-        ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2); ctx.fill();
       }
     }
-
     for (let side = -1; side <= 1; side += 2) {
       const orX = cx + perp.x * side * TILE_SIZE * 0.34 - dir.x * TILE_SIZE * 0.08;
       const orY = cy + perp.y * side * TILE_SIZE * 0.34 - dir.y * TILE_SIZE * 0.08;
       ctx.fillStyle = '#4ec9a0';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
       ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.arc(orX, orY, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(orX, orY, 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#fff0b0';
-      ctx.beginPath();
-      ctx.arc(orX, orY, 0.8, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(orX, orY, 0.8, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
-
     ctx.fillStyle = pal.eye;
     ctx.fillRect(e1x, e1y, es, es);
     ctx.fillRect(e2x, e2y, es, es);
     ctx.fillStyle = '#1a0806';
-    for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) {
-      ctx.fillRect(eye.x + 1.5, eye.y + 0.5, 1, 3);
-    }
+    for (const eye of [{x: e1x, y: e1y}, {x: e2x, y: e2y}]) ctx.fillRect(eye.x + 1.5, eye.y + 0.5, 1, 3);
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 0.8;
     ctx.strokeRect(e1x, e1y, es, es);
@@ -4850,11 +3665,8 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   const time = gameTime;
   const pulse = Math.sin(time * 0.004) * 0.5 + 0.5;
   const angle = Math.atan2(dir.y, dir.x);
-
   ctx.save();
-
   const isVulnerable = guardian.vulnerableUntil && gameTime < guardian.vulnerableUntil;
-
   const auraR = TILE_SIZE * 1.9;
   const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
   if (isVulnerable) {
@@ -4868,23 +3680,17 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     aura.addColorStop(1, 'rgba(20, 17, 15, 0)');
   }
   ctx.fillStyle = aura;
-  ctx.beginPath();
-  ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.beginPath(); ctx.arc(cx, cy, auraR, 0, Math.PI * 2); ctx.fill();
   if (isVulnerable) {
     ctx.save();
     const ringPulse = Math.sin(gameTime * 0.02) * 0.5 + 0.5;
     ctx.strokeStyle = `rgba(255, 220, 120, ${0.6 + ringPulse * 0.4})`;
     ctx.lineWidth = 2 + ringPulse * 1;
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE * 0.9, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, TILE_SIZE * 0.9, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
   }
-
   const bodySegments = 4;
   const bodyStepX = -dir.x * TILE_SIZE * 0.55;
   const bodyStepY = -dir.y * TILE_SIZE * 0.55;
@@ -4894,71 +3700,50 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     const segY = cy + bodyStepY * i;
     const segW = TILE_SIZE * (0.78 - t * 0.28);
     const segH = TILE_SIZE * (0.6 - t * 0.2);
-
     ctx.save();
     ctx.translate(segX, segY);
     ctx.rotate(angle);
-
     ctx.fillStyle = i % 2 === 0 ? pal.head : pal.body;
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 1.4;
     roundRect(ctx, -segW / 2, -segH / 2, segW, segH, 3);
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fill(); ctx.stroke();
     ctx.fillStyle = pal.obsidian;
     ctx.beginPath();
     const rs2 = segH * 0.22;
-    ctx.moveTo(0, -rs2);
-    ctx.lineTo(rs2 * 0.8, 0);
-    ctx.lineTo(0, rs2);
-    ctx.lineTo(-rs2 * 0.8, 0);
-    ctx.closePath();
-    ctx.fill();
-
+    ctx.moveTo(0, -rs2); ctx.lineTo(rs2 * 0.8, 0); ctx.lineTo(0, rs2); ctx.lineTo(-rs2 * 0.8, 0);
+    ctx.closePath(); ctx.fill();
     ctx.restore();
   }
-
   for (let side = -1; side <= 1; side += 2) {
     for (let p = 0; p < 2; p++) {
       const offset = (p === 0 ? 0.5 : 1.5);
       const pawX = cx - dir.x * TILE_SIZE * offset + perp.x * side * TILE_SIZE * 0.55;
       const pawY = cy - dir.y * TILE_SIZE * offset + perp.y * side * TILE_SIZE * 0.55;
-
       ctx.save();
       ctx.translate(pawX, pawY);
       ctx.rotate(angle);
-
       ctx.fillStyle = pal.body;
       ctx.strokeStyle = pal.obsidian;
       ctx.lineWidth = 1.1;
       roundRect(ctx, -TILE_SIZE * 0.12, -TILE_SIZE * 0.18, TILE_SIZE * 0.3, TILE_SIZE * 0.36, 2);
-      ctx.fill();
-      ctx.stroke();
-
+      ctx.fill(); ctx.stroke();
       ctx.fillStyle = pal.head;
       ctx.beginPath();
-      ctx.moveTo(TILE_SIZE * 0.18, -TILE_SIZE * 0.14);
-      ctx.lineTo(TILE_SIZE * 0.28, 0);
-      ctx.lineTo(TILE_SIZE * 0.18, TILE_SIZE * 0.14);
-      ctx.closePath();
-      ctx.fill();
-
+      ctx.moveTo(TILE_SIZE * 0.18, -TILE_SIZE * 0.14); ctx.lineTo(TILE_SIZE * 0.28, 0); ctx.lineTo(TILE_SIZE * 0.18, TILE_SIZE * 0.14);
+      ctx.closePath(); ctx.fill();
       ctx.restore();
     }
   }
-
   const tailBaseX = cx - dir.x * TILE_SIZE * 2.4;
   const tailBaseY = cy - dir.y * TILE_SIZE * 2.4;
   const tailWave = Math.sin(time * 0.008) * 2.5;
-
   for (let i = 0; i < 5; i++) {
     const tt = i / 4;
     const wave = Math.sin(time * 0.008 + i * 0.8) * 2.5;
     const tailX = tailBaseX - dir.x * TILE_SIZE * 0.35 * i + perp.x * wave;
     const tailY = tailBaseY - dir.y * TILE_SIZE * 0.35 * i + perp.y * wave;
     const tailSize = TILE_SIZE * (0.42 - tt * 0.22);
-
     ctx.save();
     ctx.translate(tailX, tailY);
     ctx.rotate(angle);
@@ -4966,11 +3751,9 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 1;
     roundRect(ctx, -tailSize / 2, -tailSize / 2, tailSize, tailSize, 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fill(); ctx.stroke();
     ctx.restore();
   }
-
   const tipTailX = tailBaseX - dir.x * TILE_SIZE * 1.75 + perp.x * tailWave;
   const tipTailY = tailBaseY - dir.y * TILE_SIZE * 1.75 + perp.y * tailWave;
   ctx.save();
@@ -4980,15 +3763,9 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.strokeStyle = pal.head;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(TILE_SIZE * 0.25, 0);
-  ctx.lineTo(0, -TILE_SIZE * 0.22);
-  ctx.lineTo(-TILE_SIZE * 0.35, 0);
-  ctx.lineTo(0, TILE_SIZE * 0.22);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  ctx.moveTo(TILE_SIZE * 0.25, 0); ctx.lineTo(0, -TILE_SIZE * 0.22); ctx.lineTo(-TILE_SIZE * 0.35, 0); ctx.lineTo(0, TILE_SIZE * 0.22);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-
   ctx.save();
   const crownCenterX = cx - dir.x * TILE_SIZE * 0.05;
   const crownCenterY = cy - dir.y * TILE_SIZE * 0.05;
@@ -5001,10 +3778,8 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     const baseY = crownCenterY + Math.sin(plumeAngle) * TILE_SIZE * 0.35;
     const tipX = crownCenterX + Math.cos(plumeAngle) * (TILE_SIZE * 0.35 + plumeLen);
     const tipY = crownCenterY + Math.sin(plumeAngle) * (TILE_SIZE * 0.35 + plumeLen);
-
     const perpP = { x: -Math.sin(plumeAngle), y: Math.cos(plumeAngle) };
     const leafW = TILE_SIZE * 0.14;
-
     ctx.fillStyle = p % 2 === 0 ? pal.head : pal.body;
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 0.8;
@@ -5013,31 +3788,21 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.lineTo(tipX + perpP.x * leafW, tipY + perpP.y * leafW);
     ctx.lineTo(tipX, tipY);
     ctx.lineTo(tipX - perpP.x * leafW, tipY - perpP.y * leafW);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.moveTo(baseX, baseY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tipX, tipY); ctx.stroke();
   }
   ctx.restore();
-
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
-
   const headSize = TILE_SIZE * 0.82;
   ctx.fillStyle = pal.head;
   ctx.strokeStyle = pal.obsidian;
   ctx.lineWidth = 1.6;
   roundRect(ctx, -headSize / 2, -headSize / 2, headSize, headSize, 4);
-  ctx.fill();
-  ctx.stroke();
-
+  ctx.fill(); ctx.stroke();
   for (let side = -1; side <= 1; side += 2) {
     const earX = side * headSize * 0.34;
     const earY = -headSize * 0.5;
@@ -5048,29 +3813,20 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.moveTo(earX - TILE_SIZE * 0.12, earY + TILE_SIZE * 0.05);
     ctx.lineTo(earX, earY - TILE_SIZE * 0.22);
     ctx.lineTo(earX + TILE_SIZE * 0.12, earY + TILE_SIZE * 0.05);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = pal.body;
     ctx.beginPath();
     ctx.moveTo(earX - TILE_SIZE * 0.05, earY + TILE_SIZE * 0.02);
     ctx.lineTo(earX, earY - TILE_SIZE * 0.12);
     ctx.lineTo(earX + TILE_SIZE * 0.05, earY + TILE_SIZE * 0.02);
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
   }
-
   for (let side = -1; side <= 1; side += 2) {
     ctx.fillStyle = pal.obsidian;
-    ctx.beginPath();
-    ctx.arc(side * headSize * 0.26, 0, headSize * 0.16, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(side * headSize * 0.26, 0, headSize * 0.16, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = pal.head;
-    ctx.beginPath();
-    ctx.arc(side * headSize * 0.26, 0, headSize * 0.08, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(side * headSize * 0.26, 0, headSize * 0.08, 0, Math.PI * 2); ctx.fill();
   }
-
   for (let side = -1; side <= 1; side += 2) {
     const eyeX = side * headSize * 0.24;
     const eyeY = 0;
@@ -5078,79 +3834,40 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.shadowColor = '#4ec9a0';
     ctx.shadowBlur = 6;
     ctx.beginPath();
-    ctx.moveTo(eyeX, eyeY - headSize * 0.09);
-    ctx.lineTo(eyeX + headSize * 0.08, eyeY);
-    ctx.lineTo(eyeX, eyeY + headSize * 0.09);
-    ctx.lineTo(eyeX - headSize * 0.08, eyeY);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(eyeX, eyeY - headSize * 0.09); ctx.lineTo(eyeX + headSize * 0.08, eyeY); ctx.lineTo(eyeX, eyeY + headSize * 0.09); ctx.lineTo(eyeX - headSize * 0.08, eyeY);
+    ctx.closePath(); ctx.fill();
     ctx.shadowBlur = 0;
-
     ctx.fillStyle = pal.obsidian;
-    ctx.beginPath();
-    ctx.ellipse(eyeX, eyeY, headSize * 0.018, headSize * 0.05, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(eyeX, eyeY, headSize * 0.018, headSize * 0.05, 0, 0, Math.PI * 2); ctx.fill();
   }
-
   ctx.fillStyle = pal.obsidian;
   ctx.beginPath();
-  ctx.moveTo(0, headSize * 0.05);
-  ctx.lineTo(headSize * 0.07, headSize * 0.18);
-  ctx.lineTo(-headSize * 0.07, headSize * 0.18);
-  ctx.closePath();
-  ctx.fill();
-
+  ctx.moveTo(0, headSize * 0.05); ctx.lineTo(headSize * 0.07, headSize * 0.18); ctx.lineTo(-headSize * 0.07, headSize * 0.18);
+  ctx.closePath(); ctx.fill();
   ctx.fillStyle = pal.ember;
   ctx.strokeStyle = pal.obsidian;
   ctx.lineWidth = 0.8;
   roundRect(ctx, -headSize * 0.18, headSize * 0.18, headSize * 0.36, headSize * 0.16, 2);
-  ctx.fill();
-  ctx.stroke();
-
+  ctx.fill(); ctx.stroke();
   for (let side = -1; side <= 1; side += 2) {
     ctx.fillStyle = '#f5efdc';
     ctx.strokeStyle = pal.obsidian;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(side * headSize * 0.12, headSize * 0.34);
-    ctx.lineTo(side * headSize * 0.18, headSize * 0.5);
-    ctx.lineTo(side * headSize * 0.06, headSize * 0.42);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.moveTo(side * headSize * 0.12, headSize * 0.34); ctx.lineTo(side * headSize * 0.18, headSize * 0.5); ctx.lineTo(side * headSize * 0.06, headSize * 0.42);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   }
-
-  ctx.strokeStyle = pal.obsidian;
-  ctx.lineWidth = 0.6;
-  ctx.globalAlpha = 0.7;
-  for (let side = -1; side <= 1; side += 2) {
-    for (let w = 0; w < 2; w++) {
-      ctx.beginPath();
-      ctx.moveTo(side * headSize * 0.18, headSize * 0.22 + w * headSize * 0.05);
-      ctx.lineTo(side * headSize * 0.5, headSize * 0.24 + w * headSize * 0.05);
-      ctx.stroke();
-    }
-  }
-  ctx.globalAlpha = 1;
-
   ctx.restore();
-
   if (guardian.smokeParticles) {
     guardian.smokeParticles.forEach(sp => {
       const age = (gameTime - sp.bornAt) / 800;
       if (age > 1) return;
       ctx.fillStyle = `rgba(20, 17, 15, ${0.5 * (1 - age)})`;
       ctx.beginPath();
-      ctx.arc(
-        sp.x * TILE_SIZE + TILE_SIZE / 2,
-        sp.y * TILE_SIZE + TILE_SIZE / 2,
-        TILE_SIZE * 0.4 * (1 + age),
-        0, Math.PI * 2
-      );
+      ctx.arc(sp.x * TILE_SIZE + TILE_SIZE / 2, sp.y * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE * 0.4 * (1 + age), 0, Math.PI * 2);
       ctx.fill();
     });
   }
-
   ctx.restore();
 }
 
@@ -5158,17 +3875,12 @@ function drawFoodOffering(food, cx, cy, pulse) {
   const isMaize = food.offering === 'maize';
   const isCacao = food.offering === 'cacao';
   const radius = Math.max(4, TILE_SIZE / 2 - 3 + pulse * 0.3);
-
   ctx.save();
-
   if (isMaize) {
     ctx.fillStyle = '#f2c230';
     ctx.strokeStyle = '#fff0b0';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, radius * 0.55, radius * 0.95, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, radius * 0.55, radius * 0.95, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#4fcea2';
     ctx.strokeStyle = '#b0f4d8';
     ctx.lineWidth = 1;
@@ -5176,49 +3888,29 @@ function drawFoodOffering(food, cx, cy, pulse) {
     ctx.moveTo(cx - radius * 0.15, cy + radius * 0.5);
     ctx.quadraticCurveTo(cx - radius * 0.95, cy, cx - radius * 0.5, cy - radius * 0.85);
     ctx.quadraticCurveTo(cx - radius * 0.25, cy - radius * 0.2, cx - radius * 0.15, cy + radius * 0.5);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fill(); ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(cx + radius * 0.15, cy + radius * 0.5);
     ctx.quadraticCurveTo(cx + radius * 0.95, cy, cx + radius * 0.5, cy - radius * 0.85);
     ctx.quadraticCurveTo(cx + radius * 0.25, cy - radius * 0.2, cx + radius * 0.15, cy + radius * 0.5);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#a87916';
-    for (let row = -2; row <= 2; row++) {
-      ctx.beginPath();
-      ctx.arc(cx - radius * 0.12, cy + row * radius * 0.24, 0.8, 0, Math.PI * 2);
-      ctx.arc(cx + radius * 0.12, cy + row * radius * 0.24, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.fill(); ctx.stroke();
   } else if (isCacao) {
     ctx.fillStyle = '#8b5a2b';
     ctx.strokeStyle = '#d4a574';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, radius * 0.55, radius * 0.9, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, radius * 0.55, radius * 0.9, 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = '#5a3a1b';
     ctx.lineWidth = 1;
     for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.moveTo(cx - radius * 0.4, cy + i * radius * 0.28);
-      ctx.lineTo(cx + radius * 0.4, cy + i * radius * 0.28);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - radius * 0.4, cy + i * radius * 0.28); ctx.lineTo(cx + radius * 0.4, cy + i * radius * 0.28); ctx.stroke();
     }
   } else {
     ctx.fillStyle = '#4fcea2';
     ctx.strokeStyle = '#b0f4d8';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 0.78, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, radius * 0.78, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#d5bd70';
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 0.22, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, radius * 0.22, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 }
@@ -5230,7 +3922,6 @@ function draw(interpolation = 1, updateEffects = false) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -5253,14 +3944,10 @@ function draw(interpolation = 1, updateEffects = false) {
     const dx = (Math.random() - 0.5) * screenShake;
     const dy = (Math.random() - 0.5) * screenShake;
     ctx.translate(dx, dy);
-    if (updateEffects) {
-      screenShake *= 0.82;
-      if (screenShake < 0.3) screenShake = 0;
-    }
+    if (updateEffects) { screenShake *= 0.82; if (screenShake < 0.3) screenShake = 0; }
   }
 
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
-
   drawHuntTrail();
 
   foods.forEach(food => {
@@ -5273,27 +3960,6 @@ function draw(interpolation = 1, updateEffects = false) {
       const mo = food.meteorOffsetX || 0;
       cx = targetX + mo * (1 - eased);
       cy = -TILE_SIZE + (targetY + TILE_SIZE) * eased;
-      ctx.save();
-      const tx = cx + Math.sign(mo || 1) * TILE_SIZE * 0.75;
-      const ty = cy - TILE_SIZE * 1.35;
-      const trail = ctx.createLinearGradient(tx, ty, cx, cy);
-      trail.addColorStop(0, 'rgba(255, 102, 35, 0)');
-      trail.addColorStop(0.65, 'rgba(255, 151, 55, 0.62)');
-      trail.addColorStop(1, 'rgba(255, 240, 176, 0.96)');
-      ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = trail;
-      ctx.lineWidth = TILE_SIZE * 0.24;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(cx, cy);
-      ctx.stroke();
-      ctx.globalAlpha = 0.8;
-      ctx.fillStyle = '#fff0b0';
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(2, TILE_SIZE * 0.13), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
     drawFoodOffering(food, cx, cy, pulse);
   });
@@ -5301,13 +3967,9 @@ function draw(interpolation = 1, updateEffects = false) {
   bonusFoods.forEach(bf => {
     const cx = bf.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = bf.y * TILE_SIZE + TILE_SIZE / 2;
-
     const timeLeft = bf.expiresAt ? bf.expiresAt - gameTime : 999999;
     const isExpiring = timeLeft < 3000;
-    const blinkAlpha = isExpiring
-      ? (Math.sin(gameTime * 0.02) > 0 ? 1 : 0.3)
-      : 1;
-
+    const blinkAlpha = isExpiring ? (Math.sin(gameTime * 0.02) > 0 ? 1 : 0.3) : 1;
     ctx.save();
     ctx.globalAlpha = blinkAlpha;
     ctx.fillStyle = bf.isBossDrop ? '#ffb347' : '#f0cf70';
@@ -5320,13 +3982,9 @@ function draw(interpolation = 1, updateEffects = false) {
       const y = cy + Math.sin(a) * r;
       if (p === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#fff0b0';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 0.36, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#fff0b0'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, radius * 0.36, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   });
 
@@ -5339,27 +3997,15 @@ function draw(interpolation = 1, updateEffects = false) {
     grad.addColorStop(0, 'rgba(125, 232, 196, 0.5)');
     grad.addColorStop(1, 'rgba(125, 232, 196, 0)');
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#7de8c4';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE / 2 + pulse, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#7de8c4'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, TILE_SIZE / 2 + pulse, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#1a7a5e';
+    ctx.beginPath(); ctx.arc(cx, cy, TILE_SIZE / 2 - 2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff0b0'; ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE / 2 - 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fff0b0';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - TILE_SIZE / 4);
-    ctx.lineTo(cx + TILE_SIZE / 4, cy);
-    ctx.lineTo(cx, cy + TILE_SIZE / 4);
-    ctx.lineTo(cx - TILE_SIZE / 4, cy);
-    ctx.closePath();
-    ctx.stroke();
+    ctx.moveTo(cx, cy - TILE_SIZE / 4); ctx.lineTo(cx + TILE_SIZE / 4, cy); ctx.lineTo(cx, cy + TILE_SIZE / 4); ctx.lineTo(cx - TILE_SIZE / 4, cy);
+    ctx.closePath(); ctx.stroke();
     ctx.restore();
   });
 
@@ -5378,17 +4024,11 @@ function draw(interpolation = 1, updateEffects = false) {
       const py = cy + Math.sin(a) * r;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = '#effbff';
-    ctx.lineWidth = 1.2;
-    ctx.lineCap = 'round';
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#effbff'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(cx - r * 0.42, cy); ctx.lineTo(cx + r * 0.42, cy);
     ctx.moveTo(cx, cy - r * 0.42); ctx.lineTo(cx, cy + r * 0.42);
-    ctx.moveTo(cx - r * 0.3, cy - r * 0.3); ctx.lineTo(cx + r * 0.3, cy + r * 0.3);
-    ctx.moveTo(cx + r * 0.3, cy - r * 0.3); ctx.lineTo(cx - r * 0.3, cy + r * 0.3);
     ctx.stroke();
     ctx.restore();
   });
@@ -5404,15 +4044,10 @@ function draw(interpolation = 1, updateEffects = false) {
     grad.addColorStop(0.6, 'rgba(140, 200, 240, 0.35)');
     grad.addColorStop(1, 'rgba(140, 200, 240, 0)');
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
     ctx.translate(cx, cy);
     ctx.rotate(gameTime * 0.003);
-    ctx.strokeStyle = '#d9f0ff';
-    ctx.lineWidth = 1.8;
-    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#d9f0ff'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
     for (let s = 0; s < 3; s++) {
       const baseAngle = (s / 3) * Math.PI * 2;
       ctx.beginPath();
@@ -5427,13 +4062,9 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.stroke();
     }
     ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#b3e5ff';
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   });
 
@@ -5442,41 +4073,14 @@ function draw(interpolation = 1, updateEffects = false) {
     const cy = o.y * TILE_SIZE + TILE_SIZE / 2;
     const beat = Math.sin(gameTime * 0.01) * 0.5 + 0.5;
     const ringR = TILE_SIZE * 0.52 + beat * 1.5;
-
     ctx.save();
-    ctx.strokeStyle = '#8b1e1e';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(239, 82, 97, 0.55)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, ringR - 2.5, 0, Math.PI * 2);
-    ctx.stroke();
-
+    ctx.strokeStyle = '#8b1e1e'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = 'rgba(48, 20, 24, 0.85)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, ringR - 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    const drops = 6;
-    const dropRot = gameTime * 0.0006;
-    for (let d = 0; d < drops; d++) {
-      const a = dropRot + (d / drops) * Math.PI * 2;
-      const dx = cx + Math.cos(a) * ringR;
-      const dy = cy + Math.sin(a) * ringR;
-      ctx.fillStyle = '#8b1e1e';
-      ctx.beginPath();
-      ctx.arc(dx, dy, 1.6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
+    ctx.beginPath(); ctx.arc(cx, cy, ringR - 3.5, 0, Math.PI * 2); ctx.fill();
     const heartSize = TILE_SIZE * 0.78 * (1 + beat * 0.1);
     ctx.font = `${heartSize}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
     ctx.shadowBlur = 3;
     ctx.fillStyle = '#ffffff';
@@ -5495,21 +4099,13 @@ function draw(interpolation = 1, updateEffects = false) {
     grad.addColorStop(0, 'rgba(239, 82, 97, 0.55)');
     grad.addColorStop(1, 'rgba(239, 82, 97, 0)');
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.beginPath(); ctx.arc(cx, cy, glowR, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(48, 19, 29, 0.94)';
     ctx.strokeStyle = '#ef5261';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.font = `${TILE_SIZE * 0.8}px "Segoe UI Emoji", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('☠️', cx, cy + 1);
     ctx.restore();
   });
@@ -5524,10 +4120,7 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fillStyle = 'rgba(22, 42, 48, 0.96)';
     ctx.strokeStyle = '#fff0b0';
     ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#d5bd70';
     ctx.beginPath();
     for (let i = 0; i < 16; i++) {
@@ -5537,38 +4130,15 @@ function draw(interpolation = 1, updateEffects = false) {
       const y = Math.sin(a) * pr;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#16343b';
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#8be7ff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.62, -Math.PI * 0.8, Math.PI * 0.8);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8be7ff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.62, -Math.PI * 0.8, Math.PI * 0.8); ctx.stroke();
     ctx.fillStyle = '#fff0b0';
     ctx.beginPath();
-    ctx.moveTo(0, -r * 0.58);
-    ctx.lineTo(r * 0.2, 0);
-    ctx.lineTo(0, r * 0.58);
-    ctx.lineTo(-r * 0.2, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.rotate(-gameTime * 0.0014);
-    ctx.strokeStyle = 'rgba(255, 240, 176, 0.65)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i < 36; i++) {
-      const a = (i / 36) * Math.PI * 2;
-      const rad = r * 1.05 + Math.sin(a * 3) * 1.5;
-      const x = Math.cos(a) * rad;
-      const y = Math.sin(a) * rad;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
+    ctx.moveTo(0, -r * 0.58); ctx.lineTo(r * 0.2, 0); ctx.lineTo(0, r * 0.58); ctx.lineTo(-r * 0.2, 0);
+    ctx.closePath(); ctx.fill();
     ctx.restore();
   });
 
@@ -5578,109 +4148,38 @@ function draw(interpolation = 1, updateEffects = false) {
       const isHead = idx === 0;
       const wobbleX = hitAt === undefined ? 0 : Math.sin((gameTime - hitAt) * 0.065 + idx * 1.2) * 2.5;
       const wobbleY = hitAt === undefined ? 0 : Math.cos((gameTime - hitAt) * 0.065 + idx * 1.2) * 1.5;
-
       const previousSegments = previousGuardianPositions.get(guardian.id);
       let progress = interpolation;
-      if (guardian.lastMoveTick === guardian.tickCounter) {
-        progress = interpolation;
-      } else {
-        progress = 1;
-      }
-      const renderSegment = interpolateGridPosition(
-        seg,
-        previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1],
-        progress
-      );
+      if (guardian.lastMoveTick === guardian.tickCounter) progress = interpolation;
+      else progress = 1;
+      const renderSegment = interpolateGridPosition(seg, previousSegments?.[idx] || previousSegments?.[previousSegments.length - 1], progress);
       renderSegment.x += wobbleX / TILE_SIZE;
       renderSegment.y += wobbleY / TILE_SIZE;
-
       const fillColor = hitAt !== undefined && Math.floor((gameTime - hitAt) / 100) % 2 === 0
         ? '#f5e5ad'
         : isHead ? guardian.palette.head : guardian.palette.body;
-
       const tailFactor = 1 - (idx / guardian.segments.length) * 0.5;
       const segSize = TILE_SIZE * tailFactor;
-
       ctx.fillStyle = fillColor;
-
       if (isHead) {
-        roundRect(
-          ctx,
-          renderSegment.x * TILE_SIZE + (TILE_SIZE - segSize) / 2,
-          renderSegment.y * TILE_SIZE + (TILE_SIZE - segSize) / 2,
-          segSize,
-          segSize,
-          8
-        );
+        roundRect(ctx, renderSegment.x * TILE_SIZE + (TILE_SIZE - segSize) / 2, renderSegment.y * TILE_SIZE + (TILE_SIZE - segSize) / 2, segSize, segSize, 8);
       } else {
-        roundRect(
-          ctx,
-          renderSegment.x * TILE_SIZE + (TILE_SIZE - segSize) / 2,
-          renderSegment.y * TILE_SIZE + (TILE_SIZE - segSize) / 2,
-          segSize,
-          segSize,
-          4
-        );
+        roundRect(ctx, renderSegment.x * TILE_SIZE + (TILE_SIZE - segSize) / 2, renderSegment.y * TILE_SIZE + (TILE_SIZE - segSize) / 2, segSize, segSize, 4);
       }
       ctx.fill();
       ctx.shadowBlur = 0;
-
-      if (!isHead) {
-        drawFeatherScale(renderSegment, idx, guardian);
-      } else {
-        drawGuardianHead(renderSegment, guardian);
-      }
+      if (!isHead) drawFeatherScale(renderSegment, idx, guardian);
+      else drawGuardianHead(renderSegment, guardian);
     });
-
-    if (guardian.targetIndicator) {
-      const ti = guardian.targetIndicator;
-      const tx = ti.x * TILE_SIZE + TILE_SIZE / 2;
-      const ty = ti.y * TILE_SIZE + TILE_SIZE / 2;
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.strokeStyle = guardian.palette.head;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 5]);
-      const head = guardian.segments[0];
-      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      ctx.beginPath();
-      ctx.moveTo(hx, hy);
-      ctx.lineTo(tx, ty);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(tx, ty, TILE_SIZE * 0.3, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
     if (guardiansFrozenUntil > gameTime) {
       ctx.save();
       guardian.segments.forEach(segment => {
-        const x = segment.x * TILE_SIZE + 2;
-        const y = segment.y * TILE_SIZE + 2;
         ctx.fillStyle = 'rgba(117, 218, 255, 0.22)';
         ctx.strokeStyle = 'rgba(225, 249, 255, 0.65)';
         ctx.lineWidth = 1;
-        roundRect(ctx, x, y, TILE_SIZE - 4, TILE_SIZE - 4, 5);
-        ctx.fill();
-        ctx.stroke();
+        roundRect(ctx, segment.x * TILE_SIZE + 2, segment.y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4, 5);
+        ctx.fill(); ctx.stroke();
       });
-      const head = guardian.segments[0];
-      const cx = head.x * TILE_SIZE + TILE_SIZE / 2;
-      const cy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      const mark = TILE_SIZE * 0.2;
-      ctx.strokeStyle = 'rgba(239, 251, 255, 0.95)';
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - mark, cy); ctx.lineTo(cx + mark, cy);
-      ctx.moveTo(cx, cy - mark); ctx.lineTo(cx, cy + mark);
-      ctx.moveTo(cx - mark * 0.7, cy - mark * 0.7); ctx.lineTo(cx + mark * 0.7, cy + mark * 0.7);
-      ctx.moveTo(cx + mark * 0.7, cy - mark * 0.7); ctx.lineTo(cx - mark * 0.7, cy + mark * 0.7);
-      ctx.stroke();
       ctx.restore();
     }
   });
@@ -5688,12 +4187,10 @@ function draw(interpolation = 1, updateEffects = false) {
   if (updateEffects) blinkCounter++;
   const isBlinking = (blinkCounter % 90) > 85;
   const playerProtected = hasGuardianProtection();
-
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
 
   if (playerProtected && snake.length > 0) {
-    const headSeg = snake[0];
-    const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
+    const headRS = interpolateGridPosition(snake[0], previousSnakePositions[0], interpolation);
     const hx = headRS.x * TILE_SIZE + TILE_SIZE / 2;
     const hy = headRS.y * TILE_SIZE + TILE_SIZE / 2;
     const auraR = TILE_SIZE * 1.0;
@@ -5701,56 +4198,7 @@ function draw(interpolation = 1, updateEffects = false) {
     aura.addColorStop(0, 'rgba(125, 232, 196, 0.22)');
     aura.addColorStop(1, 'rgba(125, 232, 196, 0)');
     ctx.fillStyle = aura;
-    ctx.beginPath();
-    ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (isGolden && snake.length > 0) {
-    const headSeg = snake[0];
-    const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
-    const hx = headRS.x * TILE_SIZE + TILE_SIZE / 2;
-    const hy = headRS.y * TILE_SIZE + TILE_SIZE / 2;
-    const flick = Math.sin(gameTime * 0.015) * 0.5 + 0.5;
-    const auraR = TILE_SIZE * (1.2 + flick * 0.2);
-    const goldenAura = ctx.createRadialGradient(hx, hy, TILE_SIZE * 0.4, hx, hy, auraR);
-    goldenAura.addColorStop(0, `rgba(200, 175, 105, ${0.12 + flick * 0.06})`);
-    goldenAura.addColorStop(0.6, `rgba(160, 140, 80, ${0.05 + flick * 0.04})`);
-    goldenAura.addColorStop(1, 'rgba(160, 140, 80, 0)');
-    ctx.fillStyle = goldenAura;
-    ctx.beginPath();
-    ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (updateEffects && Math.random() < 0.15) {
-      const a = Math.random() * Math.PI * 2;
-      const r = TILE_SIZE * (0.9 + Math.random() * 0.5);
-      particles.push({
-        x: hx + Math.cos(a) * r,
-        y: hy + Math.sin(a) * r,
-        vx: Math.cos(a) * 0.25,
-        vy: Math.sin(a) * 0.25 - 0.2,
-        size: 1 + Math.random() * 0.8,
-        color: ['#d4c488', '#b8a668', '#4ec9a0'][Math.floor(Math.random() * 3)],
-        alpha: 0.6, decay: 0.03
-      });
-    }
-  }
-
-  if (isFuria && snake.length > 0) {
-    const headSeg = snake[0];
-    const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
-    const hx = headRS.x * TILE_SIZE + TILE_SIZE / 2;
-    const hy = headRS.y * TILE_SIZE + TILE_SIZE / 2;
-    const flick = Math.sin(gameTime * 0.03) * 0.5 + 0.5;
-    const auraR = TILE_SIZE * (1.2 + flick * 0.2);
-    const furiaAura = ctx.createRadialGradient(hx, hy, TILE_SIZE * 0.4, hx, hy, auraR);
-    furiaAura.addColorStop(0, 'rgba(255, 140, 60, 0.10)');
-    furiaAura.addColorStop(1, 'rgba(255, 140, 60, 0)');
-    ctx.fillStyle = furiaAura;
-    ctx.beginPath();
-    ctx.arc(hx, hy, auraR, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
   const skin = getActiveSkin();
@@ -5761,76 +4209,24 @@ function draw(interpolation = 1, updateEffects = false) {
 
   snake.forEach((seg, idx) => {
     const isHead = idx === 0;
-    const rs = interpolateGridPosition(
-      seg,
-      previousSnakePositions[idx] || previousSnakePositions[previousSnakePositions.length - 1],
-      interpolation
-    );
-
+    const rs = interpolateGridPosition(seg, previousSnakePositions[idx] || previousSnakePositions[previousSnakePositions.length - 1], interpolation);
     if (!isHead) {
       ctx.fillStyle = KUKULKAN_BODY;
-      roundRect(
-        ctx,
-        rs.x * TILE_SIZE + 1,
-        rs.y * TILE_SIZE + 1,
-        TILE_SIZE - 2,
-        TILE_SIZE - 2,
-        5
-      );
+      roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 5);
       ctx.fill();
-
-      ctx.save();
-
       if (isGolden || KUKULKAN_PLATE) {
         ctx.fillStyle = KUKULKAN_PLATE;
-        roundRect(
-          ctx,
-          rs.x * TILE_SIZE + 2.5,
-          rs.y * TILE_SIZE + 2,
-          TILE_SIZE - 5,
-          TILE_SIZE * 0.4,
-          3
-        );
+        roundRect(ctx, rs.x * TILE_SIZE + 2.5, rs.y * TILE_SIZE + 2, TILE_SIZE - 5, TILE_SIZE * 0.4, 3);
         ctx.fill();
-        ctx.strokeStyle = KUKULKAN_BORDER;
-        ctx.lineWidth = 0.7;
-        roundRect(
-          ctx,
-          rs.x * TILE_SIZE + 2.5,
-          rs.y * TILE_SIZE + 2,
-          TILE_SIZE - 5,
-          TILE_SIZE * 0.4,
-          3
-        );
-        ctx.stroke();
       }
-
       ctx.strokeStyle = KUKULKAN_BORDER;
       ctx.lineWidth = isGolden ? 1.2 : 1;
-      roundRect(
-        ctx,
-        rs.x * TILE_SIZE + 1.5,
-        rs.y * TILE_SIZE + 1.5,
-        TILE_SIZE - 3,
-        TILE_SIZE - 3,
-        5
-      );
+      roundRect(ctx, rs.x * TILE_SIZE + 1.5, rs.y * TILE_SIZE + 1.5, TILE_SIZE - 3, TILE_SIZE - 3, 5);
       ctx.stroke();
-
-      ctx.strokeStyle = KUKULKAN_INNER;
-      ctx.lineWidth = isGolden ? 0.9 : 0.8;
-      ctx.beginPath();
-      ctx.moveTo(rs.x * TILE_SIZE + 3, rs.y * TILE_SIZE + 2.5);
-      ctx.lineTo(rs.x * TILE_SIZE + TILE_SIZE - 3, rs.y * TILE_SIZE + 2.5);
-      ctx.stroke();
-      ctx.restore();
-
       drawBodyDiamond(rs, idx, isGolden);
-
     } else {
       drawKukulkanHead(rs, direction, playerProtected, isBlinking);
     }
-
     if (isHead && headPulse > 0) {
       const pR = TILE_SIZE * 0.5 + 3 + (1 - headPulse) * 8;
       ctx.save();
@@ -5838,28 +4234,20 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.lineWidth = 1.8 * headPulse;
       ctx.globalAlpha = headPulse * 0.7;
       ctx.beginPath();
-      ctx.arc(
-        rs.x * TILE_SIZE + TILE_SIZE / 2,
-        rs.y * TILE_SIZE + TILE_SIZE / 2,
-        pR,
-        0, Math.PI * 2
-      );
+      ctx.arc(rs.x * TILE_SIZE + TILE_SIZE / 2, rs.y * TILE_SIZE + TILE_SIZE / 2, pR, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
   });
 
   if (snake.length > 0) {
-    const headSeg = snake[0];
-    const headRS = interpolateGridPosition(headSeg, previousSnakePositions[0], interpolation);
+    const headRS = interpolateGridPosition(snake[0], previousSnakePositions[0], interpolation);
     drawKukulkanPlume(headRS, direction, playerProtected);
   }
 
   drawFireBreath();
   updateAndDrawParticles(updateEffects);
-
   if (isGameRunning) drawVignette();
-
   drawDarkness();
   drawEclipseTint();
 
@@ -5874,7 +4262,6 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.globalAlpha = 1;
     }
   }
-
   ctx.restore();
 }
 
@@ -5885,25 +4272,17 @@ function startGame() {
   getAudioContext();
   if (isGameRunning) finishRunStatistics();
 
-  // ✅ 1. Detener CUALQUIER frame pendiente antes de reiniciar
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-  lastFrameTimestamp = null;
-  simulationAccumulator = 0;
-  renderInterpolation = 1;
-
-  // ✅ 2. Forzar estado limpio
-  isPaused = false;
-  isGameRunning = false;
+  stopGameLoop();
   cancelCountdown();
   stopMusic();
 
-  // ✅ 3. Resetear TODO el estado del juego
-  resetGame();
+  isPaused = false;
+  isGameRunning = false;
+  simulationAccumulator = 0;
+  renderInterpolation = 1;
+  lastFrameTimestamp = null;
 
-  // ✅ 4. Inicializar nueva partida
+  resetGame();
   gameTime = 0;
   applyGameModeRules();
 
@@ -5915,10 +4294,9 @@ function startGame() {
 
   startCountdown();
   updateFuriaUI();
-
   dtStartBtn.textContent = '🔄 Reiniciar';
 
-  // ✅ 5. Ocultar TODOS los overlays/modales
+  // Ocultar overlays
   tutorialModal.classList.add('hidden');
   introTutorialModal.classList.add('hidden');
   settingsModal.classList.add('hidden');
@@ -5933,8 +4311,6 @@ function startGame() {
   document.body.classList.remove('welcome-open', 'tutorial-open', 'gameover-open');
 
   updateLivesUI();
-
-  // ✅ 6. Arrancar bucle y música
   startMusic();
   startGameLoop();
 }
@@ -5942,19 +4318,16 @@ function startGame() {
 function togglePause() {
   if (!isGameRunning) return;
   if (!isPaused) {
-    cancelCountdown();
     isPaused = true;
-  } else {
-    isPaused = false;
-    // ✅ No reiniciamos countdown aquí para que despausar sea fluido
-  }
-  updateFuriaUI();
-  if (isPaused) {
     stopMusic();
   } else {
+    isPaused = false;
+    lastFrameTimestamp = null;
+    simulationAccumulator = 0;
     startMusic();
     startGameLoop();
   }
+  updateFuriaUI();
 }
 
 function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
@@ -5963,53 +4336,32 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   isGameRunning = false;
   isPaused = false;
 
-  // ✅ Detener el game loop explícitamente
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-  lastFrameTimestamp = null;
-
+  stopGameLoop();
   cancelCountdown();
   clearFireBreath();
-  isFuria = false;
-  furiaReadyAt = 0;
-  furiaCooldownUntil = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
   BadgeManager.setVisible('furia', false);
   airBoostUntil = 0;
   BadgeManager.setVisible('air', false);
   updateFuriaUI();
-  enemySpawnAt = null;
-  jadeSpawnAt = null;
-  freezeSpawnAt = null;
-  guardiansFrozenUntil = 0;
-  freezeFoods = [];
-  airFoods = [];
+  enemySpawnAt = null; jadeSpawnAt = null; freezeSpawnAt = null;
+  guardiansFrozenUntil = 0; freezeFoods = []; airFoods = [];
   BadgeManager.setVisible('freeze', false);
-  sacredRainUntil = 0;
-  nextSacredRainAt = null;
+  sacredRainUntil = 0; nextSacredRainAt = null;
   BadgeManager.setVisible('rain', false);
-  nextCosmicOrderSpawnAt = null;
-  cosmicOrderResolveAt = null;
-  cosmicOrderFlashStartedAt = null;
-  cosmicOrderFoods = [];
-  sacrificeFoods = [];
-  skullFoods = [];
-  nextSkullMoveAt = null;
-  nextSacrificeSpawnAt = null;
-  nextSkullSpawnAt = null;
+  nextCosmicOrderSpawnAt = null; cosmicOrderResolveAt = null; cosmicOrderFlashStartedAt = null;
+  cosmicOrderFoods = []; sacrificeFoods = []; skullFoods = [];
+  nextSkullMoveAt = null; nextSacrificeSpawnAt = null; nextSkullSpawnAt = null;
   BadgeManager.setVisible('sacrificeOffering', false);
   BadgeManager.setVisible('skullFood', false);
   BadgeManager.setVisible('cosmicOrderFood', false);
   BadgeManager.setVisible('cosmicOrder', false);
   respawnProtectedUntil = 0;
   BadgeManager.setVisible('respawn', false);
-  enemyGuardians = [];
-  particles = [];
+  enemyGuardians = []; particles = [];
   updateGuardianBadge();
   deactivateImmunity();
-  isOnFire = false;
-  fireExpiresAt = 0;
+  isOnFire = false; fireExpiresAt = 0;
 
   eclipseActive = false;
   BadgeManager.setVisible('eclipse', false);
@@ -6042,7 +4394,7 @@ function changeDirection(newDir) {
 }
 
 // ========================================================
-// 24. TUTORIAL
+// 24. TUTORIAL Y MODALES (sin ModalState)
 // ========================================================
 function showTutorialStep(step) {
   currentTutorialStep = step;
@@ -6056,92 +4408,193 @@ function showTutorialStep(step) {
   tutNextBtn.classList.toggle('hidden', step === totalTutorialSteps);
   tutStartBtn.classList.toggle('hidden', step !== totalTutorialSteps);
 }
+
+// Reanuda el juego si estaba corriendo y quedó pausado.
+function resumeIfWasRunning(wasRunning) {
+  if (!wasRunning) return;
+  if (!isPaused) {
+    // por si acaso, aseguramos loop
+    if (!isLoopRunning) startGameLoop();
+    return;
+  }
+  isPaused = false;
+  lastFrameTimestamp = null;
+  simulationAccumulator = 0;
+  startMusic();
+  startGameLoop();
+  updateFuriaUI();
+}
+
 function openTutorial() {
   if (!tutorialModal.classList.contains('hidden')) return;
-  tutorialWasRunning = isGameRunning;
-  tutorialWasPaused = isPaused;
-  tutorialDrawerWasVisible = false;
+  const wasRunning = isGameRunning;
   tutorialOpenedFromWelcome = !welcomeScreen.classList.contains('hidden');
-  if (tutorialWasRunning && !tutorialWasPaused) togglePause();
+  if (wasRunning && !isPaused) togglePause();
   if (!tutorialOpenedFromWelcome) document.body.appendChild(tutorialModal);
   welcomeStartBtn.classList.add('hidden');
   settingsModal.classList.add('hidden');
   tutorialModal.classList.remove('hidden');
   document.body.classList.add('tutorial-open');
+  tutorialModal.dataset.wasRunning = wasRunning ? '1' : '0';
   showTutorialStep(1);
 }
 function closeTutorial() {
   if (tutorialModal.classList.contains('hidden')) return;
   tutorialModal.classList.add('hidden');
   document.body.classList.remove('tutorial-open');
-  if (tutorialWasRunning && !tutorialWasPaused && isGameRunning && isPaused) {
-    togglePause();
-  }
   const card = welcomeScreen.querySelector('.welcome-card');
-  if (card && tutorialModal.parentElement !== card) {
-    card.insertBefore(tutorialModal, welcomeStartBtn);
-  }
+  if (card && tutorialModal.parentElement !== card) card.insertBefore(tutorialModal, welcomeStartBtn);
   if (tutorialOpenedFromWelcome) {
     welcomeScreen.classList.remove('hidden');
     startWelcomeDemo();
   }
   welcomeStartBtn.classList.toggle('hidden', welcomeScreen.classList.contains('hidden') || !tutorialModal.classList.contains('hidden'));
-  tutorialWasRunning = false;
-  tutorialWasPaused = false;
-  tutorialDrawerWasVisible = false;
   tutorialOpenedFromWelcome = false;
+  const wasRunning = tutorialModal.dataset.wasRunning === '1';
+  delete tutorialModal.dataset.wasRunning;
+  resumeIfWasRunning(wasRunning);
 }
 
-function openIntroTutorial() {
-  introTutorialModal.classList.remove('hidden');
-}
-function closeIntroTutorial() {
-  introTutorialModal.classList.add('hidden');
-}
+function openIntroTutorial() { introTutorialModal.classList.remove('hidden'); }
+function closeIntroTutorial() { introTutorialModal.classList.add('hidden'); }
 
 function openLore() {
-  loreWasRunning = isGameRunning;
-  loreWasPaused = isPaused;
-  if (loreWasRunning && !loreWasPaused) togglePause();
+  const wasRunning = isGameRunning;
+  if (wasRunning && !isPaused) togglePause();
+  loreModal.dataset.wasRunning = wasRunning ? '1' : '0';
   loreModal.classList.remove('hidden');
   playCosmicOrderSound();
 }
 function closeLore() {
+  if (loreModal.classList.contains('hidden')) return;
   loreModal.classList.add('hidden');
-  if (loreWasRunning && !loreWasPaused && isGameRunning && isPaused) togglePause();
-  loreWasRunning = false;
-  loreWasPaused = false;
+  const wasRunning = loreModal.dataset.wasRunning === '1';
+  delete loreModal.dataset.wasRunning;
+  resumeIfWasRunning(wasRunning);
 }
 
 function openAchievements() {
-  achievementsWasRunning = isGameRunning;
-  achievementsWasPaused = isPaused;
-  if (achievementsWasRunning && !achievementsWasPaused) togglePause();
+  const wasRunning = isGameRunning;
+  if (wasRunning && !isPaused) togglePause();
   settingsModal.classList.add('hidden');
   renderAchievementsUI();
+  achievementsModal.dataset.wasRunning = wasRunning ? '1' : '0';
   achievementsModal.classList.remove('hidden');
 }
 function closeAchievements() {
+  if (achievementsModal.classList.contains('hidden')) return;
   achievementsModal.classList.add('hidden');
-  if (achievementsWasRunning && !achievementsWasPaused && isGameRunning && isPaused) togglePause();
-  achievementsWasRunning = false;
-  achievementsWasPaused = false;
+  const wasRunning = achievementsModal.dataset.wasRunning === '1';
+  delete achievementsModal.dataset.wasRunning;
+  resumeIfWasRunning(wasRunning);
 }
 
-function openCustomize() {
-  customizeWasRunning = isGameRunning;
-  customizeWasPaused = isPaused;
-  if (customizeWasRunning && !customizeWasPaused) togglePause();
+function openStatistics() {
+  if (!statisticsModal.classList.contains('hidden')) return;
+  const wasRunning = isGameRunning;
+  if (wasRunning && !isPaused) togglePause();
   settingsModal.classList.add('hidden');
+  updateStatisticsUI();
+  statisticsModal.dataset.wasRunning = wasRunning ? '1' : '0';
+  statisticsModal.classList.remove('hidden');
+}
+function closeStatistics() {
+  if (statisticsModal.classList.contains('hidden')) return;
+  statisticsModal.classList.add('hidden');
+  const wasRunning = statisticsModal.dataset.wasRunning === '1';
+  delete statisticsModal.dataset.wasRunning;
+  resumeIfWasRunning(wasRunning);
+}
+
+// --- Personalización: selección temporal + Aplicar ---
+function openCustomize() {
+  if (isGameRunning && !isPaused) togglePause();
+  settingsModal.classList.add('hidden');
+  beginCustomizeSession();
   renderCustomizeUI();
+  customizeModal.dataset.wasRunning = isGameRunning ? '1' : '0';
   customizeModal.classList.remove('hidden');
 }
-function closeCustomize() {
+function closeCustomize(applyChanges) {
+  if (customizeModal.classList.contains('hidden')) return;
   customizeModal.classList.add('hidden');
-  if (customizeWasRunning && !customizeWasPaused && isGameRunning && isPaused) togglePause();
-  updateThemeColors();
-  customizeWasRunning = false;
-  customizeWasPaused = false;
+
+  const wasRunning = customizeModal.dataset.wasRunning === '1';
+  delete customizeModal.dataset.wasRunning;
+
+  if (applyChanges) {
+    commitCustomizeSession();
+    if (wasRunning) {
+      // Reiniciar partida limpia con el nuevo tema/skin
+      startGame();
+      return;
+    }
+    // No estaba corriendo: solo aplicamos cambios y ya.
+    cancelCustomizeSession();
+    return;
+  }
+
+  // Cancelar
+  cancelCustomizeSession();
+  resumeIfWasRunning(wasRunning);
+}
+
+// --- Ajustes ---
+function openSettings() {
+  if (isGameRunning && !isPaused) togglePause();
+  settingsGameMode.value = gameModeSelect.value;
+  settingsDifficulty.value = difficultySelect.value;
+  settingsSoundToggle.checked = !isMuted;
+  settingsDpadToggle.checked = showDpad;
+  updateSettingsDifficultyVisibility();
+  settingsModal.dataset.wasRunning = isGameRunning ? '1' : '0';
+  settingsModal.classList.remove('hidden');
+}
+function closeSettings(applyChanges) {
+  if (settingsModal.classList.contains('hidden')) return;
+  settingsModal.classList.add('hidden');
+
+  const wasRunning = settingsModal.dataset.wasRunning === '1';
+  delete settingsModal.dataset.wasRunning;
+
+  let needRestart = false;
+
+  if (applyChanges) {
+    const newMode = settingsGameMode.value;
+    const newDiff = settingsDifficulty.value;
+    if (newMode !== gameModeSelect.value) {
+      gameModeSelect.value = newMode;
+      gameMode = newMode;
+      safeSetItem('snakeIoGameMode', gameMode);
+      welcomeGameMode.value = newMode;
+      updateWelcomeModeUI();
+      updateModeUI();
+      needRestart = true;
+    }
+    if (newDiff !== difficultySelect.value) {
+      difficultySelect.value = newDiff;
+      welcomeDifficulty.value = newDiff;
+      needRestart = true;
+    }
+    toggleSound(settingsSoundToggle.checked);
+    showDpad = settingsDpadToggle.checked;
+    safeSetItem('snakeIoShowDpad', showDpad);
+    touchControls.classList.toggle('hidden', !showDpad);
+  }
+
+  if (wasRunning) {
+    if (needRestart) {
+      startGame();
+      return;
+    }
+    resumeIfWasRunning(true);
+  } else {
+    applyGameModeRules();
+  }
+}
+function updateSettingsDifficultyVisibility() {
+  const isClassic = settingsGameMode.value === 'classic';
+  settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
 }
 
 // ========================================================
@@ -6151,15 +4604,10 @@ let touchStartX = 0;
 let touchStartY = 0;
 
 window.addEventListener('touchstart', e => {
-  if (e.touches.length > 0) {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  }
+  if (e.touches.length > 0) { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }
 }, { passive: true });
 
-window.addEventListener('touchmove', e => {
-  if (e.target === canvas) e.preventDefault();
-}, { passive: false });
+window.addEventListener('touchmove', e => { if (e.target === canvas) e.preventDefault(); }, { passive: false });
 
 window.addEventListener('touchend', e => {
   const target = e.target;
@@ -6179,20 +4627,18 @@ window.addEventListener('touchend', e => {
 btnTurbo.addEventListener('pointerdown', e => { e.preventDefault(); triggerFuria(); });
 
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) { closeSettings(); return; }
+  if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) { closeSettings(false); return; }
   if (e.key === 'Escape' && !tutorialModal.classList.contains('hidden')) { closeTutorial(); return; }
   if (e.key === 'Escape' && !introTutorialModal.classList.contains('hidden')) { closeIntroTutorial(); return; }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) { closeStatistics(); return; }
   if (e.key === 'Escape' && !loreModal.classList.contains('hidden')) { closeLore(); return; }
   if (e.key === 'Escape' && !achievementsModal.classList.contains('hidden')) { closeAchievements(); return; }
-  if (e.key === 'Escape' && !customizeModal.classList.contains('hidden')) { closeCustomize(); return; }
+  if (e.key === 'Escape' && !customizeModal.classList.contains('hidden')) { closeCustomize(false); return; }
   if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
   const isText = e.target instanceof Element && e.target.matches('select, input');
   const isMove = e.key.startsWith('Arrow') || ['w','W','a','A','s','S','d','D'].includes(e.key);
   if (isText && isMove) return;
-  if (!isText && (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused))) {
-    triggerFuria();
-  }
+  if (!isText && (e.key === 'Shift' || (e.key === ' ' && isGameRunning && !isPaused))) triggerFuria();
   switch (e.key) {
     case 'ArrowUp': case 'w': case 'W': changeDirection({ x: 0, y: -1 }); break;
     case 'ArrowDown': case 's': case 'S': changeDirection({ x: 0, y: 1 }); break;
@@ -6202,9 +4648,7 @@ window.addEventListener('keydown', e => {
   }
 });
 
-const bindDpad = (btn, dir) => {
-  btn.addEventListener('pointerdown', e => { e.preventDefault(); changeDirection(dir); });
-};
+const bindDpad = (btn, dir) => { btn.addEventListener('pointerdown', e => { e.preventDefault(); changeDirection(dir); }); };
 bindDpad(btnUp, { x: 0, y: -1 });
 bindDpad(btnDown, { x: 0, y: 1 });
 bindDpad(btnLeft, { x: -1, y: 0 });
@@ -6226,15 +4670,11 @@ loreStartBtn.addEventListener('click', () => { closeLore(); startGame(); });
 loreModal.addEventListener('click', e => { if (e.target === loreModal) closeLore(); });
 
 restartOverlayBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   setTimeout(() => startGame(), 0);
 });
 
-dtStartBtn.addEventListener('click', () => {
-  startGame();
-});
-
+dtStartBtn.addEventListener('click', () => { startGame(); });
 dtSettingsBtn.addEventListener('click', openSettings);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
@@ -6246,8 +4686,10 @@ statisticsModal.addEventListener('click', e => { if (e.target === statisticsModa
 closeAchievementsBtn.addEventListener('click', closeAchievements);
 achievementsModal.addEventListener('click', e => { if (e.target === achievementsModal) closeAchievements(); });
 
-closeCustomizeBtn.addEventListener('click', closeCustomize);
-customizeModal.addEventListener('click', e => { if (e.target === customizeModal) closeCustomize(); });
+closeCustomizeBtn.addEventListener('click', () => closeCustomize(false));
+if (customizeCancelBtn) customizeCancelBtn.addEventListener('click', () => closeCustomize(false));
+if (customizeApplyBtn) customizeApplyBtn.addEventListener('click', () => closeCustomize(true));
+customizeModal.addEventListener('click', e => { if (e.target === customizeModal) closeCustomize(false); });
 
 customizeTabs.forEach(tab => {
   tab.addEventListener('click', () => {
@@ -6268,96 +4710,25 @@ mbSettingsBtn.addEventListener('click', () => {
   openSettings();
 });
 
-// Eventos del modal de configuración unificado
-function openSettings() {
-  settingsWasRunning = isGameRunning;
-  settingsWasPaused = isPaused;
-  if (settingsWasRunning && !settingsWasPaused) togglePause();
-
-  settingsGameMode.value = gameModeSelect.value;
-  settingsDifficulty.value = difficultySelect.value;
-  settingsSoundToggle.checked = !isMuted;
-  settingsDpadToggle.checked = showDpad;
-
-  updateSettingsDifficultyVisibility();
-  settingsModal.classList.remove('hidden');
-}
-
-function closeSettings() {
-  settingsModal.classList.add('hidden');
-  if (settingsWasRunning && !settingsWasPaused && isGameRunning && isPaused) {
-    togglePause();
-  }
-  settingsWasRunning = false;
-  settingsWasPaused = false;
-}
-
-function updateSettingsDifficultyVisibility() {
-  const isClassic = settingsGameMode.value === 'classic';
-  settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
-}
-
-function applySettings() {
-  if (settingsGameMode.value !== gameModeSelect.value) {
-    gameModeSelect.value = settingsGameMode.value;
-    gameModeSelect.dispatchEvent(new Event('change'));
-  }
-  if (settingsDifficulty.value !== difficultySelect.value) {
-    difficultySelect.value = settingsDifficulty.value;
-    difficultySelect.dispatchEvent(new Event('change'));
-  }
-  toggleSound(settingsSoundToggle.checked);
-  showDpad = settingsDpadToggle.checked;
-  safeSetItem('snakeIoShowDpad', showDpad);
-  touchControls.classList.toggle('hidden', !showDpad);
-
-  closeSettings();
-}
-
-closeSettingsBtn.addEventListener('click', closeSettings);
-settingsApplyBtn.addEventListener('click', applySettings);
-settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(); });
+closeSettingsBtn.addEventListener('click', () => closeSettings(false));
+settingsApplyBtn.addEventListener('click', () => closeSettings(true));
+settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(false); });
 settingsGameMode.addEventListener('change', updateSettingsDifficultyVisibility);
-settingsCustomizeBtn.addEventListener('click', () => { closeSettings(); openCustomize(); });
-settingsAchievementsBtn.addEventListener('click', () => { closeSettings(); openAchievements(); });
-settingsStatsBtn.addEventListener('click', () => { closeSettings(); openStatistics(); });
-settingsTutorialBtn.addEventListener('click', () => { closeSettings(); openTutorial(); });
-settingsRestartBtn.addEventListener('click', () => { closeSettings(); startGame(); });
-
-// ========================================================
-// 27. ESTADÍSTICAS
-// ========================================================
-function openStatistics() {
-  if (!statisticsModal.classList.contains('hidden')) return;
-  statisticsWasRunning = isGameRunning;
-  statisticsWasPaused = isPaused;
-  statisticsDrawerWasVisible = false;
-  if (statisticsWasRunning && !statisticsWasPaused) togglePause();
-  settingsModal.classList.add('hidden');
-  updateStatisticsUI();
-  statisticsModal.classList.remove('hidden');
-}
-function closeStatistics() {
-  if (statisticsModal.classList.contains('hidden')) return;
-  statisticsModal.classList.add('hidden');
-  if (statisticsWasRunning && !statisticsWasPaused && isGameRunning && isPaused) togglePause();
-  statisticsWasRunning = false;
-  statisticsWasPaused = false;
-  statisticsDrawerWasVisible = false;
-}
+settingsCustomizeBtn.addEventListener('click', () => { closeSettings(false); openCustomize(); });
+settingsAchievementsBtn.addEventListener('click', () => { closeSettings(false); openAchievements(); });
+settingsStatsBtn.addEventListener('click', () => { closeSettings(false); openStatistics(); });
+settingsTutorialBtn.addEventListener('click', () => { closeSettings(false); openTutorial(); });
+settingsRestartBtn.addEventListener('click', () => { closeSettings(false); startGame(); });
 
 // ========================================================
 // 28. DIFICULTAD Y MODO
 // ========================================================
 function updateModeUI() {
   const isClassic = gameModeSelect.value === 'classic';
-  if (settingsDifficultyGroup) {
-    settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
-  }
+  if (settingsDifficultyGroup) settingsDifficultyGroup.style.display = isClassic ? 'flex' : 'none';
   updateThemeColors();
   rebuildBoardCanvas(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2), true);
 }
-
 function updateWelcomeModeUI() {
   const isClassic = welcomeGameMode.value === 'classic';
   welcomeDifficultyBox.style.display = isClassic ? 'flex' : 'none';
@@ -6380,14 +4751,10 @@ welcomeDifficulty.addEventListener('change', () => {
 
 function applyGameModeRules() {
   const mode = GAME_MODES[gameModeSelect.value] || GAME_MODES.classic;
-
   maxLives = mode.livesEnabled ? MAX_LIVES : 1;
   lives = maxLives;
   updateLivesUI();
-
-  if (!mode.itemsEnabled) {
-    // ... (igual que antes)
-  } else {
+  if (mode.itemsEnabled) {
     const profile = getDifficultyProfile();
     if (isGameRunning) {
       nextSacredRainAt = gameTime + profile.rainFirstMs;
@@ -6411,21 +4778,15 @@ gameModeSelect.addEventListener('change', () => {
   welcomeGameMode.value = gameMode;
   updateWelcomeModeUI();
   updateModeUI();
-
-  if (isGameRunning) {
-    startGame();
-  } else {
-    applyGameModeRules();
-  }
+  if (isGameRunning) startGame();
+  else applyGameModeRules();
 });
 
 // ========================================================
 // 29. VISIBILITY
 // ========================================================
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && isGameRunning && !isPaused && countdownEndsAt === null) {
-    togglePause();
-  }
+  if (document.hidden && isGameRunning && !isPaused && countdownEndsAt === null) togglePause();
 });
 
 // ========================================================
@@ -6441,28 +4802,23 @@ function buildWelcomeScenario(cols, rows) {
   const xTurn = jx - 2;
   const mx = Math.max(sx + 2, Math.min(xTurn - 1, Math.round(cols * 0.36)));
   const last = Math.max(2, cols - 4 - jx);
-
   welcomeScenario = { sx, yTop, yBot, yG, jx, mx };
   welcomeDemoRoute = [
-    { direction: { x: 1, y: 0 },  steps: xTurn - sx },
-    { direction: { x: 0, y: 1 },  steps: yBot - yTop },
-    { direction: { x: 1, y: 0 },  steps: 2 },
+    { direction: { x: 1, y: 0 }, steps: xTurn - sx },
+    { direction: { x: 0, y: 1 }, steps: yBot - yTop },
+    { direction: { x: 1, y: 0 }, steps: 2 },
     { direction: { x: 0, y: -1 }, steps: yBot - yG },
-    { direction: { x: 1, y: 0 },  steps: last }
+    { direction: { x: 1, y: 0 }, steps: last }
   ];
 }
-
 function welcomeGuardianStart() {
   const { yG } = welcomeScenario;
   return [0, 1, 2, 3].map(i => ({ x: welcomeDemoCols - 4 + i, y: yG }));
 }
-
 function resetWelcomeDemo() {
   if (!welcomeScenario) buildWelcomeScenario(welcomeDemoCols, welcomeDemoRows);
   const s = welcomeScenario;
-  welcomeDemoSnake = [
-    { x: s.sx, y: s.yTop }, { x: s.sx - 1, y: s.yTop }, { x: s.sx - 2, y: s.yTop }
-  ];
+  welcomeDemoSnake = [{ x: s.sx, y: s.yTop }, { x: s.sx - 1, y: s.yTop }, { x: s.sx - 2, y: s.yTop }];
   welcomeDemoPreviousSnake = welcomeDemoSnake.map(p => ({ ...p }));
   welcomeDemoGuardian = welcomeGuardianStart();
   welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(p => ({ ...p }));
@@ -6482,7 +4838,6 @@ function resetWelcomeDemo() {
   welcomeDemoCalloutTimer = 0;
   welcomeDemoCallout.textContent = welcomeDemoCalloutMessages[0];
 }
-
 function updateWelcomeLayout(width, height) {
   const PAD = 8, HUD_H = 36;
   const availW = Math.max(100, width - PAD * 2);
@@ -6491,21 +4846,15 @@ function updateWelcomeLayout(width, height) {
   const cols = Math.max(14, Math.min(30, Math.floor(availW / target)));
   const rows = Math.max(7, Math.min(22, Math.floor(availH / target)));
   const cell = Math.max(8, Math.min(availW / cols, availH / rows));
-  welcomeLayout = {
-    cell,
-    bx: (width - cell * cols) / 2,
-    by: HUD_H + (availH - cell * rows) / 2
-  };
+  welcomeLayout = { cell, bx: (width - cell * cols) / 2, by: HUD_H + (availH - cell * rows) / 2 };
   const changed = cols !== welcomeDemoCols || rows !== welcomeDemoRows;
   if (changed) {
-    welcomeDemoCols = cols;
-    welcomeDemoRows = rows;
+    welcomeDemoCols = cols; welcomeDemoRows = rows;
     buildWelcomeScenario(cols, rows);
     resetWelcomeDemo();
   }
   return changed;
 }
-
 function resizeWelcomeDemo() {
   const bounds = welcomeDemo.getBoundingClientRect();
   if (bounds.width === 0 || bounds.height === 0) return;
@@ -6515,30 +4864,21 @@ function resizeWelcomeDemo() {
   const sizeChanged = welcomeDemo.width !== pw || welcomeDemo.height !== ph;
   const layoutChanged = updateWelcomeLayout(bounds.width, bounds.height);
   if (!sizeChanged && !layoutChanged) return;
-  if (sizeChanged) {
-    welcomeDemo.width = pw;
-    welcomeDemo.height = ph;
-  }
+  if (sizeChanged) { welcomeDemo.width = pw; welcomeDemo.height = ph; }
   welcomeDemoContext.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawWelcomeDemo(1);
 }
-window.addEventListener('resize', resizeWelcomeDemo);
-
 function drawWelcomeCell(segment, index, options = {}) {
   const { x, y, size } = segment;
   const inset = Math.max(1, size * 0.07);
   const isHead = index === 0;
   const direction = options.direction || { x: 1, y: 0 };
-  const colors = options.guardian
-    ? ['#e2574c', '#9b2929']
-    : options.immune ? ['#7de8c4', '#1a7a5e'] : ['#4ec9a0', '#1a7a5e'];
+  const colors = options.guardian ? ['#e2574c', '#9b2929'] : options.immune ? ['#7de8c4', '#1a7a5e'] : ['#4ec9a0', '#1a7a5e'];
   welcomeDemoContext.fillStyle = isHead ? colors[0] : colors[1];
   roundRect(welcomeDemoContext, x + inset, y + inset, size - inset * 2, size - inset * 2, isHead ? size * 0.32 : size * 0.2);
   welcomeDemoContext.fill();
-
   if (!isHead) {
-    const cx = x + size / 2;
-    const cy = y + size / 2;
+    const cx = x + size / 2, cy = y + size / 2;
     welcomeDemoContext.strokeStyle = options.guardian ? '#ff9b83' : '#d5bd70';
     welcomeDemoContext.lineWidth = Math.max(1, size * 0.08);
     welcomeDemoContext.beginPath();
@@ -6555,50 +4895,21 @@ function drawWelcomeCell(segment, index, options = {}) {
     : direction.y < 0 ? [[0.28, 0.19], [0.58, 0.19]]
     : [[0.28, 0.65], [0.58, 0.65]];
   eyePos.forEach(([ex, ey]) => welcomeDemoContext.fillRect(x + size * ex, y + size * ey, eyeSize, eyeSize));
-
-  if (!options.guardian) {
-    welcomeDemoContext.strokeStyle = options.immune ? '#e0fff2' : '#d5bd70';
-    welcomeDemoContext.lineWidth = Math.max(1, size * 0.08);
-    welcomeDemoContext.beginPath();
-    welcomeDemoContext.moveTo(x + size * 0.28, y + size * 0.22);
-    welcomeDemoContext.lineTo(x + size * 0.18, y - size * 0.08);
-    welcomeDemoContext.moveTo(x + size * 0.5, y + size * 0.2);
-    welcomeDemoContext.lineTo(x + size * 0.58, y - size * 0.08);
-    welcomeDemoContext.stroke();
-  } else {
-    welcomeDemoContext.fillStyle = '#ff9b83';
-    welcomeDemoContext.fillRect(x + size * 0.35, y + size * 0.68, size * 0.3, size * 0.1);
-  }
 }
 function drawWelcomeOffering(point, x, y, size, jade = false) {
-  const cx = x + size / 2;
-  const cy = y + size / 2;
+  const cx = x + size / 2, cy = y + size / 2;
   const r = size * (jade ? 0.36 : 0.29);
   welcomeDemoContext.save();
   if (jade) {
     welcomeDemoContext.fillStyle = '#1a7a5e';
     welcomeDemoContext.strokeStyle = '#7de8c4';
     welcomeDemoContext.lineWidth = Math.max(1, size * 0.1);
-    welcomeDemoContext.beginPath();
-    welcomeDemoContext.arc(cx, cy, r, 0, Math.PI * 2);
-    welcomeDemoContext.fill();
-    welcomeDemoContext.stroke();
-    welcomeDemoContext.strokeStyle = '#fff0b0';
-    welcomeDemoContext.beginPath();
-    welcomeDemoContext.moveTo(cx, cy - r * 0.55);
-    welcomeDemoContext.lineTo(cx + r * 0.55, cy);
-    welcomeDemoContext.lineTo(cx, cy + r * 0.55);
-    welcomeDemoContext.lineTo(cx - r * 0.55, cy);
-    welcomeDemoContext.closePath();
-    welcomeDemoContext.stroke();
+    welcomeDemoContext.beginPath(); welcomeDemoContext.arc(cx, cy, r, 0, Math.PI * 2); welcomeDemoContext.fill(); welcomeDemoContext.stroke();
   } else {
     welcomeDemoContext.fillStyle = '#f2c230';
     welcomeDemoContext.strokeStyle = '#fff0b0';
     welcomeDemoContext.lineWidth = Math.max(1, size * 0.1);
-    welcomeDemoContext.beginPath();
-    welcomeDemoContext.ellipse(cx, cy, r * 0.55, r, 0, 0, Math.PI * 2);
-    welcomeDemoContext.fill();
-    welcomeDemoContext.stroke();
+    welcomeDemoContext.beginPath(); welcomeDemoContext.ellipse(cx, cy, r * 0.55, r, 0, 0, Math.PI * 2); welcomeDemoContext.fill(); welcomeDemoContext.stroke();
     welcomeDemoContext.fillStyle = '#4fcea2';
     welcomeDemoContext.beginPath();
     welcomeDemoContext.moveTo(cx - r * 0.15, cy + r * 0.5);
@@ -6616,9 +4927,6 @@ function drawWelcomeOffering(point, x, y, size, jade = false) {
 function moveWelcomeDemoGuardian() {
   if (welcomeDemoImmuneUntil <= welcomeDemoTick) return;
   if (welcomeDemoGuardianDefeatedUntil > welcomeDemoTick) return;
-  if (welcomeDemoGuardianDefeatedUntil) {
-      welcomeDemoGuardian = welcomeGuardianStart();
-  }
   const eHead = welcomeDemoGuardian[0];
   const pHead = welcomeDemoSnake[0];
   const dx = pHead.x - eHead.x;
@@ -6629,8 +4937,7 @@ function moveWelcomeDemoGuardian() {
   cands.push({ x: -cands[0].x, y: -cands[0].y }, { x: -cands[1].x, y: -cands[1].y });
   const nd = cands.find(c => {
     if (!c.x && !c.y) return false;
-    const x = eHead.x + c.x;
-    const y = eHead.y + c.y;
+    const x = eHead.x + c.x; const y = eHead.y + c.y;
     if (x < 1 || x >= welcomeDemoCols - 1 || y < 1 || y >= welcomeDemoRows - 1) return false;
     return !welcomeDemoGuardian.slice(1, -1).some(s => s.x === x && s.y === y);
   });
@@ -6667,10 +4974,7 @@ function advanceWelcomeDemo() {
   welcomeDemoPreviousGuardian = welcomeDemoGuardian.map(s => ({ ...s }));
   const route = welcomeDemoRoute[welcomeDemoRouteIndex];
   welcomeDemoDirection = route.direction;
-  const nh = {
-    x: welcomeDemoSnake[0].x + route.direction.x,
-    y: welcomeDemoSnake[0].y + route.direction.y
-  };
+  const nh = { x: welcomeDemoSnake[0].x + route.direction.x, y: welcomeDemoSnake[0].y + route.direction.y };
   const coll = welcomeDemoGuardian.some(s => s.x === nh.x && s.y === nh.y);
   if (coll) {
     if (welcomeDemoImmuneUntil > welcomeDemoTick) {
@@ -6701,10 +5005,7 @@ function advanceWelcomeDemo() {
   if (!grows) welcomeDemoSnake.pop();
   welcomeDemoTick++;
   welcomeDemoRouteSteps++;
-  if (welcomeDemoRouteSteps >= route.steps) {
-    welcomeDemoRouteIndex++;
-    welcomeDemoRouteSteps = 0;
-  }
+  if (welcomeDemoRouteSteps >= route.steps) { welcomeDemoRouteIndex++; welcomeDemoRouteSteps = 0; }
   welcomeDemoCalloutTimer++;
   if (welcomeDemoCalloutTimer > 40) {
     welcomeDemoCalloutTimer = 0;
@@ -6722,10 +5023,8 @@ function drawWelcomeDemo(interpolation = 1) {
   const bw = cellSize * welcomeDemoCols;
   const bh = cellSize * welcomeDemoRows;
   const c = welcomeDemoContext;
-
   c.fillStyle = '#141720';
   c.fillRect(0, 0, width, height);
-
   c.fillStyle = 'rgba(20, 23, 32, 0.9)';
   roundRect(c, 8, 6, Math.min(170, width * 0.55), 24, 9);
   c.fill();
@@ -6740,22 +5039,15 @@ function drawWelcomeDemo(interpolation = 1) {
   c.fillStyle = '#9ba7a0';
   c.font = '700 10px sans-serif';
   c.fillText(`LONG. ${welcomeDemoSnake.length}`, 104, 18.5);
-
   c.strokeStyle = 'rgba(144, 153, 177, 0.17)';
   c.lineWidth = 1;
   for (let col = 0; col <= welcomeDemoCols; col++) {
     const x = bx + col * cellSize;
-    c.beginPath();
-    c.moveTo(x, by);
-    c.lineTo(x, by + bh);
-    c.stroke();
+    c.beginPath(); c.moveTo(x, by); c.lineTo(x, by + bh); c.stroke();
   }
   for (let row = 0; row <= welcomeDemoRows; row++) {
     const y = by + row * cellSize;
-    c.beginPath();
-    c.moveTo(bx, y);
-    c.lineTo(bx + bw, y);
-    c.stroke();
+    c.beginPath(); c.moveTo(bx, y); c.lineTo(bx + bw, y); c.stroke();
   }
   const drawSegments = (current, previous, options = {}) => {
     current.forEach((seg, idx) => {
@@ -6772,10 +5064,7 @@ function drawWelcomeDemo(interpolation = 1) {
   if (welcomeDemoGuardian.length) {
     const gh = welcomeDemoGuardian[0];
     const gn = welcomeDemoGuardian[1] || gh;
-    drawSegments(welcomeDemoGuardian, welcomeDemoPreviousGuardian, {
-      guardian: true,
-      direction: { x: gh.x - gn.x, y: gh.y - gn.y }
-    });
+    drawSegments(welcomeDemoGuardian, welcomeDemoPreviousGuardian, { guardian: true, direction: { x: gh.x - gn.x, y: gh.y - gn.y } });
   }
   const isImmune = welcomeDemoImmuneUntil > welcomeDemoTick;
   drawSegments(welcomeDemoSnake, welcomeDemoPreviousSnake, { immune: isImmune, direction: welcomeDemoDirection });
@@ -6785,9 +5074,7 @@ function drawWelcomeDemo(interpolation = 1) {
     const cy = by + (head.y + 0.5) * cellSize;
     c.strokeStyle = 'rgba(78, 201, 160, 0.88)';
     c.lineWidth = 2;
-    c.beginPath();
-    c.arc(cx, cy, cellSize * 0.77, 0, Math.PI * 2);
-    c.stroke();
+    c.beginPath(); c.arc(cx, cy, cellSize * 0.77, 0, Math.PI * 2); c.stroke();
   }
   if (welcomeDemoTick < welcomeDemoFlashUntil && welcomeDemoSnake.length) {
     const head = welcomeDemoSnake[0];
@@ -6799,13 +5086,9 @@ function drawWelcomeDemo(interpolation = 1) {
 }
 function welcomeDemoFrame(timestamp) {
   welcomeDemoFrameId = null;
-  if (welcomeScreen.classList.contains('hidden')) {
-    welcomeDemoLastFrame = null;
-    return;
-  }
-  if (document.hidden) {
-    welcomeDemoLastFrame = timestamp;
-  } else {
+  if (welcomeScreen.classList.contains('hidden')) { welcomeDemoLastFrame = null; return; }
+  if (document.hidden) { welcomeDemoLastFrame = timestamp; }
+  else {
     const elapsed = welcomeDemoLastFrame === null ? 0 : Math.min(100, timestamp - welcomeDemoLastFrame);
     welcomeDemoLastFrame = timestamp;
     welcomeDemoAccumulator += elapsed;
@@ -6826,10 +5109,7 @@ function startWelcomeDemo() {
   welcomeDemoFrameId = requestAnimationFrame(welcomeDemoFrame);
 }
 function stopWelcomeDemo() {
-  if (welcomeDemoFrameId !== null) {
-    cancelAnimationFrame(welcomeDemoFrameId);
-    welcomeDemoFrameId = null;
-  }
+  if (welcomeDemoFrameId !== null) { cancelAnimationFrame(welcomeDemoFrameId); welcomeDemoFrameId = null; }
   welcomeDemoLastFrame = null;
 }
 
@@ -6866,34 +5146,20 @@ gameTime = 0;
 applyGameModeRules();
 
 // ========================================================
-// 32. PWA — CAPTURA DEL EVENTO DE INSTALACIÓN
+// 32. PWA — INSTALACIÓN
 // ========================================================
 (function initPWAInstall() {
-  const btns = [
-    document.getElementById('pwa-install-btn'),
-    document.getElementById('pwa-install-btn-2')
-  ].filter(Boolean);
-
-  if (btns.length === 0) {
-    console.log('[PWA] No hay botones de instalación en el DOM.');
-    return;
-  }
-
+  const btns = [document.getElementById('pwa-install-btn'), document.getElementById('pwa-install-btn-2')].filter(Boolean);
+  if (btns.length === 0) return;
   let deferredInstallPrompt = null;
-
   window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('[PWA] beforeinstallprompt detectado. Mostrando botones.');
     e.preventDefault();
     deferredInstallPrompt = e;
     btns.forEach(btn => btn.classList.remove('hidden'));
   });
-
   btns.forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!deferredInstallPrompt) {
-        console.log('[PWA] No hay prompt de instalación pendiente.');
-        return;
-      }
+      if (!deferredInstallPrompt) return;
       deferredInstallPrompt.prompt();
       const { outcome } = await deferredInstallPrompt.userChoice;
       console.log(`[PWA] Instalación: ${outcome}`);
@@ -6901,9 +5167,7 @@ applyGameModeRules();
       btns.forEach(b => b.classList.add('hidden'));
     });
   });
-
   window.addEventListener('appinstalled', () => {
-    console.log('[PWA] ¡Kukulcán instalado!');
     btns.forEach(btn => btn.classList.add('hidden'));
     deferredInstallPrompt = null;
   });

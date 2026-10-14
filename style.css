@@ -127,6 +127,13 @@ h1, h2, h3 {
 /* =========================================================
    TOOLBAR DESKTOP
    ========================================================= */
+
+/* Ocultar los selects del toolbar SIEMPRE.
+   Se controlan desde el modal de configuración o la pantalla de bienvenida. */
+#desktop-toolbar .toolbar-hidden-select {
+  display: none !important;
+}
+
 .desktop-toolbar {
   position: fixed;
   top: 0; left: 0; width: 100%;
@@ -381,6 +388,7 @@ body.gameover-open .lives-fixed-container {
 /* =========================================================
    AJUSTES POR ANCHO DE PANTALLA
    ========================================================= */
+
 @media (max-width: 1300px) {
   .brand-title { font-size: 0.68rem; }
   .stat-pill,
@@ -1999,3 +2007,21 @@ body:not(.welcome-open):not(.gameover-open) .pwa-install-floating:not(.hidden) {
 }
 .update-banner-btn:hover { filter: brightness(1.1); }
 .update-banner-btn:active { transform: scale(0.95); }
+
+.customize-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.customize-footer .btn {
+  flex: 1;
+  max-width: 180px;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+}
+@media (max-width: 480px) {
+  .customize-footer .btn { padding: 10px 14px; font-size: 0.82rem; }
+}
