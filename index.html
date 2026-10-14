@@ -22,6 +22,9 @@
   <canvas id="gameCanvas" aria-label="Tablero de juego"></canvas>
   <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive" aria-atomic="true"></div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       PANTALLA DE BIENVENIDA
+       ═══════════════════════════════════════════════════════ -->
   <section id="welcome-screen" class="welcome-screen" aria-label="Instrucciones del juego">
     <div class="welcome-card">
       <div class="welcome-preview">
@@ -40,9 +43,11 @@
           <div class="select-box">
             <label for="welcome-game-mode">Modo</label>
             <select id="welcome-game-mode" class="styled-select">
-              <option value="classic" selected>Clásico</option>
-              <option value="hunt">Cacería</option>
-              <option value="survival">Supervivencia</option>
+              <option value="classic" selected>⚔️ Clásico</option>
+              <option value="hunt">🎯 Cacería</option>
+              <option value="survival">🛡️ Supervivencia</option>
+              <option value="zen">🧘 Zen</option>
+              <option value="timed">⏱️ Contrarreloj</option>
             </select>
           </div>
           <div class="select-box" id="welcome-difficulty-box">
@@ -57,12 +62,17 @@
         </div>
         <div class="welcome-buttons">
           <button id="welcome-info-btn" class="icon-btn" aria-label="Instrucciones">ℹ️</button>
+          <button id="welcome-lore-btn" class="icon-btn" aria-label="Historia">📜</button>
+          <button id="welcome-customize-btn" class="icon-btn" aria-label="Personalizar">🎨</button>
           <button id="welcome-start-btn" class="btn btn-primary welcome-start-btn">▶ Jugar</button>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════════════════
+       TOOLBAR DESKTOP
+       ═══════════════════════════════════════════════════════ -->
   <header id="desktop-toolbar" class="desktop-toolbar">
     <div class="toolbar-left">
       <img src="snk.png" alt="" class="brand-logo">
@@ -73,6 +83,7 @@
       <div class="stat-pill"><span class="stat-label">PUNTOS</span><span id="dt-score" class="stat-value">0</span></div>
       <div class="stat-pill"><span class="stat-label">RÉCORD</span><span id="dt-high-score" class="stat-value">0</span></div>
       <div class="stat-pill"><span class="stat-label">LONGITUD</span><span id="dt-length" class="stat-value">3</span></div>
+      <div class="stat-pill coins-pill"><span class="stat-label">🌽</span><span id="dt-coins" class="stat-value">0</span></div>
       <div class="lives-fixed-container" id="lives-fixed-container" role="status" aria-label="Sacrificios restantes">
         <span class="lives-label">SACRIFICIOS</span>
         <div class="lives-pips" id="lives-fixed-pips">
@@ -87,9 +98,11 @@
       <div class="select-box">
         <label for="game-mode-select">Modo</label>
         <select id="game-mode-select" class="styled-select">
-          <option value="classic" selected>Clásico</option>
-          <option value="hunt">Cacería</option>
-          <option value="survival">Supervivencia</option>
+          <option value="classic" selected>⚔️ Clásico</option>
+          <option value="hunt">🎯 Cacería</option>
+          <option value="survival">🛡️ Supervivencia</option>
+          <option value="zen">🧘 Zen</option>
+          <option value="timed">⏱️ Contrarreloj</option>
         </select>
       </div>
       <div class="select-box" id="difficulty-selector-box">
@@ -103,12 +116,17 @@
       </div>
       <button id="dt-sound-btn" class="icon-btn" title="Sonido" aria-label="Sonido">🔊</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
+      <button id="dt-achievements-btn" class="icon-btn" title="Logros" aria-label="Logros">🏆</button>
+      <button id="dt-customize-btn" class="icon-btn" title="Personalizar" aria-label="Personalizar">🎨</button>
       <button id="dt-stats-btn" class="icon-btn" title="Estadísticas" aria-label="Estadísticas">📊</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
       <button id="dt-pause-btn" class="btn btn-secondary">⏸ Pausa</button>
     </div>
   </header>
 
+  <!-- ═══════════════════════════════════════════════════════
+       HUD MÓVIL
+       ═══════════════════════════════════════════════════════ -->
   <header id="mobile-hud" class="mobile-hud">
     <button id="menu-toggle-btn" class="hud-btn" aria-label="Abrir menú">☰</button>
     <div class="hud-center-pill">
@@ -130,6 +148,9 @@
     </div>
   </header>
 
+  <!-- ═══════════════════════════════════════════════════════
+       BADGES DE ESTADO
+       ═══════════════════════════════════════════════════════ -->
   <div class="status-badges-container" id="status-badges-container">
     <div class="badges-priority-high" id="badges-priority-high">
       <div id="furia-badge" class="hud-badge furia-badge hidden">
@@ -202,8 +223,37 @@
         <span class="badge-text-mobile">Guardián</span>
       </div>
     </div>
+    <!-- ✅ NUEVOS BADGES DE MECÁNICAS -->
+    <div class="badges-priority-special" id="badges-priority-special">
+      <div id="timer-badge" class="hud-badge timer-badge hidden">
+        <span class="badge-icon">⏱️</span>
+        <span class="badge-text-desktop">Tiempo restante</span>
+        <span class="badge-text-mobile">Tiempo</span>
+        <span class="badge-compact"><span id="timer-value">60</span>s</span>
+      </div>
+      <div id="eclipse-badge" class="hud-badge eclipse-badge hidden">
+        <span class="badge-icon">🌑</span>
+        <span class="badge-text-desktop">¡Eclipse! Controles invertidos</span>
+        <span class="badge-text-mobile">🌑 Eclipse</span>
+        <span class="badge-compact"><span id="eclipse-timer">5</span>s</span>
+      </div>
+      <div id="xibalba-badge" class="hud-badge xibalba-badge hidden">
+        <span class="badge-icon">💀</span>
+        <span class="badge-text-desktop">Prueba de Xibalbá</span>
+        <span class="badge-text-mobile">Prueba</span>
+        <span class="badge-compact"><span id="xibalba-timer">10</span>s</span>
+      </div>
+      <div id="darkness-badge" class="hud-badge darkness-badge hidden">
+        <span class="badge-icon">🌑</span>
+        <span class="badge-text-desktop">Las tinieblas avanzan...</span>
+        <span class="badge-text-mobile">🌑 Tinieblas</span>
+      </div>
+    </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       BOTÓN FURIA
+       ═══════════════════════════════════════════════════════ -->
   <div class="turbo-container">
     <button id="btn-turbo" class="turbo-btn" aria-label="Activar Furia del Fuego">
       <span id="turbo-icon" class="turbo-icon">🔥</span>
@@ -212,6 +262,9 @@
     </button>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       CRUCETA TÁCTIL
+       ═══════════════════════════════════════════════════════ -->
   <div id="touch-controls" class="touch-controls hidden">
     <button id="btn-up" class="pad-btn" aria-label="Arriba">▲</button>
     <div class="pad-row">
@@ -222,6 +275,9 @@
     <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       DRAWER MENÚ
+       ═══════════════════════════════════════════════════════ -->
   <div id="drawer-menu" class="modal-backdrop hidden">
     <div class="drawer-card">
       <div class="drawer-header">
@@ -235,13 +291,16 @@
         <div class="stat-summary-box">
           <div class="summary-col"><span class="sum-lbl">Puntos</span><span id="drawer-score" class="sum-val">0</span></div>
           <div class="summary-col"><span class="sum-lbl">Récord</span><span id="drawer-high-score" class="sum-val">0</span></div>
+          <div class="summary-col"><span class="sum-lbl">🌽 Monedas</span><span id="drawer-coins" class="sum-val">0</span></div>
         </div>
         <div class="form-group">
           <label for="drawer-game-mode">🎮 Modo de Juego</label>
           <select id="drawer-game-mode" class="styled-select">
-            <option value="classic">Clásico</option>
-            <option value="hunt">Cacería</option>
-            <option value="survival">Supervivencia</option>
+            <option value="classic">⚔️ Clásico</option>
+            <option value="hunt">🎯 Cacería</option>
+            <option value="survival">🛡️ Supervivencia</option>
+            <option value="zen">🧘 Zen</option>
+            <option value="timed">⏱️ Contrarreloj</option>
           </select>
         </div>
         <div class="form-group">
@@ -264,6 +323,8 @@
         <div class="drawer-actions">
           <button id="drawer-resume-btn" class="btn btn-primary">▶ Continuar</button>
           <button id="drawer-restart-btn" class="btn btn-secondary">🔄 Reiniciar</button>
+          <button id="drawer-achievements-btn" class="btn btn-outline">🏆 Logros</button>
+          <button id="drawer-customize-btn" class="btn btn-outline">🎨 Personalizar</button>
           <button id="drawer-stats-btn" class="btn btn-outline">📊 Estadísticas</button>
           <button id="drawer-tutorial-btn" class="btn btn-outline">❓ Tutorial</button>
           <button id="pwa-install-btn-2" class="btn btn-outline hidden" aria-label="Instalar juego como aplicación">
@@ -274,6 +335,9 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL TUTORIAL COMPLETO
+       ═══════════════════════════════════════════════════════ -->
   <div id="tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-step-title">
     <div class="tutorial-card">
       <div class="tutorial-header">
@@ -297,9 +361,9 @@
         <div id="step-3" class="tutorial-step">
           <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 ⚡</div>
           <ul class="tutorial-guardian-list">
-            <li><strong>Cazador</strong><span>Rojo · persigue directo</span></li>
-            <li><strong>Vidente</strong><span>Violeta · anticipa tu rumbo</span></li>
-            <li><strong>Flanqueador</strong><span>Naranja · intenta rodearte</span></li>
+            <li><strong>Ahalpuh</strong><span>Rojo · El Putrefactor</span></li>
+            <li><strong>Ixtab</strong><span>Violeta · La Vidente</span></li>
+            <li><strong>Camazotz</strong><span>Naranja · El Murciélago</span></li>
             <li><strong>Tezcatlipoca</strong><span>Jaguar de obsidiana · humo y garras</span></li>
           </ul>
           <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>. 🫀 El <strong>sacrificio</strong> en el templo recupera uno.</p>
@@ -313,9 +377,11 @@
         <div id="step-5" class="tutorial-step">
           <div class="tutorial-icon-banner">🎮</div>
           <p class="tutorial-lead"><strong>Modalidades de Juego:</strong></p>
-          <p class="tutorial-tip">⚔️ <strong>Clásico:</strong> La experiencia original. La dificultad que elijas se aplica aquí.</p>
-          <p class="tutorial-tip">🎯 <strong>Cacería:</strong> Los guardianes aparecen más rápido y dan más puntos. ¡La agresividad es la clave!</p>
-          <p class="tutorial-tip">🛡️ <strong>Supervivencia:</strong> Sin ítems de jade ni sacrificios. ¡Sobrevive con una sola vida el mayor tiempo posible!</p>
+          <p class="tutorial-tip">⚔️ <strong>Clásico:</strong> La experiencia original. Cada 60s, un <strong>Eclipse</strong> invierte tus controles.</p>
+          <p class="tutorial-tip">🎯 <strong>Cacería:</strong> Los guardianes dejan un <strong>rastro de humo</strong> que te ralentiza.</p>
+          <p class="tutorial-tip">🛡️ <strong>Supervivencia:</strong> Sin ítems. La <strong>oscuridad avanza</strong> y las <strong>pruebas de Xibalbá</strong> aparecen.</p>
+          <p class="tutorial-tip">🧘 <strong>Zen:</strong> Sin guardianes. Solo tú y las ofrendas.</p>
+          <p class="tutorial-tip">⏱️ <strong>Contrarreloj:</strong> 60 segundos. Cada maíz suma +2s.</p>
         </div>
       </div>
       <div class="step-dots">
@@ -329,6 +395,97 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL LORE / HISTORIA
+       ═══════════════════════════════════════════════════════ -->
+  <div id="lore-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="lore-title">
+    <div class="lore-card">
+      <div class="lore-header">
+        <img src="snk.png" alt="" class="lore-logo">
+        <h2 id="lore-title">El Descenso a Xibalbá</h2>
+        <button id="close-lore-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="lore-content">
+        <p class="lore-paragraph">
+          <span class="lore-drop-cap">K</span>ukulcán, la Serpiente Emplumada, dios del viento y la sabiduría, contempló el mundo desde lo alto del Templo de Chichén Itzá. Los hombres habían olvidado las ofrendas. El maíz escaseaba, y el hambre se extendía por las tierras mayas.
+        </p>
+        <p class="lore-paragraph">
+          Fue entonces cuando <strong>Hunahpú y Xbalanqué</strong>, los gemelos heroicos, le revelaron la verdad: los señores de <strong>Xibalbá</strong>, el inframundo, habían robado las semillas sagradas. Solo un dios podría descender a las nueve pruebas y recuperarlas.
+        </p>
+        <p class="lore-paragraph">
+          Kukulcán se enrolló sobre sí mismo y se lanzó hacia el abismo. En su descenso, los guardianes de la muerte lo acechan: <strong>Ahalpuh</strong>, el Putrefactor; <strong>Ixtab</strong>, la Vidente; <strong>Camazotz</strong>, el Murciélago. Y en lo más profundo, el propio <strong>Tezcatlipoca</strong>, el Jaguar de Obsidiana, espera entre las sombras.
+        </p>
+        <p class="lore-paragraph">
+          Solo el <strong>jade sagrado</strong> puede protegerte. Solo el <strong>maíz</strong> puede alimentarte. Solo la <strong>Furia de Xiuhcóatl</strong> puede incinerar a tus enemigos.
+        </p>
+        <p class="lore-paragraph lore-final">
+          🐍 <em>Guía a Kukulcán a través de las tinieblas. Recupera el maíz. Regresa al mundo de los vivos.</em> 🐍
+        </p>
+      </div>
+      <div class="lore-footer">
+        <button id="lore-start-btn" class="btn btn-primary">🚀 ¡Comenzar la Travesía!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL DE LOGROS
+       ═══════════════════════════════════════════════════════ -->
+  <div id="achievements-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="achievements-title">
+    <div class="achievements-card">
+      <div class="achievements-header">
+        <h2 id="achievements-title">🏆 Logros de Kukulcán</h2>
+        <button id="close-achievements-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="achievements-summary">
+        <div class="achievements-progress">
+          <span id="achievements-count">0 / 11</span>
+          <span class="achievements-label">desbloqueados</span>
+        </div>
+        <div class="achievements-bar">
+          <div id="achievements-fill" class="achievements-fill" style="width: 0%"></div>
+        </div>
+      </div>
+      <div id="achievements-list" class="achievements-list">
+        <!-- Se llena dinámicamente con JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL DE PERSONALIZACIÓN (SKINS Y TEMAS)
+       ═══════════════════════════════════════════════════════ -->
+  <div id="customize-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="customize-title">
+    <div class="customize-card">
+      <div class="customize-header">
+        <h2 id="customize-title">🎨 Personalizar</h2>
+        <button id="close-customize-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="customize-coins">
+        <span class="coins-icon">🌽</span>
+        <span class="coins-label">Monedas de Maíz:</span>
+        <span id="customize-coins-value" class="coins-value">0</span>
+      </div>
+      <div class="customize-tabs">
+        <button class="customize-tab active" data-tab="skins">🐍 Skins</button>
+        <button class="customize-tab" data-tab="themes">🎨 Tableros</button>
+      </div>
+      <div id="customize-skins-panel" class="customize-panel active">
+        <div id="skins-grid" class="skins-grid">
+          <!-- Se llena dinámicamente -->
+        </div>
+      </div>
+      <div id="customize-themes-panel" class="customize-panel">
+        <div id="themes-grid" class="themes-grid">
+          <!-- Se llena dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL GAME OVER
+       ═══════════════════════════════════════════════════════ -->
   <div id="game-overlay" class="modal-backdrop hidden">
     <div class="modal-card">
       <img src="snk.png" alt="" class="modal-gameover-logo">
@@ -337,11 +494,15 @@
       <div class="final-stats">
         <p>Puntuación: <strong id="final-score">0</strong></p>
         <p>Longitud final: <strong id="final-length">3</strong></p>
+        <p>🌽 Monedas ganadas: <strong id="final-coins">0</strong></p>
       </div>
       <button id="restart-overlay-btn" class="btn btn-primary">🔄 Jugar de nuevo</button>
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL ESTADÍSTICAS
+       ═══════════════════════════════════════════════════════ -->
   <div id="statistics-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="statistics-title">
     <section class="statistics-card">
       <header class="statistics-header">
@@ -368,13 +529,15 @@
     </section>
   </div>
 
-  <!-- ✅ Botón flotante de instalación PWA — fuera de cualquier contenedor, siempre visible -->
+  <!-- ✅ Botón flotante de instalación PWA -->
   <button id="pwa-install-btn" class="pwa-install-floating hidden" aria-label="Instalar juego como aplicación">
     <span class="pwa-install-icon">📲</span>
     <span class="pwa-install-text">Instalar Juego</span>
   </button>
 
-  <!-- Modal de instrucciones resumidas para la intro -->
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL DE INSTRUCCIONES RÁPIDAS (INTRO)
+       ═══════════════════════════════════════════════════════ -->
   <div id="intro-tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="intro-tutorial-title">
     <div class="tutorial-card intro-tutorial-card">
       <div class="tutorial-header">
@@ -392,14 +555,28 @@
           <p class="tutorial-lead"><strong>Ítems y Poderes:</strong> 💎 Jade te protege. ❄️ Hielo congela guardianes. 💨 Viento te da velocidad y puntos. 🌀 <strong>Sello del Orden Cósmico:</strong> recógelo y tras 1s elimina a todos los guardianes (+50 c/u). 🌽 El maíz te hace crecer.</p>
         </div>
         <div class="tutorial-step active">
-          <div class="tutorial-icon-banner">⚔️ 🎯 🛡️</div>
-          <p class="tutorial-lead"><strong>Guardianes y Modos:</strong> Evita a los guardianes. En <strong>Clásico</strong> tienes 3 vidas. <strong>Cacería</strong> es más agresivo. <strong>Supervivencia</strong> es a una sola vida y sin ítems.</p>
+          <div class="tutorial-icon-banner">⚔️ 🎯 🛡️ 🧘 ⏱️</div>
+          <p class="tutorial-lead"><strong>Modos:</strong> <strong>Clásico</strong> (eclipses), <strong>Cacería</strong> (rastro de humo), <strong>Supervivencia</strong> (oscuridad + pruebas de Xibalbá), <strong>Zen</strong> (sin enemigos) y <strong>Contrarreloj</strong> (60s + maíz).</p>
         </div>
       </div>
       <div class="tutorial-footer">
         <button id="intro-tut-start-btn" class="btn btn-primary">🚀 ¡A Jugar!</button>
       </div>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       NOTIFICACIÓN DE LOGRO (TOAST) — contenedor
+       ═══════════════════════════════════════════════════════ -->
+  <div id="achievement-toast-container" class="achievement-toast-container"></div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BANNER DE ACTUALIZACIÓN PWA
+       ═══════════════════════════════════════════════════════ -->
+  <div id="update-banner" class="update-banner hidden" role="alert">
+    <span class="update-banner-icon">🔄</span>
+    <span class="update-banner-text">Nueva versión disponible</span>
+    <button id="update-banner-btn" class="update-banner-btn">Actualizar</button>
   </div>
 
   <script src="script.js"></script>

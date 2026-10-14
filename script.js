@@ -16,8 +16,11 @@ if ('serviceWorker' in navigator) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed') {
                 if (navigator.serviceWorker.controller) {
-                  console.log('Nueva versión disponible. Recargando...');
-                  window.location.reload();
+                  // ✅ En lugar de recargar automáticamente (riesgo de bucle),
+                  // mostramos un banner al usuario para que él decida.
+                  console.log('Nueva versión disponible.');
+                  const banner = document.getElementById('update-banner');
+                  if (banner) banner.classList.remove('hidden');
                 }
               }
             };
@@ -28,6 +31,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ✅ Listener del botón "Actualizar" del banner PWA
+document.addEventListener('DOMContentLoaded', () => {
+  const updateBtn = document.getElementById('update-banner-btn');
+  if (updateBtn) {
+    updateBtn.addEventListener('click', () => window.location.reload());
+  }
+});
+
 // ========================================================
 // 1. REFERENCIAS AL DOM
 // ========================================================
@@ -37,11 +48,14 @@ const ctx = canvas.getContext('2d', { alpha: true });
 const dtScore = document.getElementById('dt-score');
 const dtHighScore = document.getElementById('dt-high-score');
 const dtLength = document.getElementById('dt-length');
+const dtCoins = document.getElementById('dt-coins');
 const dtSoundBtn = document.getElementById('dt-sound-btn');
 const dtTutorialBtn = document.getElementById('dt-tutorial-btn');
 const dtStartBtn = document.getElementById('dt-start-btn');
 const dtPauseBtn = document.getElementById('dt-pause-btn');
 const dtStatsBtn = document.getElementById('dt-stats-btn');
+const dtAchievementsBtn = document.getElementById('dt-achievements-btn');
+const dtCustomizeBtn = document.getElementById('dt-customize-btn');
 const difficultySelect = document.getElementById('difficulty-select');
 const gameModeSelect = document.getElementById('game-mode-select');
 const difficultySelectorBox = document.getElementById('difficulty-selector-box');
@@ -49,6 +63,8 @@ const difficultySelectorBox = document.getElementById('difficulty-selector-box')
 const welcomeScreen = document.getElementById('welcome-screen');
 const welcomeStartBtn = document.getElementById('welcome-start-btn');
 const welcomeInfoBtn = document.getElementById('welcome-info-btn');
+const welcomeLoreBtn = document.getElementById('welcome-lore-btn');
+const welcomeCustomizeBtn = document.getElementById('welcome-customize-btn');
 const welcomeDemo = document.getElementById('welcome-demo');
 const welcomeDemoCallout = document.getElementById('welcome-demo-callout');
 const welcomeDemoContext = welcomeDemo.getContext('2d', { alpha: false });
@@ -73,6 +89,7 @@ const drawerMenu = document.getElementById('drawer-menu');
 const closeDrawerBtn = document.getElementById('close-drawer-btn');
 const drawerScore = document.getElementById('drawer-score');
 const drawerHighScore = document.getElementById('drawer-high-score');
+const drawerCoins = document.getElementById('drawer-coins');
 const drawerDifficulty = document.getElementById('drawer-difficulty');
 const drawerGameMode = document.getElementById('drawer-game-mode');
 const drawerDpadToggle = document.getElementById('drawer-dpad-toggle');
@@ -81,6 +98,8 @@ const drawerResumeBtn = document.getElementById('drawer-resume-btn');
 const drawerRestartBtn = document.getElementById('drawer-restart-btn');
 const drawerTutorialBtn = document.getElementById('drawer-tutorial-btn');
 const drawerStatsBtn = document.getElementById('drawer-stats-btn');
+const drawerAchievementsBtn = document.getElementById('drawer-achievements-btn');
+const drawerCustomizeBtn = document.getElementById('drawer-customize-btn');
 
 const immunityTimerSpan = document.getElementById('immunity-timer');
 const respawnBadge = document.getElementById('respawn-badge');
@@ -100,6 +119,15 @@ const furiaBadge = document.getElementById('furia-badge');
 const furiaTimerSpan = document.getElementById('furia-timer');
 const airBadge = document.getElementById('air-badge');
 const airTimerSpan = document.getElementById('air-timer');
+
+// ✅ NUEVOS BADGES DE MECÁNICAS
+const timerBadge = document.getElementById('timer-badge');
+const timerValueSpan = document.getElementById('timer-value');
+const eclipseBadge = document.getElementById('eclipse-badge');
+const eclipseTimerSpan = document.getElementById('eclipse-timer');
+const xibalbaBadge = document.getElementById('xibalba-badge');
+const xibalbaTimerSpan = document.getElementById('xibalba-timer');
+const darknessBadge = document.getElementById('darkness-badge');
 
 const btnTurbo = document.getElementById('btn-turbo');
 const turboIcon = document.getElementById('turbo-icon');
@@ -123,10 +151,31 @@ const introTutorialModal = document.getElementById('intro-tutorial-modal');
 const closeIntroTutorialBtn = document.getElementById('close-intro-tutorial-btn');
 const introTutStartBtn = document.getElementById('intro-tut-start-btn');
 
+// ✅ NUEVOS MODALES
+const loreModal = document.getElementById('lore-modal');
+const closeLoreBtn = document.getElementById('close-lore-btn');
+const loreStartBtn = document.getElementById('lore-start-btn');
+
+const achievementsModal = document.getElementById('achievements-modal');
+const closeAchievementsBtn = document.getElementById('close-achievements-btn');
+const achievementsList = document.getElementById('achievements-list');
+const achievementsCount = document.getElementById('achievements-count');
+const achievementsFill = document.getElementById('achievements-fill');
+
+const customizeModal = document.getElementById('customize-modal');
+const closeCustomizeBtn = document.getElementById('close-customize-btn');
+const skinsGrid = document.getElementById('skins-grid');
+const themesGrid = document.getElementById('themes-grid');
+const customizeCoinsValue = document.getElementById('customize-coins-value');
+const customizeTabs = document.querySelectorAll('.customize-tab');
+const customizeSkinsPanel = document.getElementById('customize-skins-panel');
+const customizeThemesPanel = document.getElementById('customize-themes-panel');
+
 const gameOverlay = document.getElementById('game-overlay');
 const overlayReason = document.getElementById('overlay-reason');
 const finalScoreElement = document.getElementById('final-score');
 const finalLengthElement = document.getElementById('final-length');
+const finalCoinsElement = document.getElementById('final-coins');
 const restartOverlayBtn = document.getElementById('restart-overlay-btn');
 const statisticsModal = document.getElementById('statistics-modal');
 const closeStatisticsBtn = document.getElementById('close-statistics-btn');
@@ -140,12 +189,15 @@ const BadgeManager = (() => {
   const isMobile = () => window.innerWidth <= 768;
   const MAX_MEDIUM_MOBILE = 1;
   const MAX_HIGH_MOBILE = 2;
+  const MAX_SPECIAL_MOBILE = 1;
 
   const mediumOrder = [
     'cosmicOrder', 'rain', 'sacrificeOffering',
     'cosmicOrderFood', 'skullFood', 'threat'
   ];
   const highOrder = ['furia', 'air', 'immunity', 'freeze', 'respawn'];
+  // ✅ Nuevo orden de badges especiales
+  const specialOrder = ['timer', 'eclipse', 'xibalba', 'darkness'];
 
   const refs = {
     immunity: document.getElementById('immunity-badge'),
@@ -158,14 +210,21 @@ const BadgeManager = (() => {
     cosmicOrderFood: cosmicOrderFoodBadge,
     sacrificeOffering: sacrificeOfferingBadge,
     skullFood: skullFoodBadge,
-    threat: threatBadge
+    threat: threatBadge,
+    // ✅ Nuevos
+    timer: timerBadge,
+    eclipse: eclipseBadge,
+    xibalba: xibalbaBadge,
+    darkness: darknessBadge
   };
 
   const logical = {
     immunity: false, furia: false, air: false,
     respawn: false, freeze: false, rain: false,
     cosmicOrder: false, cosmicOrderFood: false, sacrificeOffering: false,
-    skullFood: false, threat: false
+    skullFood: false, threat: false,
+    // ✅ Nuevos
+    timer: false, eclipse: false, xibalba: false, darkness: false
   };
 
   function setVisible(key, visible) {
@@ -177,6 +236,7 @@ const BadgeManager = (() => {
   function apply() {
     const mobile = isMobile();
 
+    // HIGH PRIORITY
     if (mobile) {
       const activeHigh = highOrder.filter(k => logical[k]);
       const visibleHigh = new Set(activeHigh.slice(0, MAX_HIGH_MOBILE));
@@ -193,6 +253,7 @@ const BadgeManager = (() => {
       });
     }
 
+    // MEDIUM PRIORITY
     if (mobile) {
       const active = mediumOrder.filter(k => logical[k]);
       const visible = new Set(active.slice(0, MAX_MEDIUM_MOBILE));
@@ -204,6 +265,25 @@ const BadgeManager = (() => {
       });
     } else {
       mediumOrder.forEach(k => {
+        const el = refs[k];
+        if (!el) return;
+        el.classList.toggle('hidden', !logical[k]);
+        el.classList.remove('is-visible');
+      });
+    }
+
+    // ✅ SPECIAL PRIORITY (mecánicas de modos)
+    if (mobile) {
+      const active = specialOrder.filter(k => logical[k]);
+      const visible = new Set(active.slice(0, MAX_SPECIAL_MOBILE));
+      specialOrder.forEach(k => {
+        const el = refs[k];
+        if (!el) return;
+        el.classList.toggle('is-visible', visible.has(k));
+        el.classList.toggle('hidden', !logical[k]);
+      });
+    } else {
+      specialOrder.forEach(k => {
         const el = refs[k];
         if (!el) return;
         el.classList.toggle('hidden', !logical[k]);
@@ -349,23 +429,34 @@ const DIFFICULTY_PROFILES = {
   }
 };
 
+// ✅ MODOS ACTUALIZADOS (con Zen, Contrarreloj y banderas de mecánicas)
 const GAME_MODES = {
   classic: {
     name: 'Clásico',
     icon: '⚔️',
+    subtitle: 'El Viaje de Kukulcán',
     guardianSpawnRate: 1.0,
     guardianRewardMultiplier: 1.0,
     itemsEnabled: true,
     livesEnabled: true,
+    hasEclipse: true,
+    hasDarkness: false,
+    hasHuntTrail: false,
+    hasTimer: false,
     profileOverrides: null,
   },
   hunt: {
     name: 'Cacería',
     icon: '🎯',
+    subtitle: 'La Noche de Tezcatlipoca',
     guardianSpawnRate: 0.6,
     guardianRewardMultiplier: 1.5,
     itemsEnabled: true,
     livesEnabled: true,
+    hasEclipse: false,
+    hasDarkness: false,
+    hasHuntTrail: true,
+    hasTimer: false,
     profileOverrides: {
       guardianTargets: 3,
       guardianFirstSpawnMs: 9000,
@@ -381,10 +472,15 @@ const GAME_MODES = {
   survival: {
     name: 'Supervivencia',
     icon: '🛡️',
+    subtitle: 'El Descenso a Xibalbá',
     guardianSpawnRate: 1.2,
     guardianRewardMultiplier: 1.0,
     itemsEnabled: false,
     livesEnabled: false,
+    hasEclipse: false,
+    hasDarkness: true,
+    hasHuntTrail: false,
+    hasTimer: false,
     profileOverrides: {
       guardianTargets: 2,
       guardianFirstSpawnMs: 12000,
@@ -404,7 +500,100 @@ const GAME_MODES = {
       freezeRespawnMs: 999999,
       jadeRespawnMs: 999999,
     }
+  },
+  zen: {
+    name: 'Zen',
+    icon: '🧘',
+    subtitle: 'Meditación en el Templo',
+    guardianSpawnRate: Infinity,
+    guardianRewardMultiplier: 1.0,
+    itemsEnabled: true,
+    livesEnabled: true,
+    hasEclipse: false,
+    hasDarkness: false,
+    hasHuntTrail: false,
+    hasTimer: false,
+    profileOverrides: {
+      guardianTargets: 0,
+      guardianFirstSpawnMs: 999999999,
+      guardianNextSpawnMs: 999999999,
+      rainFirstMs: 60000,
+      rainIntervalMs: 60000,
+      cosmicFirstMs: 999999999,
+      cosmicIntervalMs: 999999999,
+      sacrificeFirstMs: 999999999,
+      skullFirstMs: 999999999,
+      freezeRespawnMs: 999999999,
+      jadeRespawnMs: 999999999,
+      guardianReward: 0,
+      bossReward: 0,
+      turboDurationMs: 4000,
+      turboCooldownMs: 3000,
+    }
+  },
+  timed: {
+    name: 'Contrarreloj',
+    icon: '⏱️',
+    subtitle: 'La Cuenta Regresiva del Sol',
+    guardianSpawnRate: 1.0,
+    guardianRewardMultiplier: 1.0,
+    itemsEnabled: true,
+    livesEnabled: true,
+    hasEclipse: false,
+    hasDarkness: false,
+    hasHuntTrail: false,
+    hasTimer: true,
+    profileOverrides: {
+      guardianTargets: 2,
+      guardianFirstSpawnMs: 15000,
+      guardianNextSpawnMs: 18000,
+      guardianMoveInterval: 4,
+      guardianLead: 3,
+      guardianReward: 100,
+      bossReward: 250,
+      turboDurationMs: 3000,
+      turboCooldownMs: 5000,
+    }
   }
+};
+
+// ========================================================
+// ✅ NUEVAS CONSTANTES DE MECÁNICAS
+// ========================================================
+
+// Eclipse (modo Clásico)
+const ECLIPSE_FIRST_MS = 60000;
+const ECLIPSE_INTERVAL_MS = 75000;
+const ECLIPSE_DURATION_MS = 5000;
+const ECLIPSE_WARNING_MS = 3000;
+
+// Oscuridad (modo Supervivencia)
+const DARKNESS_START_MS = 15000;
+const DARKNESS_MAX_RADIUS = 8;
+const DARKNESS_MIN_RADIUS = 2.5;
+const DARKNESS_FULL_MS = 180000;
+
+// Rastro de humo (modo Cacería)
+const HUNT_TRAIL_LIFETIME_MS = 4000;
+const HUNT_TRAIL_SLOW_FACTOR = 1.35;
+
+// Contrarreloj
+const TIMED_INITIAL_MS = 60000;
+const TIMED_MAIZE_BONUS_MS = 2000;
+const TIMED_BONUS_BONUS_MS = 5000;
+const TIMED_WARNING_MS = 10000;
+
+// Pruebas de Xibalbá (Supervivencia)
+const XIBALBA_FIRST_MS = 30000;
+const XIBALBA_INTERVAL_MS = 45000;
+const XIBALBA_DURATION_MS = 10000;
+
+// ✅ Configuración de Tezcatlipoca por dificultad
+const TEZCATLIPOCA_CONFIG = {
+  easy:    { unlockMs: 90000,  cooldownMs: 90000,  teleportMs: 4500, vulnerableMs: 3000 },
+  medium:  { unlockMs: 60000,  cooldownMs: 60000,  teleportMs: 4000, vulnerableMs: 2500 },
+  hard:    { unlockMs: 45000,  cooldownMs: 60000,  teleportMs: 3000, vulnerableMs: 2200 },
+  extreme: { unlockMs: 35000,  cooldownMs: 45000,  teleportMs: 2600, vulnerableMs: 2000 }
 };
 
 const BOARD_THEMES = {
@@ -413,21 +602,41 @@ const BOARD_THEMES = {
     gridLine: 'rgba(144, 153, 177, 0.13)',
     patternColor: 'rgba(198, 164, 85, 0.07)',
     patternType: 'diamond',
-    vignetteColor: 'rgba(0,0,0,0.42)'
+    vignetteColor: 'rgba(0,0,0,0.42)',
+    cost: 0
   },
   hunt: {
     bg: '#0a1a12',
     gridLine: 'rgba(78, 201, 160, 0.15)',
     patternColor: 'rgba(217, 142, 43, 0.08)',
     patternType: 'diamond',
-    vignetteColor: 'rgba(0, 10, 5, 0.55)'
+    vignetteColor: 'rgba(0, 10, 5, 0.55)',
+    cost: 0
   },
   survival: {
     bg: '#0a0809',
     gridLine: 'rgba(239, 82, 97, 0.08)',
     patternColor: 'rgba(239, 82, 97, 0.04)',
     patternType: 'crack',
-    vignetteColor: 'rgba(0,0,0,0.7)'
+    vignetteColor: 'rgba(0,0,0,0.7)',
+    cost: 0
+  },
+  // ✅ NUEVOS TEMAS DESBLOQUEABLES
+  obsidian: {
+    bg: '#0a0a0d',
+    gridLine: 'rgba(120, 120, 120, 0.12)',
+    patternColor: 'rgba(80, 80, 80, 0.08)',
+    patternType: 'diamond',
+    vignetteColor: 'rgba(0,0,0,0.7)',
+    cost: 200
+  },
+  jade: {
+    bg: '#0d1a14',
+    gridLine: 'rgba(78, 201, 160, 0.14)',
+    patternColor: 'rgba(125, 232, 196, 0.06)',
+    patternType: 'diamond',
+    vignetteColor: 'rgba(0, 20, 10, 0.6)',
+    cost: 300
   }
 };
 
@@ -457,21 +666,6 @@ function getDifficultyProfile() {
   return profile;
 }
 
-const GUARDIAN_TARGETS = Object.fromEntries(
-  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianTargets])
-);
-const GUARDIAN_FIRST_SPAWN_MS = Object.fromEntries(
-  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianFirstSpawnMs])
-);
-const GUARDIAN_NEXT_SPAWN_MS = Object.fromEntries(
-  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianNextSpawnMs])
-);
-const GUARDIAN_LIFETIME_MS = Object.fromEntries(
-  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.guardianLifetimeMs])
-);
-const JADE_RESPAWN_DELAY_MS = Object.fromEntries(
-  Object.entries(DIFFICULTY_PROFILES).map(([k, v]) => [k, v.jadeRespawnMs])
-);
 const FREEZE_FIRST_SPAWN_MS = 16000;
 const FREEZE_RESPAWN_DELAY_MS = 22000;
 
@@ -480,32 +674,44 @@ const GUARDIAN_FREEZE_DURATION_MS = 3000;
 const CHAAC_UNLOCK_MS = 45000;
 const CHAAC_COOLDOWN_MS = 60000;
 const CHAAC_LIFETIME_MS = 999999;
-const CHAAC_TELEPORT_MS = 5000;      
+const CHAAC_TELEPORT_MS = 5000;
 const CHAAC_RETRY_MS = 3000;
-const CHAAC_VULNERABLE_MS = 2200;    
+const CHAAC_VULNERABLE_MS = 2200;
 
+// ✅ GUARDIANES CON NOMBRES MAYAS Y PARTÍCULAS AMBIENTALES
 const GUARDIAN_DEFS = [
   {
     behavior: 'hunter',
-    name: 'Cazador',
+    name: 'Ahalpuh',
+    title: 'El Putrefactor',
+    lore: 'Demonio que causa la putrefacción. Te persigue sin descanso.',
     palette: { head: '#e2574c', body: '#9b2929', crest: '#ff9b83', eye: '#fff0c6' },
-    traits: { fangs: true, crestCount: 1, eyeMark: false }
+    traits: { fangs: true, crestCount: 1, eyeMark: false },
+    ambientParticles: { color: '#ff6b4c', rate: 0.35, size: 1.5 }
   },
   {
     behavior: 'interceptor',
-    name: 'Vidente',
+    name: 'Ixtab',
+    title: 'La Vidente',
+    lore: 'Diosa de la adivinación. Anticipa tu rumbo antes de que lo tomes.',
     palette: { head: '#a65bd4', body: '#64328e', crest: '#d4a0f0', eye: '#f0e0ff' },
-    traits: { fangs: false, crestCount: 1, eyeMark: true }
+    traits: { fangs: false, crestCount: 1, eyeMark: true },
+    ambientParticles: { color: '#c89bf0', rate: 0.4, size: 1.8 }
   },
   {
     behavior: 'flanker',
-    name: 'Flanqueador',
+    name: 'Camazotz',
+    title: 'El Murciélago de la Muerte',
+    lore: 'Señor de los murciélagos. Intenta rodearte desde las sombras.',
     palette: { head: '#f28c28', body: '#a64b1b', crest: '#ffc078', eye: '#fff0c6' },
-    traits: { fangs: true, crestCount: 2, eyeMark: false }
+    traits: { fangs: true, crestCount: 2, eyeMark: false },
+    ambientParticles: { color: '#ff9b3c', rate: 0.45, size: 1.6 }
   },
   {
     behavior: 'ambusher',
     name: 'Tezcatlipoca',
+    title: 'El Jaguar de Obsidiana',
+    lore: 'Dios de la noche y los espejos. Se teletransporta entre las sombras.',
     palette: {
       head: '#d98e2b',
       body: '#a8561b',
@@ -515,7 +721,8 @@ const GUARDIAN_DEFS = [
       obsidian: '#14110f',
       ember: '#f2e2b8'
     },
-    traits: { fangs: true, crestCount: 4, eyeMark: false, isBoss: true, isTezcatlipoca: true }
+    traits: { fangs: true, crestCount: 4, eyeMark: false, isBoss: true, isTezcatlipoca: true },
+    ambientParticles: { color: '#d98e2b', rate: 0.6, size: 2 }
   }
 ];
 
@@ -565,6 +772,7 @@ let welcomeScenario = null;
 let welcomeLayout = null;
 
 const STATISTICS_STORAGE_KEY = 'kukulcanGameStatistics';
+const PROGRESSION_STORAGE_KEY = 'kukulcanProgression';
 const DIFFICULTY_NAMES = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil', extreme: 'Pesadilla' };
 
 // ========================================================
@@ -581,7 +789,281 @@ function safeSetItem(key, value) {
 }
 
 // ========================================================
-// 5. ESTADO DEL JUEGO
+// ✅ 5. SISTEMA DE PROGRESIÓN
+// ========================================================
+let progression = {
+  totalMaize: 0,
+  totalCacao: 0,
+  totalGuardiansDefeated: 0,
+  totalTezcatlipocaDefeated: 0,
+  totalGamesPlayed: 0,
+  totalSurvivalMs: 0,
+  bestTimedScore: 0,
+  achievements: {},
+  unlockedSkins: ['default'],
+  unlockedThemes: ['classic', 'hunt', 'survival'],
+  selectedSkin: 'default',
+  selectedTheme: 'classic',
+  maizeCoins: 0
+};
+
+function loadProgression() {
+  const saved = safeGetItem(PROGRESSION_STORAGE_KEY, null);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    if (parsed && typeof parsed === 'object') {
+      progression = { ...progression, ...parsed };
+      if (!Array.isArray(progression.unlockedSkins)) progression.unlockedSkins = ['default'];
+      if (!Array.isArray(progression.unlockedThemes)) progression.unlockedThemes = ['classic', 'hunt', 'survival'];
+      if (!progression.achievements || typeof progression.achievements !== 'object') {
+        progression.achievements = {};
+      }
+    }
+  } catch (e) {
+    console.warn('No se pudo cargar la progresión:', e);
+  }
+}
+
+function saveProgression() {
+  safeSetItem(PROGRESSION_STORAGE_KEY, JSON.stringify(progression));
+}
+
+loadProgression();
+
+// ========================================================
+// ✅ 5.1. LOGROS
+// ========================================================
+const ACHIEVEMENTS = [
+  { id: 'first_maize',    name: 'Primera Ofrenda',       description: 'Recoge tu primer maíz.',                          icon: '🌽', check: (p) => p.totalMaize >= 1 },
+  { id: 'maize_100',      name: 'Agricultor Sagrado',    description: 'Recoge 100 maíces en total.',                     icon: '🌽', check: (p) => p.totalMaize >= 100 },
+  { id: 'maize_1000',     name: 'Señor del Maíz',        description: 'Recoge 1000 maíces en total.',                    icon: '🌽', check: (p) => p.totalMaize >= 1000 },
+  { id: 'cacao_50',       name: 'Mercader de Cacao',     description: 'Recoge 50 ofrendas de cacao.',                    icon: '🍫', check: (p) => p.totalCacao >= 50 },
+  { id: 'guardian_10',    name: 'Cazador de Demonios',   description: 'Derrota 10 guardianes.',                          icon: '⚔️', check: (p) => p.totalGuardiansDefeated >= 10 },
+  { id: 'guardian_100',   name: 'Guerrero Jaguar',       description: 'Derrota 100 guardianes.',                         icon: '🐆', check: (p) => p.totalGuardiansDefeated >= 100 },
+  { id: 'tezcat_1',       name: 'El Primer Espejo',      description: 'Derrota a Tezcatlipoca por primera vez.',         icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 1 },
+  { id: 'tezcat_10',      name: 'Rompe-Espejos',         description: 'Derrota a Tezcatlipoca 10 veces.',                icon: '👁️', check: (p) => p.totalTezcatlipocaDefeated >= 10 },
+  { id: 'survive_5min',   name: 'Viajero del Inframundo',description: 'Sobrevive 5 minutos acumulados.',                 icon: '⏳', check: (p) => p.totalSurvivalMs >= 300000 },
+  { id: 'games_50',       name: 'Devoto de Kukulcán',    description: 'Juega 50 partidas.',                              icon: '🐍', check: (p) => p.totalGamesPlayed >= 50 },
+  { id: 'timed_500',      name: 'Contra el Sol',         description: 'Consigue 500 puntos en Contrarreloj.',            icon: '⏱️', check: (p) => p.bestTimedScore >= 500 }
+];
+
+function checkAchievements() {
+  const newlyUnlocked = [];
+  ACHIEVEMENTS.forEach(ach => {
+    if (progression.achievements[ach.id]) return;
+    if (ach.check(progression)) {
+      progression.achievements[ach.id] = Date.now();
+      newlyUnlocked.push(ach);
+    }
+  });
+  if (newlyUnlocked.length > 0) {
+    saveProgression();
+    newlyUnlocked.forEach((ach, idx) => {
+      setTimeout(() => showAchievementToast(ach), idx * 1200);
+    });
+  }
+  return newlyUnlocked;
+}
+
+function showAchievementToast(achievement) {
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  toast.innerHTML = `
+    <div class="achievement-toast-icon">${achievement.icon}</div>
+    <div class="achievement-toast-content">
+      <div class="achievement-toast-title">¡Logro desbloqueado!</div>
+      <div class="achievement-toast-name">${achievement.name}</div>
+      <div class="achievement-toast-desc">${achievement.description}</div>
+    </div>
+  `;
+  const container = document.getElementById('achievement-toast-container') || document.body;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 500);
+  }, 4000);
+  playAchievementSound();
+  vibrate([20, 40, 20]);
+}
+
+function playAchievementSound() {
+  if (isMuted) return;
+  playTone(523, 100, 0.15, 'triangle');
+  setTimeout(() => playTone(659, 100, 0.15, 'triangle'), 80);
+  setTimeout(() => playTone(784, 150, 0.18, 'triangle'), 160);
+  setTimeout(() => playTone(1046, 250, 0.2, 'sine'), 240);
+}
+
+function renderAchievementsUI() {
+  if (!achievementsList) return;
+  const total = ACHIEVEMENTS.length;
+  const unlockedCount = ACHIEVEMENTS.filter(a => progression.achievements[a.id]).length;
+  if (achievementsCount) achievementsCount.textContent = `${unlockedCount} / ${total}`;
+  if (achievementsFill) achievementsFill.style.width = `${(unlockedCount / total) * 100}%`;
+
+  achievementsList.innerHTML = '';
+  ACHIEVEMENTS.forEach(ach => {
+    const unlocked = !!progression.achievements[ach.id];
+    const item = document.createElement('div');
+    item.className = `achievement-item ${unlocked ? 'unlocked' : 'locked'}`;
+    item.innerHTML = `
+      <div class="achievement-icon">${ach.icon}</div>
+      <div class="achievement-name">${ach.name}</div>
+      <div class="achievement-desc">${ach.description}</div>
+    `;
+    achievementsList.appendChild(item);
+  });
+}
+
+// ========================================================
+// ✅ 5.2. SKINS Y TEMAS DESBLOQUEABLES
+// ========================================================
+const KUKULKAN_SKINS = {
+  default: {
+    name: 'Jade Clásico',
+    description: 'El aspecto tradicional de Kukulcán.',
+    head: '#4ec9a0',
+    body: '#1a7a5e',
+    border: 'rgba(213, 189, 112, 0.55)',
+    inner: 'rgba(182, 242, 209, 0.28)',
+    plate: null,
+    cost: 0
+  },
+  golden: {
+    name: 'Oro de Itzamná',
+    description: 'Un tributo al dios creador.',
+    head: '#d4b45c',
+    body: '#a8924a',
+    border: '#f5e9b8',
+    inner: 'rgba(245, 235, 190, 0.4)',
+    plate: '#c2b06a',
+    cost: 100
+  },
+  obsidian: {
+    name: 'Obsidiana Negra',
+    description: 'Forjado en las profundidades de Xibalbá.',
+    head: '#3a3a3a',
+    body: '#1a1a1a',
+    border: 'rgba(120, 120, 120, 0.6)',
+    inner: 'rgba(80, 80, 80, 0.3)',
+    plate: '#2a2a2a',
+    cost: 250
+  },
+  blood: {
+    name: 'Sangre de Sacrificio',
+    description: 'Para los que ofrecen todo a los dioses.',
+    head: '#ef5261',
+    body: '#9b2929',
+    border: 'rgba(255, 200, 200, 0.5)',
+    inner: 'rgba(255, 150, 150, 0.25)',
+    plate: '#c23434',
+    cost: 500
+  }
+};
+
+function isSkinUnlocked(skinId) {
+  return progression.unlockedSkins.includes(skinId) || (KUKULKAN_SKINS[skinId] && KUKULKAN_SKINS[skinId].cost === 0);
+}
+
+function isThemeUnlocked(themeId) {
+  return progression.unlockedThemes.includes(themeId) || !(BOARD_THEMES[themeId] && BOARD_THEMES[themeId].cost);
+}
+
+function getActiveSkin() {
+  return KUKULKAN_SKINS[progression.selectedSkin] || KUKULKAN_SKINS.default;
+}
+
+function renderCustomizeUI() {
+  if (!skinsGrid || !themesGrid) return;
+  if (customizeCoinsValue) customizeCoinsValue.textContent = progression.maizeCoins;
+
+  // SKINS
+  skinsGrid.innerHTML = '';
+  Object.entries(KUKULKAN_SKINS).forEach(([id, skin]) => {
+    const unlocked = isSkinUnlocked(id);
+    const selected = progression.selectedSkin === id;
+    const item = document.createElement('div');
+    item.className = `skin-item ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
+    const gradient = `radial-gradient(circle at 35% 35%, ${skin.head}, ${skin.body} 80%)`;
+    item.innerHTML = `
+      <div class="skin-preview" style="background: ${gradient};"></div>
+      <div class="skin-name">${skin.name}</div>
+      <div class="skin-desc">${skin.description}</div>
+      ${!selected && unlocked ? '' : ''}
+      ${!unlocked ? `<div class="skin-cost">${skin.cost}</div>` : ''}
+      ${unlocked && !selected ? `<div class="skin-cost" style="background: transparent; border-color: rgba(78,201,160,0.4); color: #7de8c4;">✓ Usar</div>` : ''}
+    `;
+    item.addEventListener('click', () => {
+      if (!unlocked) {
+        if (progression.maizeCoins >= skin.cost) {
+          progression.maizeCoins -= skin.cost;
+          progression.unlockedSkins.push(id);
+          progression.selectedSkin = id;
+          saveProgression();
+          renderCustomizeUI();
+          updateScoresUI();
+          playAchievementSound();
+        } else {
+          vibrate([30, 40, 30]);
+          item.classList.add('shake');
+          setTimeout(() => item.classList.remove('shake'), 400);
+        }
+      } else {
+        progression.selectedSkin = id;
+        saveProgression();
+        renderCustomizeUI();
+        updateThemeColors();
+      }
+    });
+    skinsGrid.appendChild(item);
+  });
+
+  // TEMAS
+  themesGrid.innerHTML = '';
+  Object.entries(BOARD_THEMES).forEach(([id, theme]) => {
+    const unlocked = isThemeUnlocked(id);
+    const selected = progression.selectedTheme === id;
+    const item = document.createElement('div');
+    item.className = `theme-item ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
+    item.innerHTML = `
+      <div class="theme-preview" style="background: ${theme.bg};">
+        <div class="theme-preview-grid"></div>
+      </div>
+      <div class="theme-name">${id.charAt(0).toUpperCase() + id.slice(1)}</div>
+      <div class="theme-desc">${theme.cost > 0 ? 'Desbloqueable' : 'Disponible'}</div>
+      ${!unlocked ? `<div class="theme-cost">${theme.cost}</div>` : ''}
+      ${unlocked && !selected ? `<div class="theme-cost" style="background: transparent; border-color: rgba(78,201,160,0.4); color: #7de8c4;">✓ Usar</div>` : ''}
+    `;
+    item.addEventListener('click', () => {
+      if (!unlocked) {
+        if (progression.maizeCoins >= theme.cost) {
+          progression.maizeCoins -= theme.cost;
+          progression.unlockedThemes.push(id);
+          progression.selectedTheme = id;
+          saveProgression();
+          renderCustomizeUI();
+          updateScoresUI();
+          updateThemeColors();
+        } else {
+          vibrate([30, 40, 30]);
+          item.classList.add('shake');
+          setTimeout(() => item.classList.remove('shake'), 400);
+        }
+      } else {
+        progression.selectedTheme = id;
+        saveProgression();
+        renderCustomizeUI();
+        updateThemeColors();
+      }
+    });
+    themesGrid.appendChild(item);
+  });
+}
+
+// ========================================================
+// 6. ESTADO DEL JUEGO
 // ========================================================
 let snake = [];
 let foods = [];
@@ -666,6 +1148,24 @@ const FIRE_BREATH_ACTIVE_MS = 540;
 
 let jadeTrailAccumulator = 0;
 
+// ✅ ESTADO DE NUEVAS MECÁNICAS
+let eclipseActive = false;
+let eclipseUntil = 0;
+let nextEclipseAt = null;
+let eclipseWarningShown = false;
+
+let darknessRadius = DARKNESS_MAX_RADIUS;
+let darknessStartTime = null;
+
+let huntTrail = [];
+
+let timedRemainingMs = TIMED_INITIAL_MS;
+let timedWarningShown = false;
+
+let activeXibalbaTrial = null;
+let nextXibalbaTrialAt = null;
+let xibalbaMaizeBlocked = false;
+
 let welcomeDemoSnake = [];
 let welcomeDemoPreviousSnake = [];
 let welcomeDemoGuardian = [];
@@ -712,11 +1212,19 @@ let statisticsWasRunning = false;
 let statisticsWasPaused = false;
 let statisticsDrawerWasVisible = false;
 
+let achievementsWasRunning = false;
+let achievementsWasPaused = false;
+let customizeWasRunning = false;
+let customizeWasPaused = false;
+
+let loreWasRunning = false;
+let loreWasPaused = false;
+
 let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
 let gameMode = safeGetItem('snakeIoGameMode', 'classic');
 
 // ========================================================
-// 6. ESTADÍSTICAS
+// 7. ESTADÍSTICAS
 // ========================================================
 function createEmptyStats() {
   return Object.fromEntries(Object.keys(DIFFICULTY_NAMES).map(d => [
@@ -774,16 +1282,31 @@ function finishRunStatistics() {
   const r = gameStatistics[runDifficulty];
   r.gamesPlayed++;
   r.bestScore = Math.max(r.bestScore, score);
-  r.bestSurvivalMs = Math.max(r.bestSurvivalMs, gameTime - runStartedAt);
+  const survivalMs = gameTime - runStartedAt;
+  r.bestSurvivalMs = Math.max(r.bestSurvivalMs, survivalMs);
   r.guardiansDefeated += runGuardiansDefeated;
   saveStats();
+
+  // ✅ Actualizar progresión
+  progression.totalGamesPlayed++;
+  progression.totalSurvivalMs += survivalMs;
+  progression.totalGuardiansDefeated += runGuardiansDefeated;
+  progression.maizeCoins += Math.floor(score / 10);
+
+  if (gameModeSelect.value === 'timed') {
+    progression.bestTimedScore = Math.max(progression.bestTimedScore, score);
+  }
+
+  saveProgression();
+  checkAchievements();
+
   runStartedAt = null;
   runDifficulty = null;
   runGuardiansDefeated = 0;
 }
 
 // ========================================================
-// 7. ESCALADO ADAPTATIVO
+// 8. ESCALADO ADAPTATIVO
 // ========================================================
 function resizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -802,17 +1325,18 @@ function resizeCanvas() {
 }
 
 function rebuildBoardCanvas(width, height, dpr, force = false) {
-  if (!force && boardCanvas && boardWidth === width && boardHeight === height && boardTheme === gameMode) return;
+  const themeId = progression.selectedTheme || 'classic';
+  if (!force && boardCanvas && boardWidth === width && boardHeight === height && boardTheme === themeId) return;
   boardCanvas = document.createElement('canvas');
   boardCanvas.width = Math.max(1, Math.floor(width * dpr));
   boardCanvas.height = Math.max(1, Math.floor(height * dpr));
   boardWidth = width;
   boardHeight = height;
-  boardTheme = gameMode;
+  boardTheme = themeId;
   boardContext = boardCanvas.getContext('2d', { alpha: false });
   boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const theme = BOARD_THEMES[boardTheme] || BOARD_THEMES.classic;
+  const theme = BOARD_THEMES[themeId] || BOARD_THEMES.classic;
 
   boardContext.fillStyle = theme.bg;
   boardContext.fillRect(0, 0, width, height);
@@ -865,6 +1389,18 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
     }
   }
 
+  // ✅ Iluminación central tipo pirámide
+  const centerGlow = boardContext.createRadialGradient(
+    width / 2, height / 2, 0,
+    width / 2, height / 2, Math.max(width, height) * 0.55
+  );
+  centerGlow.addColorStop(0, 'rgba(255, 200, 100, 0.06)');
+  centerGlow.addColorStop(0.5, 'rgba(255, 150, 50, 0.02)');
+  centerGlow.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+  boardContext.fillStyle = centerGlow;
+  boardContext.fillRect(0, 0, width, height);
+
+  // Pirámide central estilizada
   const centerX = width / 2;
   const centerY = height / 2;
   boardContext.strokeStyle = theme.patternColor;
@@ -878,17 +1414,20 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
 }
 
 function updateThemeColors() {
-  const theme = BOARD_THEMES[gameMode] || BOARD_THEMES.classic;
+  const themeId = progression.selectedTheme || 'classic';
+  const theme = BOARD_THEMES[themeId] || BOARD_THEMES.classic;
   document.documentElement.style.setProperty('--bg-1', theme.bg);
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) metaTheme.setAttribute('content', theme.bg);
+  rebuildBoardCanvas(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 2), true);
+  if (!isGameRunning) draw(1, false);
 }
 
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
 
 // ========================================================
-// 8. AUDIO
+// 9. AUDIO — MÚSICA TEMÁTICA MAYA
 // ========================================================
 let audioCtx = null;
 let musicTimer = null;
@@ -924,11 +1463,40 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
   } catch (e) { return null; }
 }
 
+// ✅ Escala pentatónica menor (frecuencias en Hz)
+// C, Eb, F, G, Bb, C (una octava arriba)
+const PENTATONIC_MINOR = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00, 466.16];
+
+// ✅ Capas musicales con instrumentos simulados
 const MUSIC_LAYERS = {
-  1: { notes: [55, 65.4, 73.4], interval: 900, type: 'sine', vol: 0.05 },
-  2: { notes: [55, 65.4, 73.4, 87.3, 98], interval: 620, type: 'triangle', vol: 0.06 },
-  3: { notes: [82.4, 98, 110, 130.8, 146.8, 164.8], interval: 420, type: 'sawtooth', vol: 0.055 },
-  4: { notes: [110, 130.8, 146.8, 174.6, 196, 233, 261.6], interval: 280, type: 'square', vol: 0.05 }
+  1: { // Meditativo — flauta de barro suave
+    notes: [130.81, 155.56, 174.61, 196.00],
+    interval: 950,
+    type: 'sine',
+    vol: 0.045,
+    drumEvery: 4
+  },
+  2: { // Exploración — ocarina + tambor suave
+    notes: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63],
+    interval: 640,
+    type: 'triangle',
+    vol: 0.055,
+    drumEvery: 3
+  },
+  3: { // Tensión — cascabeles + flauta aguda
+    notes: [174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00],
+    interval: 440,
+    type: 'sawtooth',
+    vol: 0.05,
+    drumEvery: 2
+  },
+  4: { // Furia — percusión intensa + silbato de muerte
+    notes: [233.08, 261.63, 311.13, 349.23, 392.00, 466.16, 523.25],
+    interval: 290,
+    type: 'square',
+    vol: 0.045,
+    drumEvery: 1
+  }
 };
 
 function getDesiredMusicLayer() {
@@ -952,12 +1520,20 @@ function playMusicTick() {
     const noteIndex = musicTick % layer.notes.length;
     const freq = layer.notes[noteIndex];
     playTone(freq, layer.interval * 0.85, layer.vol, layer.type);
+
+    // ✅ Eco armónico (flauta)
     if (musicLayer >= 2) {
       setTimeout(() => {
         if (!isGameRunning || isPaused || isMuted) return;
         playTone(freq * 1.5, layer.interval * 0.5, layer.vol * 0.4, 'sine');
       }, layer.interval * 0.3);
     }
+    // ✅ Percusión de fondo (tambor de tronco)
+    if (layer.drumEvery && musicTick % layer.drumEvery === 0) {
+      playTone(55, 180, 0.09, 'sine');
+      setTimeout(() => playTone(60, 120, 0.06, 'sine'), 50);
+    }
+    // ✅ Cascabeles en capas altas
     if (musicLayer >= 4) {
       setTimeout(() => {
         if (!isGameRunning || isPaused || isMuted) return;
@@ -1106,6 +1682,37 @@ function playCosmicOrderSound() {
     });
   } catch (e) {}
 }
+
+// ✅ NUEVOS SONIDOS PARA MECÁNICAS
+function playEclipseSound() {
+  if (isMuted) return;
+  try {
+    const a = getAudioContext();
+    if (!a) return;
+    const now = a.currentTime;
+    const o = a.createOscillator();
+    const g = a.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(220, now);
+    o.frequency.exponentialRampToValueAtTime(55, now + 1.2);
+    g.gain.setValueAtTime(0.25, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 1.3);
+    o.connect(g); g.connect(a.destination);
+    o.start(now); o.stop(now + 1.3);
+  } catch (e) {}
+}
+function playXibalbaSound() {
+  if (isMuted) return;
+  playTone(155, 300, 0.2, 'sawtooth');
+  setTimeout(() => playTone(130, 350, 0.18, 'sawtooth'), 200);
+}
+function playTimerWarningSound() {
+  if (isMuted) return;
+  playTone(660, 100, 0.18, 'square');
+  setTimeout(() => playTone(880, 100, 0.18, 'square'), 120);
+  setTimeout(() => playTone(660, 100, 0.18, 'square'), 240);
+}
+
 function playGameOverSound() {
   if (isMuted) return;
   const notes = [311, 293, 261, 220, 155, 110];
@@ -1135,7 +1742,7 @@ function toggleSound(forceState = null) {
 }
 
 // ========================================================
-// 9. FURIA (FUEGO + VELOCIDAD)
+// 10. FURIA (FUEGO + VELOCIDAD)
 // ========================================================
 function triggerFuria() {
   if (isFuria || getFuriaCooldownRemaining() > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
@@ -1205,7 +1812,7 @@ function triggerTurboBurst() { triggerFuria(); }
 function updateTurboUI() { updateFuriaUI(); }
 
 // ========================================================
-// 10. EFECTOS VISUALES
+// 11. EFECTOS VISUALES
 // ========================================================
 function triggerHeadPulse(color = '#d5bd70') {
   headPulse = 1;
@@ -1313,25 +1920,23 @@ function updateAndDrawParticles(updateState = true) {
   const MAX_PARTICLES = window.innerWidth <= 768 ? 60 : 150;
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  
-  // ✅ Limitar cantidad
+
   if (particles.length > MAX_PARTICLES) {
     particles.splice(0, particles.length - MAX_PARTICLES);
   }
-  
+
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (updateState) { p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; }
-    
-    // ✅ ELIMINAR PARTÍCULAS FUERA DE PANTALLA (evita smear en bordes)
-    const isOffScreen = p.x < -50 || p.x > screenW + 50 || 
+
+    const isOffScreen = p.x < -50 || p.x > screenW + 50 ||
                         p.y < -50 || p.y > screenH + 50;
-    
-    if (p.alpha <= 0 || isOffScreen) { 
-      particles.splice(i, 1); 
-      continue; 
+
+    if (p.alpha <= 0 || isOffScreen) {
+      particles.splice(i, 1);
+      continue;
     }
-    
+
     ctx.globalAlpha = p.alpha;
     ctx.fillStyle = p.color;
     ctx.beginPath();
@@ -1366,7 +1971,7 @@ function updateAndDrawParticles(updateState = true) {
 }
 
 // ========================================================
-// 11. INMUNIDAD / FREEZE / FUEGO
+// 12. INMUNIDAD / FREEZE / AIRE / FUEGO
 // ========================================================
 function activateImmunity(seconds = 10) {
   isImmune = true;
@@ -1465,7 +2070,7 @@ function deactivateAirBoost() {
 }
 
 // ========================================================
-// 12. GUARDIANES
+// 13. GUARDIANES
 // ========================================================
 function scheduleEnemySpawn(retryDelay = null) {
   const profile = getDifficultyProfile();
@@ -1520,7 +2125,7 @@ function spawnEnemySnake() {
     const dy = Math.min(Math.abs(y - snake[0].y), gridRows - Math.abs(y - snake[0].y));
     if (dx + dy < 8) continue;
     if (candidate.some(c => !isCellFreeForNewGuardian(c.x, c.y))) continue;
-    if (enemyGuardians.some(g => g.segments.some(s => 
+    if (enemyGuardians.some(g => g.segments.some(s =>
       Math.abs(s.x - x) + Math.abs(s.y - y) < 5
     ))) continue;
 
@@ -1536,6 +2141,7 @@ function spawnEnemySnake() {
       palette: def.palette,
       behavior: { id: def.behavior, name: def.name },
       traits: def.traits,
+      ambientParticles: def.ambientParticles,
       lastMoveTick: -1,
       targetIndicator: null,
       recentCells: [],
@@ -1565,10 +2171,12 @@ function spawnEnemySnake() {
   return false;
 }
 
+// ✅ Spawn de Tezcatlipoca — ahora disponible en TODAS las dificultades
 function spawnChaac() {
   const difficulty = getEffectiveDifficulty();
+  const config = TEZCATLIPOCA_CONFIG[difficulty] || TEZCATLIPOCA_CONFIG.medium;
   const profile = getDifficultyProfile();
-  if (difficulty !== 'hard' && difficulty !== 'extreme') return false;
+
   const normalGuardians = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalGuardians < 2) return false;
   if (enemyGuardians.some(g => g.behavior.id === 'ambusher')) return false;
@@ -1601,16 +2209,19 @@ function spawnChaac() {
       palette: def.palette,
       behavior: { id: def.behavior, name: def.name },
       traits: def.traits,
-      nextTeleportAt: gameTime + profile.chaacTeleportMs,
+      ambientParticles: def.ambientParticles,
+      nextTeleportAt: gameTime + config.teleportMs,
       teleportFlash: 0,
       teleportDest: null,
       smokeParticles: [],
       lastMoveTick: -1,
       targetIndicator: null,
-      recentCells: []
+      recentCells: [],
+      vulnerableUntil: 0,
+      config: config
     };
     enemyGuardians.push(guardian);
-    nextChaacSpawnAt = gameTime + profile.chaacCooldownMs;
+    nextChaacSpawnAt = gameTime + config.cooldownMs;
     updateGuardianBadge();
     const hx = x * TILE_SIZE + TILE_SIZE / 2;
     const hy = y * TILE_SIZE + TILE_SIZE / 2;
@@ -1683,6 +2294,37 @@ function updateGuardianBadge() {
   BadgeManager.setVisible('threat', true);
 }
 
+// ✅ NUEVA: Partículas ambientales por guardián
+function updateGuardianAmbientParticles() {
+  if (isPaused || cosmicOrderResolveAt !== null) return;
+
+  enemyGuardians.forEach(guardian => {
+    if (!guardian.ambientParticles) return;
+    if (guardiansFrozenUntil > gameTime) return;
+
+    const { color, rate, size } = guardian.ambientParticles;
+    if (Math.random() > rate * 0.1) return;
+
+    const head = guardian.segments[0];
+    const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+    const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+
+    const a = Math.random() * Math.PI * 2;
+    const dist = TILE_SIZE * (0.3 + Math.random() * 0.5);
+
+    particles.push({
+      x: hx + Math.cos(a) * dist,
+      y: hy + Math.sin(a) * dist,
+      vx: Math.cos(a) * 0.3,
+      vy: Math.sin(a) * 0.3 - 0.4,
+      size: size * (0.7 + Math.random() * 0.6),
+      color: color,
+      alpha: 0.7,
+      decay: 0.025
+    });
+  });
+}
+
 function getGuardianTarget(g, playerHead, difficulty) {
   const profile = getDifficultyProfile();
   if (g.behavior.id === 'interceptor') {
@@ -1709,11 +2351,7 @@ function reconcileGuardianCount() {
   const newDifficulty = getEffectiveDifficulty();
   const target = profile.guardianTargets;
 
-  if (newDifficulty !== 'hard' && newDifficulty !== 'extreme') {
-    const boss = enemyGuardians.find(g => g.behavior.id === 'ambusher');
-    if (boss) destroyEnemySnake(boss.id);
-  }
-
+  // ✅ Ya no eliminamos a Tezcatlipoca por dificultad: aparece en todas
   let normalCount = enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length;
   if (normalCount > target) {
     for (let i = enemyGuardians.length - 1; i >= 0 && normalCount > target; i--) {
@@ -1735,15 +2373,12 @@ function destroyEnemySnake(id, spawnBonus = true) {
   if (idx === -1) return;
   const [g] = enemyGuardians.splice(idx, 1);
 
-  // ✅ Limpiar posiciones previas para evitar renderizado huérfano
   previousGuardianPositions.delete(id);
 
-  // ✅ Limpiar partículas asociadas al guardián (humo de teletransporte, etc.)
   if (g.smokeParticles) g.smokeParticles = [];
 
   if (spawnBonus) {
     g.segments.forEach(s => {
-      // ✅ Bonus food con expiración
       bonusFoods.push({
         x: s.x,
         y: s.y,
@@ -1758,7 +2393,11 @@ function destroyEnemySnake(id, spawnBonus = true) {
         expiresAt: gameTime + 15000,
         isBossDrop: true
       });
-      // Partículas de explosión (reducidas y efímeras)
+      // ✅ Registrar derrota de Tezcatlipoca
+      progression.totalTezcatlipocaDefeated++;
+      saveProgression();
+      checkAchievements();
+
       for (let p = 0; p < 8; p++) {
         const a = (Math.PI * 2 * p) / 8;
         const sp = 1.5 + Math.random() * 2;
@@ -1773,7 +2412,9 @@ function destroyEnemySnake(id, spawnBonus = true) {
           decay: 0.06
         });
       }
-      nextChaacSpawnAt = gameTime + getDifficultyProfile().chaacCooldownMs;
+      const diff = getEffectiveDifficulty();
+      const config = TEZCATLIPOCA_CONFIG[diff] || TEZCATLIPOCA_CONFIG.medium;
+      nextChaacSpawnAt = gameTime + config.cooldownMs;
     }
   }
   updateGuardianBadge();
@@ -1829,9 +2470,9 @@ function updateEnemySnakeAI() {
     g.tickCounter++;
 
     if (g.behavior.id === 'ambusher') {
-      // ⚖️ Tezcatlipoca solo se mueve/teletransporta si NO está vulnerable
       const isVulnerable = gameTime < g.vulnerableUntil;
-      
+      const config = g.config || TEZCATLIPOCA_CONFIG.medium;
+
       if (!isVulnerable && gameTime >= g.nextTeleportAt) {
         const total = gridCols * gridRows;
         const start = Math.floor(Math.random() * total);
@@ -1842,16 +2483,14 @@ function updateEnemySnakeAI() {
           const dx = Math.min(Math.abs(tx - playerHead.x), gridCols - Math.abs(tx - playerHead.x));
           const dy = Math.min(Math.abs(ty - playerHead.y), gridRows - Math.abs(ty - playerHead.y));
           const dist = dx + dy;
-          // ⚖️ Rango más cercano (4-7 celdas) para que sea alcanzable
           if (dist >= 4 && dist <= 7 && !isGuardianCellOccupied(tx, ty)) {
             const oldHead = g.segments[0];
             g.smokeParticles.push({ x: oldHead.x, y: oldHead.y, bornAt: gameTime });
             g.segments[0] = { x: tx, y: ty };
             g.teleportFlash = 1;
             g.teleportDest = { x: tx, y: ty };
-            // ⚖️ Después de teletransportarse, queda vulnerable 2.2s
-            g.vulnerableUntil = gameTime + CHAAC_VULNERABLE_MS;
-            g.nextTeleportAt = gameTime + profile.chaacTeleportMs;
+            g.vulnerableUntil = gameTime + config.vulnerableMs;
+            g.nextTeleportAt = gameTime + config.teleportMs;
             for (let p = 0; p < 12; p++) {
               const a = Math.random() * Math.PI * 2;
               particles.push({
@@ -1874,11 +2513,11 @@ function updateEnemySnakeAI() {
         g.smokeParticles = g.smokeParticles.filter(sp => gameTime - sp.bornAt < 800);
       }
 
-      // ⚖️ Si está vulnerable, no se mueve (queda quieto esperando ser eliminado)
       if (isVulnerable) {
-        // Solo verifica si el jugador lo toca
         const head = g.segments[0];
-        const touches = snake.some(s => s.x === head.x && s.y === head.y);
+        const touches = snake.some(s =>
+          Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1
+        );
         if (touches) {
           if (hasGuardianProtection() || isFuria || guardiansFrozenUntil > gameTime) {
             const frozen = guardiansFrozenUntil > gameTime;
@@ -1907,7 +2546,7 @@ function updateEnemySnakeAI() {
             return;
           }
         }
-        continue; // No se mueve mientras es vulnerable
+        continue;
       }
 
       const enemyHead = g.segments[0];
@@ -1930,8 +2569,7 @@ function updateEnemySnakeAI() {
         x: (enemyHead.x + dir.x + gridCols) % gridCols,
         y: (enemyHead.y + dir.y + gridRows) % gridRows
       };
-      // ⚖️ Detección ampliada: también detecta si el jugador está adyacente
-      const touches = snake.some(s => 
+      const touches = snake.some(s =>
         Math.abs(s.x - newHead.x) <= 1 && Math.abs(s.y - newHead.y) <= 1
       );
       if (touches) {
@@ -1967,6 +2605,7 @@ function updateEnemySnakeAI() {
       continue;
     }
 
+    // === IA de guardianes normales ===
     const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
     if ((g.tickCounter + g.id) % interval !== 0) continue;
 
@@ -2071,6 +2710,16 @@ function updateEnemySnakeAI() {
       g.targetIndicator = null;
     }
 
+    // ✅ Rastro de humo (modo Cacería)
+    if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail) {
+      huntTrail.push({
+        x: enemyHead.x,
+        y: enemyHead.y,
+        expiresAt: gameTime + HUNT_TRAIL_LIFETIME_MS,
+        ownerId: g.id
+      });
+    }
+
     const touches = snake.some(s => s.x === newHead.x && s.y === newHead.y);
     if (touches) {
       if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isOnFire) {
@@ -2104,7 +2753,7 @@ function updateEnemySnakeAI() {
 }
 
 // ========================================================
-// 13. SPAWN HELPERS
+// 14. SPAWN HELPERS
 // ========================================================
 function maybeSpawnCosmicOrderFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
@@ -2270,17 +2919,24 @@ function resolveCosmicOrder() {
 }
 
 // ========================================================
-// 14. LOOP
+// 15. LOOP
 // ========================================================
 function getCurrentSpeed() {
   const sel = difficultySelect.value;
   const base = SPEEDS[sel] || SPEEDS.medium;
-  const lengthPenalty = Math.max(0, snake.length - 3) * 2.4;
-  let adaptive = Math.max(base * 0.72, base - lengthPenalty);
+  // ✅ Penalización reducida (antes 2.4) para que sea más justo con guardianes
+  const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
+  let adaptive = Math.max(base * 0.78, base - lengthPenalty);
   if (isFuria) {
     adaptive *= 0.55;
   } else if (airBoostUntil > gameTime) {
     adaptive *= AIR_BOOST_MULTIPLIER;
+  }
+  // ✅ Rastro de humo (Cacería) ralentiza
+  if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
+    const head = snake[0];
+    const onTrail = huntTrail.some(t => t.x === head.x && t.y === head.y);
+    if (onTrail) adaptive *= HUNT_TRAIL_SLOW_FACTOR;
   }
   return adaptive;
 }
@@ -2357,7 +3013,7 @@ function startGameLoop() {
 }
 
 // ========================================================
-// 15. TIMERS
+// 16. TIMERS
 // ========================================================
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
@@ -2425,11 +3081,13 @@ function updateGameTimers(elapsedMs) {
     scheduleEnemySpawn(ok ? null : 1500);
   }
 
+  // ✅ Tezcatlipoca aparece en TODAS las dificultades
   const profile = getDifficultyProfile();
   const effectiveDiff = getEffectiveDifficulty();
+  const tezConfig = TEZCATLIPOCA_CONFIG[effectiveDiff] || TEZCATLIPOCA_CONFIG.medium;
+
   if (
-    (effectiveDiff === 'hard' || effectiveDiff === 'extreme') &&
-    gameTime >= profile.chaacUnlockMs &&
+    gameTime >= tezConfig.unlockMs &&
     enemyGuardians.filter(g => g.behavior.id !== 'ambusher').length >= 2 &&
     !enemyGuardians.some(g => g.behavior.id === 'ambusher')
   ) {
@@ -2455,6 +3113,9 @@ function updateGameTimers(elapsedMs) {
       decay: 0.03
     });
   }
+
+  // ✅ Partículas ambientales de guardianes
+  updateGuardianAmbientParticles();
 
   if (jadeSpawnAt !== null && gameTime >= jadeSpawnAt) {
     jadeSpawnAt = null;
@@ -2542,6 +3203,11 @@ function updateGameTimers(elapsedMs) {
     bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
   }
 
+  // ✅ Expiración del rastro de humo
+  if (huntTrail.length > 0) {
+    huntTrail = huntTrail.filter(t => t.expiresAt > gameTime);
+  }
+
   if (isImmune && snake.length > 0) {
     jadeTrailAccumulator += elapsedMs;
     if (jadeTrailAccumulator > 55) {
@@ -2550,10 +3216,124 @@ function updateGameTimers(elapsedMs) {
       spawnJadeTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
     }
   }
+
+  // ✅ NUEVAS MECÁNICAS DE MODOS
+  updateModeMechanics(elapsedMs);
 }
 
 // ========================================================
-// 16. RESET / GAME OVER
+// 17. NUEVAS MECÁNICAS POR MODO
+// ========================================================
+function updateModeMechanics(elapsedMs) {
+  const mode = GAME_MODES[gameModeSelect.value];
+  if (!mode) return;
+
+  // ═══════════════════════════════════════════════════════
+  // ECLIPSE (modo Clásico)
+  // ═══════════════════════════════════════════════════════
+  if (mode.hasEclipse && nextEclipseAt !== null) {
+    if (!eclipseActive && gameTime >= nextEclipseAt - ECLIPSE_WARNING_MS && !eclipseWarningShown) {
+      eclipseWarningShown = true;
+      spawnFloatingText('🌑 ¡Eclipse inminente!', window.innerWidth / 2, 100, '#c89bf0');
+    }
+    if (!eclipseActive && gameTime >= nextEclipseAt) {
+      eclipseActive = true;
+      eclipseUntil = gameTime + ECLIPSE_DURATION_MS;
+      eclipseWarningShown = false;
+      playEclipseSound();
+      vibrate([40, 60, 40]);
+      BadgeManager.setVisible('eclipse', true);
+      if (eclipseTimerSpan) eclipseTimerSpan.textContent = Math.ceil(ECLIPSE_DURATION_MS / 1000);
+      spawnFloatingText('🌑 ¡ECLIPSE! Controles invertidos', window.innerWidth / 2, 100, '#c89bf0');
+    }
+    if (eclipseActive) {
+      const sec = Math.max(0, Math.ceil((eclipseUntil - gameTime) / 1000));
+      if (eclipseTimerSpan) eclipseTimerSpan.textContent = sec;
+      if (gameTime >= eclipseUntil) {
+        eclipseActive = false;
+        BadgeManager.setVisible('eclipse', false);
+        nextEclipseAt = gameTime + ECLIPSE_INTERVAL_MS;
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // OSCURIDAD (modo Supervivencia)
+  // ═══════════════════════════════════════════════════════
+  if (mode.hasDarkness) {
+    if (darknessStartTime === null) darknessStartTime = gameTime;
+    const elapsedSinceDark = gameTime - darknessStartTime;
+    if (elapsedSinceDark > DARKNESS_START_MS) {
+      const t = Math.min(1, (elapsedSinceDark - DARKNESS_START_MS) / (DARKNESS_FULL_MS - DARKNESS_START_MS));
+      darknessRadius = DARKNESS_MAX_RADIUS - t * (DARKNESS_MAX_RADIUS - DARKNESS_MIN_RADIUS);
+      BadgeManager.setVisible('darkness', true);
+    } else {
+      darknessRadius = DARKNESS_MAX_RADIUS;
+      BadgeManager.setVisible('darkness', false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // CONTRARRELOJ
+  // ═══════════════════════════════════════════════════════
+  if (mode.hasTimer) {
+    timedRemainingMs -= elapsedMs;
+    BadgeManager.setVisible('timer', true);
+    if (timerValueSpan) timerValueSpan.textContent = Math.ceil(Math.max(0, timedRemainingMs) / 1000);
+    if (timerBadge) timerBadge.classList.toggle('critical', timedRemainingMs < TIMED_WARNING_MS);
+    if (timedRemainingMs < TIMED_WARNING_MS && !timedWarningShown) {
+      timedWarningShown = true;
+      playTimerWarningSound();
+    }
+    if (timedRemainingMs <= 0) {
+      timedRemainingMs = 0;
+      gameOver('⏱️ ¡El sol se ha puesto! Se acabó el tiempo.');
+      return;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // PRUEBAS DE XIBALBÁ (modo Supervivencia)
+  // ═══════════════════════════════════════════════════════
+  if (mode.name === 'Supervivencia') {
+    if (nextXibalbaTrialAt !== null && gameTime >= nextXibalbaTrialAt && !activeXibalbaTrial) {
+      const trials = [
+        { type: 'no_maize', description: '💀 No comas durante 10s', durationMs: XIBALBA_DURATION_MS },
+        { type: 'center_cross', description: '💀 Cruza el centro del tablero', durationMs: XIBALBA_DURATION_MS },
+      ];
+      const trial = trials[Math.floor(Math.random() * trials.length)];
+      activeXibalbaTrial = { ...trial, startedAt: gameTime };
+      xibalbaMaizeBlocked = trial.type === 'no_maize';
+      playXibalbaSound();
+      vibrate([60, 40, 60]);
+      BadgeManager.setVisible('xibalba', true);
+      const badgeText = xibalbaBadge.querySelector('.badge-text-desktop');
+      if (badgeText) badgeText.textContent = trial.description;
+      if (xibalbaTimerSpan) xibalbaTimerSpan.textContent = Math.ceil(trial.durationMs / 1000);
+      spawnFloatingText(trial.description, window.innerWidth / 2, 100, '#ff8fa3');
+    }
+    if (activeXibalbaTrial) {
+      const elapsed = gameTime - activeXibalbaTrial.startedAt;
+      const remaining = activeXibalbaTrial.durationMs - elapsed;
+      if (xibalbaTimerSpan) xibalbaTimerSpan.textContent = Math.ceil(Math.max(0, remaining) / 1000);
+      if (remaining <= 0) {
+        activeXibalbaTrial = null;
+        xibalbaMaizeBlocked = false;
+        BadgeManager.setVisible('xibalba', false);
+        nextXibalbaTrialAt = gameTime + XIBALBA_INTERVAL_MS;
+        // ✅ Recompensa por superar la prueba
+        score += 100;
+        progression.maizeCoins += 5;
+        updateScoresUI();
+        spawnFloatingText('✅ ¡Prueba superada! +100', window.innerWidth / 2, 100, '#7de8c4');
+        playAchievementSound();
+      }
+    }
+  }
+}
+
+// ========================================================
+// 18. RESET / GAME OVER
 // ========================================================
 function ensureFoodCount(count = 6) {
   let attempts = 0;
@@ -2684,6 +3464,33 @@ function resetGame() {
   ensureFoodCount(6);
   maybeSpawnShieldFood();
   gameOverlay.classList.add('hidden');
+
+  // ✅ Reset de nuevas mecánicas
+  eclipseActive = false;
+  eclipseUntil = 0;
+  eclipseWarningShown = false;
+  const mode = GAME_MODES[gameModeSelect.value];
+  nextEclipseAt = mode.hasEclipse ? ECLIPSE_FIRST_MS : null;
+
+  darknessRadius = DARKNESS_MAX_RADIUS;
+  darknessStartTime = mode.hasDarkness ? null : null;
+
+  huntTrail = [];
+
+  timedRemainingMs = TIMED_INITIAL_MS;
+  timedWarningShown = false;
+
+  activeXibalbaTrial = null;
+  nextXibalbaTrialAt = mode.name === 'Supervivencia' ? XIBALBA_FIRST_MS : null;
+  xibalbaMaizeBlocked = false;
+
+  // ✅ Reset UI de badges especiales
+  BadgeManager.setVisible('timer', false);
+  BadgeManager.setVisible('eclipse', false);
+  BadgeManager.setVisible('xibalba', false);
+  BadgeManager.setVisible('darkness', false);
+  if (timerBadge) timerBadge.classList.remove('critical');
+
   updateMusicLayer();
 }
 
@@ -2772,25 +3579,34 @@ function loseLife(reason) {
 }
 
 // ========================================================
-// 17. UPDATE POR TICK
+// 19. UPDATE POR TICK
 // ========================================================
 function gameUpdate() {
   if (isPaused || !isGameRunning || countdownEndsAt !== null) return;
 
   if (directionQueue.length > 0) direction = directionQueue.shift();
 
-  const crossed =
-    (direction.x > 0 && snake[0].x === gridCols - 1) ||
-    (direction.x < 0 && snake[0].x === 0) ||
-    (direction.y > 0 && snake[0].y === gridRows - 1) ||
-    (direction.y < 0 && snake[0].y === 0);
+  // ✅ Invertir dirección si hay eclipse activo
+  let moveDir = direction;
+  if (eclipseActive) {
+    moveDir = { x: -direction.x, y: -direction.y };
+  }
 
-  const newX = (snake[0].x + direction.x + gridCols) % gridCols;
-  const newY = (snake[0].y + direction.y + gridRows) % gridRows;
+  const crossed =
+    (moveDir.x > 0 && snake[0].x === gridCols - 1) ||
+    (moveDir.x < 0 && snake[0].x === 0) ||
+    (moveDir.y > 0 && snake[0].y === gridRows - 1) ||
+    (moveDir.y < 0 && snake[0].y === 0);
+
+  const newX = (snake[0].x + moveDir.x + gridCols) % gridCols;
+  const newY = (snake[0].y + moveDir.y + gridRows) % gridRows;
   const head = { x: newX, y: newY };
 
+  // ✅ Bloqueo de maíz si la prueba de Xibalbá está activa
+  const canEatMaize = !xibalbaMaizeBlocked;
+
   const willGrow =
-    foods.some(f => f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt)) ||
+    (canEatMaize && foods.some(f => f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt))) ||
     bonusFoods.some(f => f.x === head.x && f.y === head.y) ||
     shieldFoods.some(f => f.x === head.x && f.y === head.y) ||
     freezeFoods.some(f => f.x === head.x && f.y === head.y) ||
@@ -2814,13 +3630,10 @@ function gameUpdate() {
     return;
   }
 
-  // ⚖️ Detección de colisión ampliada: incluye celdas adyacentes para el boss
-  // Esto hace que sea más fácil tocarlo con la cabeza de Kukulcán
   const hitG = enemyGuardians.find(g => {
     if (g.destroyed) return false;
     if (g.behavior.id === 'ambusher') {
-      // ⚖️ Radio ampliado de 1 celda para Tezcatlipoca
-      return g.segments.some(s => 
+      return g.segments.some(s =>
         Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1
       );
     }
@@ -2981,11 +3794,17 @@ function gameUpdate() {
       const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
       bonusFoods.splice(bonusIdx, 1);
       score += 50;
+      progression.maizeCoins += 2;
       triggerHeadPulse('#facc15');
       spawnFloatingText('+50', hx, hy, '#facc15');
       playEatSound('bonus');
       updateScoresUI();
       spawnEatBurst(hx, hy, '#facc15', 10);
+      // ✅ Bonus también da tiempo en Contrarreloj
+      if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
+        timedRemainingMs += TIMED_BONUS_BONUS_MS;
+        spawnFloatingText(`+${TIMED_BONUS_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
+      }
       ateItem = true;
     }
   }
@@ -2995,23 +3814,45 @@ function gameUpdate() {
       f.x === head.x && f.y === head.y && (f.landingAt === undefined || gameTime >= f.landingAt)
     );
     if (foodIdx !== -1) {
-      const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
-      const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
-      const [food] = foods.splice(foodIdx, 1);
-      const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime ? MAIZE_RAIN_BONUS : 0;
-      const foodScore = 10 + maizeBonus;
-      score += foodScore;
-      triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
-      spawnFloatingText(
-        maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`,
-        hx, hy,
-        maizeBonus ? '#facc15' : '#d5bd70'
-      );
-      playEatSound('normal');
-      spawnEatBurst(hx, hy, maizeBonus ? '#facc15' : '#d5bd70', maizeBonus ? 10 : 6);
-      ensureFoodCount(6);
-      updateScoresUI();
-      ateItem = true;
+      // ✅ Bloqueo de maíz durante prueba de Xibalbá
+      if (xibalbaMaizeBlocked) {
+        // No come, se salta este bloque
+      } else {
+        const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+        const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+        const [food] = foods.splice(foodIdx, 1);
+        const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime ? MAIZE_RAIN_BONUS : 0;
+        const foodScore = 10 + maizeBonus;
+        score += foodScore;
+
+        // ✅ Actualizar progresión
+        if (food.offering === 'maize') {
+          progression.totalMaize++;
+        } else if (food.offering === 'cacao') {
+          progression.totalCacao++;
+        }
+        progression.maizeCoins += 1;
+
+        triggerHeadPulse(maizeBonus ? '#facc15' : '#d5bd70');
+        spawnFloatingText(
+          maizeBonus ? `+${foodScore} 🌽🌧️` : `+${foodScore}`,
+          hx, hy,
+          maizeBonus ? '#facc15' : '#d5bd70'
+        );
+
+        // ✅ Contrarreloj: añadir tiempo
+        if (GAME_MODES[gameModeSelect.value]?.hasTimer) {
+          timedRemainingMs += TIMED_MAIZE_BONUS_MS;
+          spawnFloatingText(`+${TIMED_MAIZE_BONUS_MS/1000}s ⏱️`, hx, hy - 22, '#5cc8ff');
+        }
+
+        playEatSound('normal');
+        spawnEatBurst(hx, hy, maizeBonus ? '#facc15' : '#d5bd70', maizeBonus ? 10 : 6);
+        ensureFoodCount(6);
+        updateScoresUI();
+        saveProgression();
+        ateItem = true;
+      }
     }
   }
 
@@ -3035,7 +3876,7 @@ function gameUpdate() {
 }
 
 // ========================================================
-// 18. UI
+// 20. UI
 // ========================================================
 function updateScoresUI() {
   dtScore.textContent = score;
@@ -3045,6 +3886,8 @@ function updateScoresUI() {
   mbHighScore.textContent = highScore;
   drawerHighScore.textContent = highScore;
   dtLength.textContent = snake.length;
+  if (dtCoins) dtCoins.textContent = progression.maizeCoins;
+  if (drawerCoins) drawerCoins.textContent = progression.maizeCoins;
   if (score > highScore) {
     highScore = score;
     dtHighScore.textContent = highScore;
@@ -3082,7 +3925,7 @@ function updateLivesUI() {
 }
 
 // ========================================================
-// 19. HELPERS DE DIBUJO
+// 21. HELPERS DE DIBUJO
 // ========================================================
 function interpolateGridPosition(current, previous, progress) {
   if (!previous || progress >= 1) return { ...current };
@@ -3092,11 +3935,10 @@ function interpolateGridPosition(current, previous, progress) {
   else if (dx < -gridCols / 2) dx += gridCols;
   if (dy > gridRows / 2) dy -= gridRows;
   else if (dy < -gridRows / 2) dy += gridRows;
-  
-  // ✅ Clampear el resultado a los límites de la cuadrícula
+
   const rawX = previous.x + dx * progress;
   const rawY = previous.y + dy * progress;
-  
+
   return {
     x: Math.max(0, Math.min(gridCols - 1, (rawX + gridCols) % gridCols)),
     y: Math.max(0, Math.min(gridRows - 1, (rawY + gridRows) % gridRows))
@@ -3118,7 +3960,7 @@ function roundRect(c, x, y, w, h, r) {
 function drawVignette() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const theme = BOARD_THEMES[gameMode] || BOARD_THEMES.classic;
+  const theme = BOARD_THEMES[progression.selectedTheme || 'classic'] || BOARD_THEMES.classic;
   const gradient = ctx.createRadialGradient(
     w / 2, h / 2, Math.min(w, h) * 0.35,
     w / 2, h / 2, Math.max(w, h) * 0.75
@@ -3127,6 +3969,81 @@ function drawVignette() {
   gradient.addColorStop(1, theme.vignetteColor);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, w, h);
+}
+
+// ✅ NUEVA: Dibujar oscuridad (Supervivencia)
+function drawDarkness() {
+  const mode = GAME_MODES[gameModeSelect.value];
+  if (!mode || !mode.hasDarkness) return;
+  if (darknessRadius >= DARKNESS_MAX_RADIUS) return;
+  if (snake.length === 0) return;
+
+  const head = snake[0];
+  const hx = head.x * TILE_SIZE + TILE_SIZE / 2;
+  const hy = head.y * TILE_SIZE + TILE_SIZE / 2;
+  const radiusPx = darknessRadius * TILE_SIZE;
+
+  const gradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.35, hx, hy, radiusPx);
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(0.55, 'rgba(0, 0, 0, 0.55)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.94)');
+
+  ctx.save();
+  // Rellenar todo menos el círculo de visión
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
+  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+  ctx.globalCompositeOperation = 'destination-out';
+  const cutGradient = ctx.createRadialGradient(hx, hy, radiusPx * 0.35, hx, hy, radiusPx);
+  cutGradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+  cutGradient.addColorStop(0.6, 'rgba(0, 0, 0, 0.85)');
+  cutGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = cutGradient;
+  ctx.beginPath();
+  ctx.arc(hx, hy, radiusPx, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Aplicar viñeta sobre el borde de la visión
+  ctx.save();
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(hx, hy, radiusPx * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ✅ NUEVA: Dibujar tinte de eclipse
+function drawEclipseTint() {
+  if (!eclipseActive) return;
+  const remaining = Math.max(0, eclipseUntil - gameTime);
+  const total = ECLIPSE_DURATION_MS;
+  const intensity = Math.min(1, remaining / total) * 0.35;
+  ctx.save();
+  ctx.fillStyle = `rgba(60, 40, 100, ${intensity})`;
+  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+  ctx.restore();
+}
+
+// ✅ NUEVA: Dibujar rastro de humo (Cacería)
+function drawHuntTrail() {
+  if (huntTrail.length === 0) return;
+  ctx.save();
+  huntTrail.forEach(t => {
+    const age = (gameTime - (t.expiresAt - HUNT_TRAIL_LIFETIME_MS)) / HUNT_TRAIL_LIFETIME_MS;
+    if (age < 0 || age > 1) return;
+    const alpha = (1 - age) * 0.4;
+    const cx = t.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = t.y * TILE_SIZE + TILE_SIZE / 2;
+    const r = TILE_SIZE * (0.35 + age * 0.4);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(120, 120, 140, ${alpha})`);
+    grad.addColorStop(1, `rgba(80, 80, 100, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
 }
 
 function drawFeatherScale(segment, index, guardian) {
@@ -3329,20 +4246,21 @@ function drawKukulkanHead(rs, dir, protectedFlag, isBlinking) {
   const cx = rs.x * TILE_SIZE + TILE_SIZE / 2;
   const cy = rs.y * TILE_SIZE + TILE_SIZE / 2;
   const perp = { x: -dir.y, y: dir.x };
-  const rear = { x: cx - dir.x * TILE_SIZE * 0.34, y: cy - dir.y * TILE_SIZE * 0.34 };
 
+  const skin = getActiveSkin();
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
+
   const GOLD_MAIN = isGolden ? '#d4b45c' : '#d5bd70';
   const GOLD_DEEP = isGolden ? '#a8924a' : '#a8843a';
   const GOLD_PALE = isGolden ? '#f5e9b8' : '#fff2c2';
   const JADE_EYE = '#4ec9a0';
-  const HEAD_FILL = isGolden ? '#c2a95e' : '#4ec9a0';
+  const HEAD_FILL = isGolden ? '#c2a95e' : skin.head;
 
   ctx.save();
   ctx.fillStyle = HEAD_FILL;
   roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
   ctx.fill();
-  ctx.strokeStyle = GOLD_PALE;
+  ctx.strokeStyle = skin.border || GOLD_PALE;
   ctx.lineWidth = isGolden ? 1.8 : 1.4;
   roundRect(ctx, rs.x * TILE_SIZE + 1, rs.y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2, 8);
   ctx.stroke();
@@ -4032,14 +4950,11 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
 
   ctx.save();
 
-  // ⚖️ Indicador de vulnerabilidad (parpadeo dorado cuando es eliminable)
   const isVulnerable = guardian.vulnerableUntil && gameTime < guardian.vulnerableUntil;
-  
-  // === AURA DE OBSIDIANA ===
+
   const auraR = TILE_SIZE * 1.9;
   const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, auraR);
   if (isVulnerable) {
-    // Aura dorada pulsante cuando es vulnerable
     const vulnPulse = Math.sin(gameTime * 0.015) * 0.5 + 0.5;
     aura.addColorStop(0, `rgba(255, 220, 120, ${0.45 + vulnPulse * 0.25})`);
     aura.addColorStop(0.5, `rgba(217, 142, 43, ${0.25 + vulnPulse * 0.15})`);
@@ -4053,8 +4968,7 @@ function drawTezcatlipoca(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.beginPath();
   ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
   ctx.fill();
-  
-  // ⚖️ Anillo dorado brillante cuando es vulnerable
+
   if (isVulnerable) {
     ctx.save();
     const ringPulse = Math.sin(gameTime * 0.02) * 0.5 + 0.5;
@@ -4408,45 +5322,31 @@ function drawFoodOffering(food, cx, cy, pulse) {
 }
 
 // ========================================================
-// 20. DRAW PRINCIPAL — AHORA CON LIMPIEZA CORRECTA
+// 22. DRAW PRINCIPAL
 // ========================================================
 function draw(interpolation = 1, updateEffects = false) {
-  // ========================================================
-  // ✅ FIX PROFESIONAL DEL SMEAR:
-  // 1. Resetear la transformación al estado base
-  // 2. Limpiar TODO el canvas (ahora funciona porque alpha:true)
-  // 3. Aplicar clip a toda el área visible para evitar dibujar fuera
-  // 4. Redibujar el fondo completo
-  // 5. Restaurar transformación para el juego
-  // ========================================================
-  
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  
-  // Reset transform y limpieza TOTAL del canvas
+
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
-  
-  // Redibujar fondo completo del tablero
+
   if (boardCanvas) {
     ctx.drawImage(boardCanvas, 0, 0, screenW, screenH);
   } else {
-    const theme = BOARD_THEMES[gameMode] || BOARD_THEMES.classic;
+    const theme = BOARD_THEMES[progression.selectedTheme || 'classic'] || BOARD_THEMES.classic;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, screenW, screenH);
   }
-  
-  // ✅ CLIP: Recortar todo el dibujado al área visible del juego
-  // Esto evita que partículas, guardianes o cualquier elemento se pinten fuera
+
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, screenW, screenH);
   ctx.clip();
-  
-  // Aplicar screen shake después del clip
+
   if (screenShake > 0) {
     const dx = (Math.random() - 0.5) * screenShake;
     const dy = (Math.random() - 0.5) * screenShake;
@@ -4456,8 +5356,11 @@ function draw(interpolation = 1, updateEffects = false) {
       if (screenShake < 0.3) screenShake = 0;
     }
   }
-  
+
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
+
+  // ✅ Rastro de humo (Cacería) — se dibuja debajo de todo
+  drawHuntTrail();
 
   foods.forEach(food => {
     const targetX = food.x * TILE_SIZE + TILE_SIZE / 2;
@@ -4497,13 +5400,13 @@ function draw(interpolation = 1, updateEffects = false) {
   bonusFoods.forEach(bf => {
     const cx = bf.x * TILE_SIZE + TILE_SIZE / 2;
     const cy = bf.y * TILE_SIZE + TILE_SIZE / 2;
-    
+
     const timeLeft = bf.expiresAt ? bf.expiresAt - gameTime : 999999;
     const isExpiring = timeLeft < 3000;
-    const blinkAlpha = isExpiring 
+    const blinkAlpha = isExpiring
       ? (Math.sin(gameTime * 0.02) > 0 ? 1 : 0.3)
       : 1;
-    
+
     ctx.save();
     ctx.globalAlpha = blinkAlpha;
     ctx.fillStyle = bf.isBossDrop ? '#ffb347' : '#f0cf70';
@@ -4886,11 +5789,6 @@ function draw(interpolation = 1, updateEffects = false) {
   const playerProtected = hasGuardianProtection();
 
   const isGolden = isImmune || isFuria || guardiansFrozenUntil > gameTime;
-  const KUKULKAN_HEAD = isGolden ? '#b8a668' : '#4ec9a0';
-  const KUKULKAN_BODY = isGolden ? '#9c8a4a' : '#1a7a5e';
-  const KUKULKAN_BORDER = isGolden ? '#d4c488' : 'rgba(213, 189, 112, 0.55)';
-  const KUKULKAN_INNER = isGolden ? 'rgba(245, 235, 190, 0.4)' : 'rgba(182, 242, 209, 0.28)';
-  const KUKULKAN_PLATE = isGolden ? '#c2b06a' : null;
 
   if (playerProtected && snake.length > 0) {
     const headSeg = snake[0];
@@ -4954,6 +5852,13 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fill();
   }
 
+  // ✅ Skin activo
+  const skin = getActiveSkin();
+  const KUKULKAN_BODY = isGolden ? '#9c8a4a' : skin.body;
+  const KUKULKAN_BORDER = isGolden ? '#d4c488' : skin.border;
+  const KUKULKAN_INNER = isGolden ? 'rgba(245, 235, 190, 0.4)' : skin.inner;
+  const KUKULKAN_PLATE = isGolden ? '#c2b06a' : skin.plate;
+
   snake.forEach((seg, idx) => {
     const isHead = idx === 0;
     const rs = interpolateGridPosition(
@@ -4976,7 +5881,7 @@ function draw(interpolation = 1, updateEffects = false) {
 
       ctx.save();
 
-      if (isGolden) {
+      if (isGolden || KUKULKAN_PLATE) {
         ctx.fillStyle = KUKULKAN_PLATE;
         roundRect(
           ctx,
@@ -4998,18 +5903,6 @@ function draw(interpolation = 1, updateEffects = false) {
           3
         );
         ctx.stroke();
-
-        ctx.fillStyle = '#8a7a4a';
-        const rivetR = 0.7;
-        const rxs = [rs.x * TILE_SIZE + 4, rs.x * TILE_SIZE + TILE_SIZE - 4];
-        const rys = [rs.y * TILE_SIZE + 4, rs.y * TILE_SIZE + TILE_SIZE * 0.4 - 1];
-        for (const rx of rxs) {
-          for (const ry of rys) {
-            ctx.beginPath();
-            ctx.arc(rx, ry, rivetR, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
       }
 
       ctx.strokeStyle = KUKULKAN_BORDER;
@@ -5067,6 +5960,12 @@ function draw(interpolation = 1, updateEffects = false) {
 
   if (isGameRunning) drawVignette();
 
+  // ✅ Oscuridad (Supervivencia) — encima de todo
+  drawDarkness();
+
+  // ✅ Tinte de eclipse (Clásico)
+  drawEclipseTint();
+
   if (cosmicOrderFlashStartedAt !== null) {
     const elapsed = gameTime - cosmicOrderFlashStartedAt;
     if (elapsed >= 0 && elapsed < COSMIC_ORDER_FLASH_DURATION_MS) {
@@ -5078,13 +5977,12 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.globalAlpha = 1;
     }
   }
-  
-  // ✅ Restaurar el clip
+
   ctx.restore();
 }
 
 // ========================================================
-// 21. START / PAUSE / GAME OVER
+// 23. START / PAUSE / GAME OVER
 // ========================================================
 function startGame() {
   getAudioContext();
@@ -5145,6 +6043,7 @@ function togglePause() {
 
 function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   finishRunStatistics();
+  const coinsEarned = Math.floor(score / 10);
   isGameRunning = false;
   cancelCountdown();
   clearFireBreath();
@@ -5186,6 +6085,15 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   deactivateImmunity();
   isOnFire = false;
   fireExpiresAt = 0;
+
+  // ✅ Limpiar mecánicas de modo
+  eclipseActive = false;
+  BadgeManager.setVisible('eclipse', false);
+  BadgeManager.setVisible('timer', false);
+  BadgeManager.setVisible('xibalba', false);
+  BadgeManager.setVisible('darkness', false);
+  huntTrail = [];
+
   stopMusic();
   playGameOverSound();
   vibrate([80, 50, 80, 50, 150]);
@@ -5193,6 +6101,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   overlayReason.textContent = reason;
   finalScoreElement.textContent = score;
   finalLengthElement.textContent = snake.length;
+  if (finalCoinsElement) finalCoinsElement.textContent = coinsEarned;
   gameOverlay.classList.remove('hidden');
   document.body.classList.add('gameover-open');
   dtStartBtn.textContent = '▶ Iniciar';
@@ -5209,7 +6118,7 @@ function changeDirection(newDir) {
 }
 
 // ========================================================
-// 22. TUTORIAL
+// 24. TUTORIAL
 // ========================================================
 function showTutorialStep(step) {
   currentTutorialStep = step;
@@ -5248,8 +6157,8 @@ function closeTutorial() {
   } else if (tutorialDrawerWasVisible) {
     drawerMenu.classList.remove('hidden');
   }
-  if (tutorialModal.parentElement !== welcomeScreen.querySelector('.welcome-card')) {
-    const card = welcomeScreen.querySelector('.welcome-card');
+  const card = welcomeScreen.querySelector('.welcome-card');
+  if (card && tutorialModal.parentElement !== card) {
     card.insertBefore(tutorialModal, welcomeStartBtn);
   }
   if (tutorialOpenedFromWelcome) {
@@ -5270,8 +6179,56 @@ function closeIntroTutorial() {
   introTutorialModal.classList.add('hidden');
 }
 
+// ✅ LORE
+function openLore() {
+  loreWasRunning = isGameRunning;
+  loreWasPaused = isPaused;
+  if (loreWasRunning && !loreWasPaused) togglePause();
+  loreModal.classList.remove('hidden');
+  playCosmicOrderSound();
+}
+function closeLore() {
+  loreModal.classList.add('hidden');
+  if (loreWasRunning && !loreWasPaused && isGameRunning && isPaused) togglePause();
+  loreWasRunning = false;
+  loreWasPaused = false;
+}
+
+// ✅ LOGROS
+function openAchievements() {
+  achievementsWasRunning = isGameRunning;
+  achievementsWasPaused = isPaused;
+  if (achievementsWasRunning && !achievementsWasPaused) togglePause();
+  drawerMenu.classList.add('hidden');
+  renderAchievementsUI();
+  achievementsModal.classList.remove('hidden');
+}
+function closeAchievements() {
+  achievementsModal.classList.add('hidden');
+  if (achievementsWasRunning && !achievementsWasPaused && isGameRunning && isPaused) togglePause();
+  achievementsWasRunning = false;
+  achievementsWasPaused = false;
+}
+
+// ✅ PERSONALIZACIÓN
+function openCustomize() {
+  customizeWasRunning = isGameRunning;
+  customizeWasPaused = isPaused;
+  if (customizeWasRunning && !customizeWasPaused) togglePause();
+  drawerMenu.classList.add('hidden');
+  renderCustomizeUI();
+  customizeModal.classList.remove('hidden');
+}
+function closeCustomize() {
+  customizeModal.classList.add('hidden');
+  if (customizeWasRunning && !customizeWasPaused && isGameRunning && isPaused) togglePause();
+  updateThemeColors();
+  customizeWasRunning = false;
+  customizeWasPaused = false;
+}
+
 // ========================================================
-// 23. CONTROLES
+// 25. CONTROLES
 // ========================================================
 let touchStartX = 0;
 let touchStartY = 0;
@@ -5323,6 +6280,9 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !tutorialModal.classList.contains('hidden')) { closeTutorial(); return; }
   if (e.key === 'Escape' && !introTutorialModal.classList.contains('hidden')) { closeIntroTutorial(); return; }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) { closeStatistics(); return; }
+  if (e.key === 'Escape' && !loreModal.classList.contains('hidden')) { closeLore(); return; }
+  if (e.key === 'Escape' && !achievementsModal.classList.contains('hidden')) { closeAchievements(); return; }
+  if (e.key === 'Escape' && !customizeModal.classList.contains('hidden')) { closeCustomize(); return; }
   if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
   const isText = e.target instanceof Element && e.target.matches('select, input');
   const isMove = e.key.startsWith('Arrow') || ['w','W','a','A','s','S','d','D'].includes(e.key);
@@ -5348,13 +6308,19 @@ bindDpad(btnLeft, { x: -1, y: 0 });
 bindDpad(btnRight, { x: 1, y: 0 });
 
 // ========================================================
-// 24. EVENTOS UI
+// 26. EVENTOS UI
 // ========================================================
 welcomeStartBtn.addEventListener('click', startGame);
 welcomeInfoBtn.addEventListener('click', openIntroTutorial);
+welcomeLoreBtn.addEventListener('click', openLore);
+welcomeCustomizeBtn.addEventListener('click', openCustomize);
 closeIntroTutorialBtn.addEventListener('click', closeIntroTutorial);
 introTutStartBtn.addEventListener('click', () => { closeIntroTutorial(); startGame(); });
 introTutorialModal.addEventListener('click', e => { if (e.target === introTutorialModal) closeIntroTutorial(); });
+
+closeLoreBtn.addEventListener('click', closeLore);
+loreStartBtn.addEventListener('click', () => { closeLore(); startGame(); });
+loreModal.addEventListener('click', e => { if (e.target === loreModal) closeLore(); });
 
 dtStartBtn.addEventListener('click', () => {
   if (!welcomeScreen.classList.contains('hidden')) startGame();
@@ -5364,9 +6330,31 @@ dtPauseBtn.addEventListener('click', togglePause);
 dtSoundBtn.addEventListener('click', () => toggleSound());
 dtTutorialBtn.addEventListener('click', openTutorial);
 dtStatsBtn.addEventListener('click', openStatistics);
+dtAchievementsBtn.addEventListener('click', openAchievements);
+dtCustomizeBtn.addEventListener('click', openCustomize);
+
 drawerStatsBtn.addEventListener('click', openStatistics);
+drawerAchievementsBtn.addEventListener('click', openAchievements);
+drawerCustomizeBtn.addEventListener('click', openCustomize);
+
 closeStatisticsBtn.addEventListener('click', closeStatistics);
 statisticsModal.addEventListener('click', e => { if (e.target === statisticsModal) closeStatistics(); });
+
+closeAchievementsBtn.addEventListener('click', closeAchievements);
+achievementsModal.addEventListener('click', e => { if (e.target === achievementsModal) closeAchievements(); });
+
+closeCustomizeBtn.addEventListener('click', closeCustomize);
+customizeModal.addEventListener('click', e => { if (e.target === customizeModal) closeCustomize(); });
+
+// ✅ Tabs de personalización
+customizeTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    customizeTabs.forEach(t => t.classList.toggle('active', t === tab));
+    if (customizeSkinsPanel) customizeSkinsPanel.classList.toggle('active', target === 'skins');
+    if (customizeThemesPanel) customizeThemesPanel.classList.toggle('active', target === 'themes');
+  });
+});
 
 menuToggleBtn.addEventListener('click', () => {
   if (isGameRunning && !isPaused) togglePause();
@@ -5405,7 +6393,7 @@ closeTutorialBtn.addEventListener('click', closeTutorial);
 tutorialModal.addEventListener('click', e => { if (e.target === tutorialModal) closeTutorial(); });
 
 // ========================================================
-// 25. ESTADÍSTICAS
+// 27. ESTADÍSTICAS
 // ========================================================
 function openStatistics() {
   if (!statisticsModal.classList.contains('hidden')) return;
@@ -5428,7 +6416,7 @@ function closeStatistics() {
 }
 
 // ========================================================
-// 26. DIFICULTAD Y MODO
+// 28. DIFICULTAD Y MODO
 // ========================================================
 function updateModeUI() {
   const isClassic = gameModeSelect.value === 'classic';
@@ -5533,7 +6521,7 @@ drawerGameMode.addEventListener('change', () => {
 });
 
 // ========================================================
-// 27. VISIBILITY
+// 29. VISIBILITY
 // ========================================================
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && isGameRunning && !isPaused) togglePause();
@@ -5543,7 +6531,7 @@ window.addEventListener('blur', () => {
 });
 
 // ========================================================
-// 28. WELCOME DEMO
+// 30. WELCOME DEMO
 // ========================================================
 function buildWelcomeScenario(cols, rows) {
   const sx = 4;
@@ -5948,7 +6936,7 @@ function stopWelcomeDemo() {
 }
 
 // ========================================================
-// 29. INICIALIZACIÓN
+// 31. INICIALIZACIÓN
 // ========================================================
 updateSoundUI();
 drawerDpadToggle.checked = showDpad;
@@ -5981,7 +6969,7 @@ gameTime = 0;
 applyGameModeRules();
 
 // ========================================================
-// 30. PWA — CAPTURA DEL EVENTO DE INSTALACIÓN
+// 32. PWA — CAPTURA DEL EVENTO DE INSTALACIÓN
 // ========================================================
 (function initPWAInstall() {
   const btns = [
