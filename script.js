@@ -4770,7 +4770,9 @@ function openTutorial() {
   const wasRunning = isGameRunning;
   tutorialOpenedFromWelcome = !welcomeScreen.classList.contains('hidden');
   if (wasRunning && !isPaused) pauseForModal();
-  if (!tutorialOpenedFromWelcome) document.body.appendChild(tutorialModal);
+  if (!tutorialOpenedFromWelcome && tutorialModal.parentElement !== document.body) {
+    document.body.appendChild(tutorialModal);
+  }
   welcomeStartBtn.classList.add('hidden');
   settingsModal.classList.add('hidden');
   tutorialModal.classList.remove('hidden');
@@ -4782,13 +4784,24 @@ function closeTutorial() {
   if (tutorialModal.classList.contains('hidden')) return;
   tutorialModal.classList.add('hidden');
   document.body.classList.remove('tutorial-open');
+
+  // ✅ FIX: devolver el modal a su lugar SIN insertBefore frágil
   const card = welcomeScreen.querySelector('.welcome-card');
-  if (card && tutorialModal.parentElement !== card) card.insertBefore(tutorialModal, welcomeStartBtn);
+  if (card && tutorialModal.parentElement !== card) {
+    // Insertar como hijo directo de la card (sin referencia a otro nodo)
+    card.appendChild(tutorialModal);
+  }
+
   if (tutorialOpenedFromWelcome) {
     welcomeScreen.classList.remove('hidden');
     startWelcomeDemo();
   }
-  welcomeStartBtn.classList.toggle('hidden', welcomeScreen.classList.contains('hidden') || !tutorialModal.classList.contains('hidden'));
+
+  welcomeStartBtn.classList.toggle(
+    'hidden',
+    welcomeScreen.classList.contains('hidden') || !tutorialModal.classList.contains('hidden')
+  );
+
   tutorialOpenedFromWelcome = false;
   const wasRunning = tutorialModal.dataset.wasRunning === '1';
   delete tutorialModal.dataset.wasRunning;
