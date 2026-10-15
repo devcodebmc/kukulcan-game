@@ -93,6 +93,7 @@
       <button id="dt-pause-btn" class="icon-btn" title="Pausar" aria-label="Pausar">⏸️</button>
       <button id="dt-settings-btn" class="icon-btn" title="Configuración" aria-label="Configuración">⚙️</button>
       <button id="dt-sound-btn" class="icon-btn" title="Sonido" aria-label="Sonido">🔊</button>
+      <button id="dt-objectives-btn" class="icon-btn" title="Objetivos" aria-label="Objetivos">🎯</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
       <button id="dt-customize-btn" class="icon-btn" title="Personalizar" aria-label="Personalizar">🎨</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
@@ -118,6 +119,7 @@
     <div class="hud-actions">
       <button id="mb-pause-btn" class="hud-action-btn" aria-label="Pausar">⏸️</button>
       <button id="mb-settings-btn" class="hud-action-btn" aria-label="Configuración">⚙️</button>
+      <button id="mb-objectives-btn" class="hud-action-btn" aria-label="Objetivos">🎯</button>
       <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
     </div>
   </header>
@@ -282,7 +284,7 @@
         </div>
         <div class="settings-actions-grid">
           <button id="settings-customize-btn" class="btn btn-outline">🎨 Skins</button>
-          <button id="settings-achievements-btn" class="btn btn-outline">🏆 Logros</button>
+          <button id="settings-objectives-btn" class="btn btn-outline">🎯 Objetivos</button>
           <button id="settings-stats-btn" class="btn btn-outline">📊 Stats</button>
           <button id="settings-tutorial-btn" class="btn btn-outline">❓ Tutorial</button>
           <button id="settings-restart-btn" class="btn btn-secondary full-width">🔄 Reiniciar partida</button>
@@ -383,26 +385,6 @@
     </div>
   </div>
 
-  <!-- MODAL LOGROS -->
-  <div id="achievements-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="achievements-title">
-    <div class="achievements-card">
-      <div class="achievements-header">
-        <h2 id="achievements-title">🏆 Logros de Kukulcán</h2>
-        <button id="close-achievements-btn" class="close-btn" aria-label="Cerrar">✕</button>
-      </div>
-      <div class="achievements-summary">
-        <div class="achievements-progress">
-          <span id="achievements-count">0 / 11</span>
-          <span class="achievements-label">desbloqueados</span>
-        </div>
-        <div class="achievements-bar">
-          <div id="achievements-fill" class="achievements-fill" style="width: 0%"></div>
-        </div>
-      </div>
-      <div id="achievements-list" class="achievements-list"></div>
-    </div>
-  </div>
-
   <!-- MODAL PERSONALIZACIÓN -->
   <div id="customize-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="customize-title">
     <div class="customize-card">
@@ -431,6 +413,35 @@
       </div>
     </div>
   </div>
+
+  <!-- MODAL OBJETIVOS -->
+<div id="objectives-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="objectives-title">
+  <div class="objectives-card">
+    <div class="objectives-header">
+      <h2 id="objectives-title">🎯 Objetivos de la Travesía</h2>
+      <button id="close-objectives-btn" class="close-btn" aria-label="Cerrar">✕</button>
+    </div>
+
+    <div class="objectives-summary">
+      <div class="objectives-progress">
+        <span id="objectives-count">0 / 11</span>
+        <span class="objectives-label">completados</span>
+      </div>
+      <div class="objectives-bar">
+        <div id="objectives-fill" class="objectives-fill" style="width: 0%"></div>
+      </div>
+      <div id="objectives-next" class="objectives-next"></div>
+    </div>
+
+    <div class="objectives-tabs">
+      <button class="objectives-tab active" data-filter="all">Todos</button>
+      <button class="objectives-tab" data-filter="pending">Pendientes</button>
+      <button class="objectives-tab" data-filter="done">Cumplidos</button>
+    </div>
+
+    <div id="objectives-list" class="objectives-list"></div>
+  </div>
+</div>
 
   <!-- MODAL GAME OVER -->
   <div id="game-overlay" class="modal-backdrop hidden">

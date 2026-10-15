@@ -1327,163 +1327,6 @@ body.gameover-open .lives-fixed-container {
 }
 
 /* =========================================================
-   LOGROS
-   ========================================================= */
-.achievements-card {
-  background: var(--bg-3);
-  border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  box-shadow: var(--shadow-card);
-  max-width: 560px;
-  width: 100%;
-  padding: 14px;
-  max-height: 88vh;
-  overflow-y: auto;
-  animation: modal-pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-.achievements-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 10px;
-}
-
-.achievements-header h2 {
-  color: var(--gold);
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.achievements-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.achievements-progress {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 0.8rem;
-}
-
-.achievements-progress span:first-child {
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--jade);
-}
-
-.achievements-label {
-  color: var(--text-dim);
-  font-size: 0.72rem;
-}
-
-.achievements-bar {
-  height: 6px;
-  background: var(--bg-2);
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-
-.achievements-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--jade-dk), var(--jade-lt));
-  border-radius: 3px;
-  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 0 8px rgba(125, 232, 196, 0.5);
-}
-
-.achievements-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px;
-}
-
-.achievement-item {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
-  position: relative;
-  overflow: hidden;
-  min-height: 88px;
-  justify-content: center;
-}
-
-.achievement-item.unlocked {
-  border-color: rgba(198, 164, 85, 0.5);
-  background: linear-gradient(180deg, rgba(60, 48, 18, 0.4), var(--bg-2));
-}
-
-.achievement-item.unlocked::before {
-  content: '✓';
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  color: var(--jade);
-  font-weight: 900;
-  font-size: 0.85rem;
-  text-shadow: 0 0 6px rgba(78, 201, 160, 0.8);
-}
-
-.achievement-item.locked {
-  opacity: 0.55;
-  filter: grayscale(0.6);
-}
-
-.achievement-item:hover {
-  transform: translateY(-1px);
-}
-
-.achievement-item.unlocked:hover {
-  box-shadow: 0 4px 16px rgba(198, 164, 85, 0.3);
-}
-
-.achievement-icon {
-  font-size: 1.5rem;
-  line-height: 1;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
-}
-
-.achievement-item.locked .achievement-icon {
-  filter: grayscale(1) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
-}
-
-.achievement-name {
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--gold-lt);
-  line-height: 1.15;
-}
-
-.achievement-item.unlocked .achievement-name {
-  color: var(--gold-hi);
-}
-
-.achievement-desc {
-  font-size: 0.62rem;
-  color: var(--text-dim);
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* =========================================================
    PERSONALIZACIÓN
    ========================================================= */
 .customize-card {
@@ -2102,7 +1945,7 @@ body.gameover-open .lives-fixed-container {
 }
 
 /* =========================================================
-   TOAST DE LOGRO (compacto)
+   TOAST DE OBJETIVO
    ========================================================= */
 .achievement-toast-container {
   position: fixed;
@@ -2331,4 +2174,408 @@ body.gameover-open .lives-fixed-container {
 .hud-badge .badge-text-desktop,
 .hud-badge .badge-text-mobile {
   line-height: 1.25;
+}
+
+/* =========================================================
+   OBJETIVOS — Medallones de glifos
+   ========================================================= */
+.objectives-card {
+  background: linear-gradient(180deg, rgba(26, 22, 18, 0.98), rgba(20, 18, 15, 0.98));
+  border: 1px solid rgba(198, 164, 85, 0.45);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card), 0 0 60px rgba(198, 164, 85, 0.12);
+  max-width: 720px;
+  width: 100%;
+  padding: 18px 16px 16px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modal-pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  position: relative;
+}
+
+/* Textura sutil de fondo */
+.objectives-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background-image:
+    radial-gradient(circle at 15% 15%, rgba(198, 164, 85, 0.06) 0, transparent 25%),
+    radial-gradient(circle at 85% 85%, rgba(78, 201, 160, 0.05) 0, transparent 25%);
+  pointer-events: none;
+}
+
+.objectives-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(198, 164, 85, 0.22);
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.objectives-header h2 {
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin: 0;
+  text-shadow: 0 0 18px rgba(198, 164, 85, 0.35);
+}
+
+/* ---- RESUMEN ---- */
+.objectives-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: rgba(15, 18, 24, 0.55);
+  border: 1px solid rgba(198, 164, 85, 0.2);
+  border-radius: 12px;
+  position: relative;
+}
+
+.objectives-progress {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.objectives-progress span:first-child {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--jade-lt);
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 14px rgba(125, 232, 196, 0.55);
+  line-height: 1;
+}
+
+.objectives-label {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.objectives-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(198, 164, 85, 0.18);
+  position: relative;
+}
+
+.objectives-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--jade-dk), var(--jade-lt) 50%, var(--jade));
+  border-radius: 3px;
+  transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 12px rgba(125, 232, 196, 0.7), inset 0 0 6px rgba(255, 255, 255, 0.25);
+}
+
+.objectives-next {
+  font-size: 0.72rem;
+  color: var(--gold-lt);
+  background: rgba(198, 164, 85, 0.06);
+  border: 1px dashed rgba(198, 164, 85, 0.32);
+  border-radius: 8px;
+  padding: 7px 10px;
+  line-height: 1.4;
+  text-align: center;
+}
+.objectives-next:empty { display: none; }
+.objectives-next strong {
+  color: var(--gold-hi);
+  font-weight: 700;
+}
+
+/* ---- TABS ---- */
+.objectives-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.objectives-tab {
+  background: rgba(15, 18, 24, 0.5);
+  border: 1px solid rgba(198, 164, 85, 0.22);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.objectives-tab:hover {
+  color: var(--gold-lt);
+  border-color: rgba(198, 164, 85, 0.5);
+}
+.objectives-tab.active {
+  color: #101a13;
+  background: linear-gradient(135deg, var(--gold-lt), var(--gold));
+  border-color: var(--gold-hi);
+  box-shadow: 0 0 12px rgba(198, 164, 85, 0.4);
+}
+
+/* ---- GRID DE MEDALLONES ---- */
+.objectives-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.objective-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.objective-item:hover {
+  transform: translateY(-3px);
+}
+
+/* ---- MEDALLÓN (círculo con anillo de progreso) ---- */
+.objective-medallion {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* El SVG del anillo de progreso */
+.objective-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.objective-ring-bg {
+  fill: none;
+  stroke: rgba(198, 164, 85, 0.15);
+  stroke-width: 4;
+}
+
+.objective-ring-fill {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+              stroke 0.3s ease;
+  filter: drop-shadow(0 0 4px rgba(198, 164, 85, 0.7));
+}
+
+.objective-item.completed .objective-ring-fill {
+  stroke: var(--jade-lt);
+  filter: drop-shadow(0 0 6px rgba(125, 232, 196, 0.9));
+}
+
+/* Disco interior con el glifo */
+.objective-disc {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%,
+    rgba(60, 50, 30, 0.95),
+    rgba(30, 25, 18, 0.98) 70%);
+  border: 2px solid rgba(198, 164, 85, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.7),
+    inset 0 -2px 4px rgba(255, 200, 100, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.objective-item.completed .objective-disc {
+  background: radial-gradient(circle at 35% 30%,
+    rgba(30, 90, 80, 0.9),
+    rgba(15, 40, 35, 0.98) 70%);
+  border-color: rgba(125, 232, 196, 0.7);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 -2px 6px rgba(125, 232, 196, 0.15),
+    0 0 18px rgba(78, 201, 160, 0.45);
+}
+
+.objective-item.completed .objective-disc::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(125, 232, 196, 0.18), transparent 65%);
+  animation: objective-glow-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes objective-glow-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.08); }
+}
+
+.objective-icon {
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+  transition: transform 0.3s, filter 0.3s;
+}
+
+.objective-item.completed .objective-icon {
+  filter: drop-shadow(0 0 6px rgba(125, 232, 196, 0.85)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  transform: scale(1.05);
+}
+
+/* Check de completado (sello pequeño) */
+.objective-status {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--jade-lt), var(--jade-dk));
+  color: #0a1a14;
+  font-size: 0.85rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-3);
+  box-shadow: 0 0 10px rgba(125, 232, 196, 0.8);
+  transform: scale(0);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+.objective-item.completed .objective-status {
+  transform: scale(1);
+}
+
+.objective-item.pending .objective-status {
+  display: none;
+}
+
+/* Info debajo del medallón */
+.objective-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+}
+
+.objective-name {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--gold-lt);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+}
+
+.objective-item.completed .objective-name {
+  color: var(--jade-lt);
+  text-shadow: 0 0 8px rgba(125, 232, 196, 0.4);
+}
+
+.objective-progress-text {
+  font-size: 0.62rem;
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(198, 164, 85, 0.15);
+}
+
+.objective-item.completed .objective-progress-text {
+  color: var(--jade-lt);
+  border-color: rgba(125, 232, 196, 0.35);
+  background: rgba(30, 90, 80, 0.3);
+}
+
+/* Descripción pequeña y sutil */
+.objective-desc {
+  font-size: 0.6rem;
+  color: var(--text-mute);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 0 4px;
+  opacity: 0.85;
+}
+
+.objective-item.completed .objective-desc {
+  opacity: 0.7;
+}
+
+.objectives-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 32px 12px;
+  color: var(--text-mute);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 480px) {
+  .objectives-card { padding: 14px 12px; max-height: 92vh; }
+  .objectives-list { gap: 10px; }
+  .objective-medallion { width: 72px; height: 72px; }
+  .objective-disc { width: 56px; height: 56px; }
+  .objective-icon { font-size: 1.7rem; }
+  .objective-name { font-size: 0.68rem; }
+  .objective-desc { font-size: 0.56rem; -webkit-line-clamp: 1; }
+  .objective-progress-text { font-size: 0.58rem; padding: 1px 6px; }
+  .objectives-progress span:first-child { font-size: 1.25rem; }
+}
+
+@media (min-width: 640px) {
+  .objectives-list { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .objective-medallion { width: 92px; height: 92px; }
+  .objective-disc { width: 74px; height: 74px; }
+  .objective-icon { font-size: 2.2rem; }
+}
+
+@media (min-width: 900px) {
+  .objectives-card { max-width: 860px; }
+  .objectives-list { grid-template-columns: repeat(4, 1fr); gap: 16px; }
 }

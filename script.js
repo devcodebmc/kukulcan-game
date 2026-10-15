@@ -1,6 +1,5 @@
 // ========================================================
-// LA TRAVESÍA DE KUKULCÁN — script.js (v7 final)
-// Fixes: eclipse, pausa robusta, modales, overlay, glitches
+// LA TRAVESÍA DE KUKULCÁN — script.js (v8 fixed)
 // ========================================================
 
 // ========================================================
@@ -105,11 +104,16 @@ const loreModal = document.getElementById('lore-modal');
 const closeLoreBtn = document.getElementById('close-lore-btn');
 const loreStartBtn = document.getElementById('lore-start-btn');
 
-const achievementsModal = document.getElementById('achievements-modal');
-const closeAchievementsBtn = document.getElementById('close-achievements-btn');
-const achievementsList = document.getElementById('achievements-list');
-const achievementsCount = document.getElementById('achievements-count');
-const achievementsFill = document.getElementById('achievements-fill');
+const objectivesModal = document.getElementById('objectives-modal');
+const closeObjectivesBtn = document.getElementById('close-objectives-btn');
+const objectivesList = document.getElementById('objectives-list');
+const objectivesCount = document.getElementById('objectives-count');
+const objectivesFill = document.getElementById('objectives-fill');
+const objectivesNext = document.getElementById('objectives-next');
+const dtObjectivesBtn = document.getElementById('dt-objectives-btn');
+const mbObjectivesBtn = document.getElementById('mb-objectives-btn');
+const settingsObjectivesBtn = document.getElementById('settings-objectives-btn');
+const objectivesTabs = document.querySelectorAll('.objectives-tab');
 
 const customizeModal = document.getElementById('customize-modal');
 const closeCustomizeBtn = document.getElementById('close-customize-btn');
@@ -143,7 +147,6 @@ const difficultySelect = settingsDifficulty;
 const settingsSoundToggle = document.getElementById('settings-sound-toggle');
 const settingsDpadToggle = document.getElementById('settings-dpad-toggle');
 const settingsCustomizeBtn = document.getElementById('settings-customize-btn');
-const settingsAchievementsBtn = document.getElementById('settings-achievements-btn');
 const settingsStatsBtn = document.getElementById('settings-stats-btn');
 const settingsTutorialBtn = document.getElementById('settings-tutorial-btn');
 const settingsRestartBtn = document.getElementById('settings-restart-btn');
@@ -158,7 +161,7 @@ function isAnyModalOpen() {
     (tutorialModal && !tutorialModal.classList.contains('hidden')) ||
     (introTutorialModal && !introTutorialModal.classList.contains('hidden')) ||
     (loreModal && !loreModal.classList.contains('hidden')) ||
-    (achievementsModal && !achievementsModal.classList.contains('hidden')) ||
+    (objectivesModal && !objectivesModal.classList.contains('hidden')) ||
     (customizeModal && !customizeModal.classList.contains('hidden')) ||
     (statisticsModal && !statisticsModal.classList.contains('hidden')) ||
     (gameOverlay && !gameOverlay.classList.contains('hidden')) ||
@@ -167,9 +170,11 @@ function isAnyModalOpen() {
 }
 
 // ========================================================
-// 5.1. LOGROS
+// 5.1. OBJETIVOS.
 // ========================================================
-const ACHIEVEMENTS = [
+let objectivesFilter = 'all';
+
+const OBJECTIVES = [
   { id: 'first_maize',    name: 'Primera Ofrenda',       description: 'Recoge tu primer maíz.',           icon: '🌽', check: (p) => p.totalMaize >= 1 },
   { id: 'maize_100',      name: 'Agricultor Sagrado',    description: 'Recoge 100 maíces en total.',      icon: '🌽', check: (p) => p.totalMaize >= 100 },
   { id: 'maize_1000',     name: 'Señor del Maíz',        description: 'Recoge 1000 maíces en total.',     icon: '🌽', check: (p) => p.totalMaize >= 1000 },
@@ -187,12 +192,12 @@ let achievementToastQueue = [];
 let achievementToastActive = false;
 
 function checkAchievements() {
-  if (typeof ACHIEVEMENTS === 'undefined' || !Array.isArray(ACHIEVEMENTS)) {
-    console.warn('[Kukulcán] ACHIEVEMENTS no disponible aún');
+  if (typeof OBJECTIVES === 'undefined' || !Array.isArray(OBJECTIVES)) {
+    console.warn('[Kukulcán] OBJECTIVES no disponible aún');
     return [];
   }
   const newlyUnlocked = [];
-  ACHIEVEMENTS.forEach(ach => {
+  OBJECTIVES.forEach(ach => {
     if (progression.achievements[ach.id]) return;
     try {
       if (ach.check(progression)) {
@@ -200,13 +205,17 @@ function checkAchievements() {
         newlyUnlocked.push(ach);
       }
     } catch (e) {
-      console.warn('[Kukulcán] Error en logro', ach.id, e);
+      console.warn('[Kukulcán] Error en objetivo', ach.id, e);
     }
   });
   if (newlyUnlocked.length > 0) {
     saveProgression();
     newlyUnlocked.forEach(ach => achievementToastQueue.push(ach));
     processAchievementToastQueue();
+    // ✅ refrescar objetivos si el modal está abierto
+    if (objectivesModal && !objectivesModal.classList.contains('hidden')) {
+      renderObjectivesUI();
+    }
   }
   return newlyUnlocked;
 }
@@ -231,7 +240,7 @@ function showAchievementToast(achievement, onDone) {
   toast.innerHTML = `
     <div class="achievement-toast-icon">${achievement.icon}</div>
     <div class="achievement-toast-content">
-      <div class="achievement-toast-title">¡Logro desbloqueado!</div>
+      <div class="achievement-toast-title">¡Objetivo cumplido!</div>
       <div class="achievement-toast-name">${achievement.name}</div>
       <div class="achievement-toast-desc">${achievement.description}</div>
     </div>
@@ -260,25 +269,150 @@ function playAchievementSound() {
   } catch (e) {}
 }
 
-function renderAchievementsUI() {
-  if (!achievementsList) return;
-  if (typeof ACHIEVEMENTS === 'undefined') return;
-  const total = ACHIEVEMENTS.length;
-  const unlockedCount = ACHIEVEMENTS.filter(a => progression.achievements[a.id]).length;
-  if (achievementsCount) achievementsCount.textContent = `${unlockedCount} / ${total}`;
-  if (achievementsFill) achievementsFill.style.width = `${(unlockedCount / total) * 100}%`;
-  achievementsList.innerHTML = '';
-  ACHIEVEMENTS.forEach(ach => {
-    const unlocked = !!progression.achievements[ach.id];
-    const item = document.createElement('div');
-    item.className = `achievement-item ${unlocked ? 'unlocked' : 'locked'}`;
-    item.innerHTML = `
-      <div class="achievement-icon">${ach.icon}</div>
-      <div class="achievement-name">${ach.name}</div>
-      <div class="achievement-desc">${ach.description}</div>
-    `;
-    achievementsList.appendChild(item);
+// ========================================================
+// PROGRESO DETALLADO DE OBJETIVOS
+// ========================================================
+function getObjectiveProgress(ach) {
+  const p = progression;
+  switch (ach.id) {
+    case 'first_maize':  return { current: Math.min(p.totalMaize, 1), target: 1, unit: 'maíz' };
+    case 'maize_100':    return { current: Math.min(p.totalMaize, 100), target: 100, unit: 'maíces' };
+    case 'maize_1000':   return { current: Math.min(p.totalMaize, 1000), target: 1000, unit: 'maíces' };
+    case 'cacao_50':     return { current: Math.min(p.totalCacao, 50), target: 50, unit: 'cacao' };
+    case 'guardian_10':  return { current: Math.min(p.totalGuardiansDefeated, 10), target: 10, unit: 'guardianes' };
+    case 'guardian_100': return { current: Math.min(p.totalGuardiansDefeated, 100), target: 100, unit: 'guardianes' };
+    case 'tezcat_1':     return { current: Math.min(p.totalTezcatlipocaDefeated, 1), target: 1, unit: 'Tezcatlipoca' };
+    case 'tezcat_10':    return { current: Math.min(p.totalTezcatlipocaDefeated, 10), target: 10, unit: 'Tezcatlipoca' };
+    case 'survive_5min': return {
+      current: Math.min(Math.floor(p.totalSurvivalMs / 60000), 5),
+      target: 5,
+      unit: 'minutos'
+    };
+    case 'games_50':     return { current: Math.min(p.totalGamesPlayed, 50), target: 50, unit: 'partidas' };
+    case 'timed_500':    return { current: Math.min(p.bestTimedScore, 500), target: 500, unit: 'puntos' };
+    default: return null;
+  }
+}
+
+function getNextObjective() {
+  const pending = OBJECTIVES
+    .filter(a => !progression.achievements[a.id])
+    .map(a => ({ ach: a, prog: getObjectiveProgress(a) }))
+    .filter(x => x.prog);
+
+  if (pending.length === 0) return null;
+
+  // Elegir el más cercano a completarse (mayor ratio)
+  pending.sort((a, b) => {
+    const ratioA = a.prog.current / a.prog.target;
+    const ratioB = b.prog.current / b.prog.target;
+    return ratioB - ratioA;
   });
+  return pending[0];
+}
+
+// ========================================================
+// OBJETIVOS — RENDER
+// ========================================================
+
+function renderObjectivesUI() {
+  if (!objectivesList) return;
+
+  const total = OBJECTIVES.length;
+  const done = OBJECTIVES.filter(a => progression.achievements[a.id]).length;
+  const pct = Math.round((done / total) * 100);
+
+  if (objectivesCount) objectivesCount.textContent = `${done} / ${total}`;
+  if (objectivesFill) objectivesFill.style.width = `${pct}%`;
+
+  if (objectivesNext) {
+    const next = getNextObjective();
+    if (next) {
+      const p = next.prog;
+      const pctNext = Math.round((p.current / p.target) * 100);
+      objectivesNext.innerHTML =
+        `Próximo objetivo: <strong>${next.ach.name}</strong> — ` +
+        `${p.current} / ${p.target} ${p.unit} (${pctNext}%)`;
+    } else {
+      objectivesNext.innerHTML = `🎉 ¡Has completado todos los objetivos!`;
+    }
+  }
+
+  const visible = OBJECTIVES.filter(a => {
+    const completed = !!progression.achievements[a.id];
+    if (objectivesFilter === 'pending') return !completed;
+    if (objectivesFilter === 'done')    return completed;
+    return true;
+  });
+
+  objectivesList.innerHTML = '';
+  if (visible.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'objectives-empty';
+    empty.textContent = objectivesFilter === 'pending'
+      ? '¡No queda ningún objetivo pendiente!'
+      : 'Aún no has completado ningún objetivo.';
+    objectivesList.appendChild(empty);
+    return;
+  }
+
+  // Config del anillo SVG
+  const R = 40;                    // radio
+  const CIRC = 2 * Math.PI * R;    // circunferencia
+
+  visible.forEach(ach => {
+    const completed = !!progression.achievements[ach.id];
+    const prog = getObjectiveProgress(ach);
+    const ratio = prog ? Math.min(1, prog.current / prog.target) : (completed ? 1 : 0);
+    const dashOffset = CIRC * (1 - ratio);
+
+    const item = document.createElement('div');
+    item.className = `objective-item ${completed ? 'completed' : 'pending'}`;
+
+    const progressText = prog
+      ? `${prog.current} / ${prog.target} ${prog.unit}`
+      : (completed ? '✓ Completado' : '');
+
+    item.innerHTML = `
+      <div class="objective-medallion">
+        <svg class="objective-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="objective-ring-bg" cx="50" cy="50" r="${R}" />
+          <circle class="objective-ring-fill" cx="50" cy="50" r="${R}"
+                  stroke-dasharray="${CIRC.toFixed(2)}"
+                  stroke-dashoffset="${dashOffset.toFixed(2)}" />
+        </svg>
+        <div class="objective-disc">
+          <div class="objective-icon">${ach.icon}</div>
+          <div class="objective-status" aria-hidden="true">✓</div>
+        </div>
+      </div>
+      <div class="objective-content">
+        <div class="objective-name">${ach.name}</div>
+        ${progressText ? `<div class="objective-progress-text">${progressText}</div>` : ''}
+        <div class="objective-desc">${ach.description}</div>
+      </div>
+    `;
+    objectivesList.appendChild(item);
+  });
+}
+
+function openObjectives() {
+  const wasRunning = isGameRunning;
+  if (wasRunning && !isPaused) pauseForModal();
+  if (settingsModal) settingsModal.classList.add('hidden');
+  renderObjectivesUI();
+  objectivesModal.dataset.wasRunning = wasRunning ? '1' : '0';
+  objectivesModal.classList.remove('hidden');
+}
+
+function closeObjectives() {
+  if (!objectivesModal || objectivesModal.classList.contains('hidden')) return;
+  objectivesModal.classList.add('hidden');
+  const wasRunning = objectivesModal.dataset.wasRunning === '1';
+  delete objectivesModal.dataset.wasRunning;
+  resumeIfWasRunning(wasRunning);
+  // ✅ refrescar badge de guardianes por si cambió algo
+  updateGuardianBadge();
 }
 
 // ========================================================
@@ -1036,38 +1170,59 @@ function finishRunStatistics() {
 }
 
 // ========================================================
-// 8. ESCALADO / CANVAS
+// 8. ESCALADO / CANVAS  ✅ FIX
 // ========================================================
 function resizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const width = window.innerWidth;
   const height = window.innerHeight;
   TILE_SIZE = width < 480 ? 20 : 24;
-  canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(height * dpr);
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
+
+  const newW = Math.floor(width * dpr);
+  const newH = Math.floor(height * dpr);
+
+  // ✅ FIX: solo reasignar width/height si cambió (evita glitches)
+  if (canvas.width !== newW || canvas.height !== newH) {
+    canvas.width = newW;
+    canvas.height = newH;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+  }
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   gridCols = Math.max(14, Math.floor(width / TILE_SIZE));
   gridRows = Math.max(14, Math.floor(height / TILE_SIZE));
-  rebuildBoardCanvas(width, height, dpr, true);
+  rebuildBoardCanvas(width, height, dpr, false);
   if (!isGameRunning) draw(1, false);
 }
 
 function rebuildBoardCanvas(width, height, dpr, force = false) {
   const themeId = progression.selectedTheme || 'classic';
-  const needsRebuild = force || !boardCanvas || boardWidth !== width || boardHeight !== height || boardTheme !== themeId;
+  const needsRebuild =
+    force ||
+    !boardCanvas ||
+    boardWidth !== width ||
+    boardHeight !== height ||
+    boardTheme !== themeId;
+
   if (!needsRebuild) return;
 
-  boardCanvas = document.createElement('canvas');
+  // ✅ FIX: reutilizar canvas existente en vez de crear uno nuevo
+  if (!boardCanvas) {
+    boardCanvas = document.createElement('canvas');
+    boardContext = boardCanvas.getContext('2d', { alpha: false });
+  }
   boardCanvas.width = Math.max(1, Math.floor(width * dpr));
   boardCanvas.height = Math.max(1, Math.floor(height * dpr));
   boardWidth = width; boardHeight = height; boardTheme = themeId;
-  boardContext = boardCanvas.getContext('2d', { alpha: false });
+
+  // ✅ FIX: limpieza explícita antes de redibujar
+  boardContext.setTransform(1, 0, 0, 1, 0, 0);
+  boardContext.clearRect(0, 0, boardCanvas.width, boardCanvas.height);
   boardContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+
   const theme = BOARD_THEMES[themeId] || BOARD_THEMES.classic;
 
-  boardContext.clearRect(0, 0, width, height);
   boardContext.fillStyle = theme.bg;
   boardContext.fillRect(0, 0, width, height);
   boardContext.strokeStyle = theme.gridLine;
@@ -1095,14 +1250,17 @@ function rebuildBoardCanvas(width, height, dpr, force = false) {
   } else if (theme.patternType === 'crack') {
     boardContext.strokeStyle = theme.patternColor;
     boardContext.lineWidth = 1.5;
+    // ✅ FIX: seed determinista — los cracks no cambian entre rebuilds
+    let s = 12345;
+    const rand = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
     for (let i = 0; i < 12; i++) {
-      const cx = Math.random() * width;
-      const cy = Math.random() * height;
+      const cx = rand() * width;
+      const cy = rand() * height;
       boardContext.beginPath(); boardContext.moveTo(cx, cy);
       let lx = cx, ly = cy;
-      for (let s = 0; s < 4; s++) {
-        lx += (Math.random() - 0.5) * TILE_SIZE * 3;
-        ly += (Math.random() - 0.5) * TILE_SIZE * 3;
+      for (let k = 0; k < 4; k++) {
+        lx += (rand() - 0.5) * TILE_SIZE * 3;
+        ly += (rand() - 0.5) * TILE_SIZE * 3;
         boardContext.lineTo(lx, ly);
       }
       boardContext.stroke();
@@ -1507,17 +1665,21 @@ function spawnEatBurst(x, y, color = '#d5bd70', count = 6) {
   }
 }
 
+// ✅ FIX: límite duro + clamp de alpha
 function updateAndDrawParticles(updateState = true) {
   const MAX_PARTICLES = window.innerWidth <= 768 ? 60 : 150;
   const screenW = window.innerWidth, screenH = window.innerHeight;
-  if (particles.length > MAX_PARTICLES) particles.splice(0, particles.length - MAX_PARTICLES);
+
+  if (particles.length > MAX_PARTICLES) {
+    particles.splice(0, particles.length - MAX_PARTICLES);
+  }
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     if (updateState) { p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; }
     const isOffScreen = p.x < -50 || p.x > screenW + 50 || p.y < -50 || p.y > screenH + 50;
     if (p.alpha <= 0 || isOffScreen) { particles.splice(i, 1); continue; }
-    ctx.globalAlpha = p.alpha;
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
     ctx.fillStyle = p.color;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
   }
@@ -1527,7 +1689,7 @@ function updateAndDrawParticles(updateState = true) {
     const ft = floatingTexts[i];
     if (updateState) { ft.y += ft.vy; ft.alpha -= 0.028; ft.life += 1; ft.scale = Math.min(1, ft.scale + 0.15); }
     if (ft.alpha <= 0) { floatingTexts.splice(i, 1); continue; }
-    ctx.globalAlpha = ft.alpha;
+    ctx.globalAlpha = Math.max(0, Math.min(1, ft.alpha));
     const fontSize = Math.round(13 * ft.scale);
     ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1609,6 +1771,139 @@ function activateAirBoost() {
   }
 }
 function deactivateAirBoost() { airBoostUntil = 0; BadgeManager.setVisible('air', false); }
+
+// ========================================================
+// 12.5 LOOP ROBUSTO ✅ FIX
+// ========================================================
+function getCurrentSpeed() {
+  const sel = difficultySelect.value;
+  const base = SPEEDS[sel] || SPEEDS.medium;
+  const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
+  let adaptive = Math.max(base * 0.78, base - lengthPenalty);
+  if (isFuria) adaptive *= 0.55;
+  else if (airBoostUntil > gameTime) adaptive *= AIR_BOOST_MULTIPLIER;
+  if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
+    const head = snake[0];
+    if (huntTrail.some(t => t.x === head.x && t.y === head.y)) adaptive *= HUNT_TRAIL_SLOW_FACTOR;
+  }
+  return Math.max(16, adaptive);
+}
+function snapshotRenderPositions() {
+  previousSnakePositions = snake.map(s => ({ ...s }));
+  previousGuardianPositions = new Map(
+    enemyGuardians.map(g => [g.id, g.segments.map(s => ({ ...s }))])
+  );
+}
+function startCountdown() {
+  countdownEndsAt = performance.now() + 3000;
+  countdownValue = 3;
+  const mode = GAME_MODES[gameModeSelect.value];
+  countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
+  countdownOverlay.classList.remove('hidden');
+}
+function cancelCountdown() {
+  countdownEndsAt = null;
+  countdownValue = 0;
+  countdownOverlay.innerHTML = '';
+  countdownOverlay.classList.add('hidden');
+}
+
+// ✅ FIX: interpolación fluida sin microsaltos
+function gameLoopFrame(timestamp) {
+  animationFrameId = null;
+
+  if (!isGameRunning || isPaused) {
+    lastFrameTimestamp = null;
+    return;
+  }
+
+  let elapsedMs = lastFrameTimestamp === null ? 0 : timestamp - lastFrameTimestamp;
+  if (elapsedMs > 500) {
+    isPaused = true;
+    lastFrameTimestamp = null;
+    stopMusic();
+    stopGameLoop();
+    updateFuriaUI();
+    updatePauseButtonUI();
+    if (!isAnyModalOpen() && pauseOverlay) pauseOverlay.classList.remove('hidden');
+    draw(renderInterpolation, false);
+    return;
+  }
+  elapsedMs = Math.max(0, Math.min(100, elapsedMs));
+  lastFrameTimestamp = timestamp;
+  let updateEffects = false;
+
+  if (countdownEndsAt !== null) {
+    const remaining = Math.max(0, countdownEndsAt - timestamp);
+    const next = Math.ceil(remaining / 1000);
+    if (next > 0 && next !== countdownValue) {
+      countdownValue = next;
+      const mode = GAME_MODES[gameModeSelect.value];
+      countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
+    }
+    if (remaining === 0) {
+      cancelCountdown();
+      simulationAccumulator = 0;
+      snapshotRenderPositions();
+      renderInterpolation = 0;
+      scheduleEnemySpawn();
+    }
+  } else {
+    updateEffects = true;
+    updateGameTimers(elapsedMs);
+    if (!isGameRunning) {
+      lastFrameTimestamp = null;
+      return;
+    }
+
+    // ✅ FIX: capturar la velocidad UNA sola vez por frame
+    const speedThisFrame = getCurrentSpeed();
+    simulationAccumulator = Math.min(simulationAccumulator + elapsedMs, speedThisFrame * 3);
+
+    let ticks = 0;
+    while (
+      isGameRunning &&
+      !isPaused &&
+      countdownEndsAt === null &&
+      ticks < 3 &&
+      simulationAccumulator >= speedThisFrame
+    ) {
+      snapshotRenderPositions();
+      gameUpdate();
+      simulationAccumulator -= speedThisFrame;
+      ticks++;
+    }
+
+    // ✅ FIX: si el acumulador quedó negativo (tick ligeramente antes de tiempo),
+    // lo clampeamos a 0 para evitar interpolaciones negativas que dan tirones.
+    if (simulationAccumulator < 0) simulationAccumulator = 0;
+
+    renderInterpolation = Math.min(1, simulationAccumulator / speedThisFrame);
+  }
+
+  draw(renderInterpolation, updateEffects);
+
+  if (isGameRunning && !isPaused) {
+    animationFrameId = requestAnimationFrame(gameLoopFrame);
+  }
+}
+
+function startGameLoop() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  lastFrameTimestamp = null;
+  animationFrameId = requestAnimationFrame(gameLoopFrame);
+}
+
+function stopGameLoop() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  lastFrameTimestamp = null;
+}
 
 // ========================================================
 // 13. GUARDIANES
@@ -2237,125 +2532,7 @@ function resolveCosmicOrder() {
 }
 
 // ========================================================
-// 15. LOOP ROBUSTO
-// ========================================================
-function getCurrentSpeed() {
-  const sel = difficultySelect.value;
-  const base = SPEEDS[sel] || SPEEDS.medium;
-  const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
-  let adaptive = Math.max(base * 0.78, base - lengthPenalty);
-  if (isFuria) adaptive *= 0.55;
-  else if (airBoostUntil > gameTime) adaptive *= AIR_BOOST_MULTIPLIER;
-  if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
-    const head = snake[0];
-    if (huntTrail.some(t => t.x === head.x && t.y === head.y)) adaptive *= HUNT_TRAIL_SLOW_FACTOR;
-  }
-  return Math.max(16, adaptive);
-}
-function snapshotRenderPositions() {
-  previousSnakePositions = snake.map(s => ({ ...s }));
-  previousGuardianPositions = new Map(enemyGuardians.map(g => [g.id, g.segments.map(s => ({ ...s }))]));
-}
-function startCountdown() {
-  countdownEndsAt = performance.now() + 3000;
-  countdownValue = 3;
-  const mode = GAME_MODES[gameModeSelect.value];
-  countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
-  countdownOverlay.classList.remove('hidden');
-}
-function cancelCountdown() {
-  countdownEndsAt = null;
-  countdownValue = 0;
-  countdownOverlay.innerHTML = '';
-  countdownOverlay.classList.add('hidden');
-}
-
-function gameLoopFrame(timestamp) {
-  animationFrameId = null;
-
-  if (!isGameRunning || isPaused) {
-    lastFrameTimestamp = null;
-    return;
-  }
-
-  let elapsedMs = lastFrameTimestamp === null ? 0 : timestamp - lastFrameTimestamp;
-  // ✅ FIX: detectar salto grande (pestaña oculta sin visibilitychange)
-  if (elapsedMs > 500) {
-    isPaused = true;
-    lastFrameTimestamp = null;
-    stopMusic();
-    stopGameLoop();
-    updateFuriaUI();
-    updatePauseButtonUI();
-    // ✅ FIX: solo mostrar overlay si no hay modal abierto
-    if (!isAnyModalOpen() && pauseOverlay) pauseOverlay.classList.remove('hidden');
-    draw(renderInterpolation, false);
-    return;
-  }
-  elapsedMs = Math.max(0, Math.min(100, elapsedMs));
-  lastFrameTimestamp = timestamp;
-  let updateEffects = false;
-
-  if (countdownEndsAt !== null) {
-    const remaining = Math.max(0, countdownEndsAt - timestamp);
-    const next = Math.ceil(remaining / 1000);
-    if (next > 0 && next !== countdownValue) {
-      countdownValue = next;
-      const mode = GAME_MODES[gameModeSelect.value];
-      countdownOverlay.innerHTML = `<span>${countdownValue}</span><div class="mode-text">${mode.icon} ${mode.name}</div>`;
-    }
-    if (remaining === 0) {
-      cancelCountdown();
-      simulationAccumulator = 0;
-      snapshotRenderPositions();
-      renderInterpolation = 1;
-      scheduleEnemySpawn();
-    }
-  } else {
-    updateEffects = true;
-    updateGameTimers(elapsedMs);
-    if (!isGameRunning) {
-      lastFrameTimestamp = null;
-      return;
-    }
-    simulationAccumulator = Math.min(simulationAccumulator + elapsedMs, getCurrentSpeed() * 3);
-    let ticks = 0;
-    while (isGameRunning && !isPaused && countdownEndsAt === null && ticks < 3 && simulationAccumulator >= getCurrentSpeed()) {
-      const tickDuration = getCurrentSpeed();
-      snapshotRenderPositions();
-      gameUpdate();
-      simulationAccumulator -= tickDuration;
-      ticks++;
-    }
-    renderInterpolation = Math.min(1, simulationAccumulator / getCurrentSpeed());
-  }
-
-  draw(renderInterpolation, updateEffects);
-
-  if (isGameRunning && !isPaused) {
-    animationFrameId = requestAnimationFrame(gameLoopFrame);
-  }
-}
-
-function startGameLoop() {
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-  lastFrameTimestamp = null;
-  animationFrameId = requestAnimationFrame(gameLoopFrame);
-}
-
-function stopGameLoop() {
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-  lastFrameTimestamp = null;
-}
-
-// ========================================================
-// 16. TIMERS
+// 15. TIMERS
 // ========================================================
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
@@ -2521,9 +2698,10 @@ function updateGameTimers(elapsedMs) {
   if (bonusFoods.length > 0) bonusFoods = bonusFoods.filter(f => !f.expiresAt || f.expiresAt > gameTime);
   if (huntTrail.length > 0) huntTrail = huntTrail.filter(t => t.expiresAt > gameTime);
 
+  // ✅ FIX: límite de partículas antes de spawnear trail
   if (isImmune && snake.length > 0) {
     jadeTrailAccumulator += elapsedMs;
-    if (jadeTrailAccumulator > 55) {
+    if (jadeTrailAccumulator > 55 && particles.length < 100) {
       jadeTrailAccumulator = 0;
       const tail = snake[snake.length - 1];
       spawnJadeTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
@@ -2534,7 +2712,7 @@ function updateGameTimers(elapsedMs) {
 }
 
 // ========================================================
-// 17. MECÁNICAS POR MODO
+// 16. MECÁNICAS POR MODO
 // ========================================================
 function updateModeMechanics(elapsedMs) {
   const mode = GAME_MODES[gameModeSelect.value];
@@ -2647,7 +2825,7 @@ function updateModeMechanics(elapsedMs) {
 }
 
 // ========================================================
-// 18. RESET / GAME OVER
+// 17. RESET / GAME OVER
 // ========================================================
 function ensureFoodCount(count = 6) {
   let attempts = 0;
@@ -2815,7 +2993,7 @@ function loseLife(reason) {
 }
 
 // ========================================================
-// 19. UPDATE POR TICK
+// 18. UPDATE POR TICK
 // ========================================================
 function gameUpdate() {
   if (isPaused || !isGameRunning || countdownEndsAt !== null) return;
@@ -3042,12 +3220,18 @@ function gameUpdate() {
   if (!ateItem) snake.pop();
 
   if (crossed) spawnWorldCrossingEffect(head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE + TILE_SIZE / 2);
+
+  // ✅ FIX: límite de partículas antes de spawnear trail
   if (isFuria && snake.length > 0) {
     const tail = snake[snake.length - 1];
-    spawnFuriaTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+    if (particles.length < 120) {
+      spawnFuriaTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+    }
   } else if (airBoostUntil > gameTime && snake.length > 0) {
     const tail = snake[snake.length - 1];
-    spawnAirTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+    if (particles.length < 100) {
+      spawnAirTrail(tail.x * TILE_SIZE + TILE_SIZE / 2, tail.y * TILE_SIZE + TILE_SIZE / 2);
+    }
   }
 
   updateEnemySnakeAI();
@@ -3055,7 +3239,7 @@ function gameUpdate() {
 }
 
 // ========================================================
-// 20. UI
+// 19. UI
 // ========================================================
 function updateScoresUI() {
   if (dtScore) dtScore.textContent = score;
@@ -3092,16 +3276,28 @@ function updateLivesUI() {
 }
 
 // ========================================================
-// 21. HELPERS DE DIBUJO
+// 20. HELPERS DE DIBUJO
 // ========================================================
 function interpolateGridPosition(current, previous, progress) {
   if (!previous || progress >= 1) return { ...current };
+
   let dx = current.x - previous.x;
   let dy = current.y - previous.y;
+
+  // Wrap horizontal
   if (dx > gridCols / 2) dx -= gridCols;
   else if (dx < -gridCols / 2) dx += gridCols;
+
+  // Wrap vertical
   if (dy > gridRows / 2) dy -= gridRows;
   else if (dy < -gridRows / 2) dy += gridRows;
+
+  // ✅ FIX: si el salto es demasiado grande (la serpiente creció y cambió el índice),
+  // no interpolar — devolver la posición actual directa para evitar el tirón.
+  if (Math.abs(dx) > 1.5 || Math.abs(dy) > 1.5) {
+    return { ...current };
+  }
+
   const rawX = previous.x + dx * progress;
   const rawY = previous.y + dy * progress;
   return {
@@ -3972,18 +4168,23 @@ function drawFoodOffering(food, cx, cy, pulse) {
 }
 
 // ========================================================
-// 22. DRAW PRINCIPAL
+// 22. DRAW PRINCIPAL  ✅ FIX COMPLETO
 // ========================================================
 function draw(interpolation = 1, updateEffects = false) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  if (boardCanvas) {
+  // ✅ FIX: reset total del estado del contexto antes de dibujar
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Fondo
+  if (boardCanvas && boardCanvas.width > 0) {
     ctx.drawImage(boardCanvas, 0, 0, screenW, screenH);
   } else {
     const theme = BOARD_THEMES[progression.selectedTheme || 'classic'] || BOARD_THEMES.classic;
@@ -3991,17 +4192,19 @@ function draw(interpolation = 1, updateEffects = false) {
     ctx.fillRect(0, 0, screenW, screenH);
   }
 
+  // ✅ FIX: shake con save/restore balanceado (1 save, 1 restore)
+  ctx.save();
+  if (screenShake > 0.3) {
+    const dx = (Math.random() - 0.5) * screenShake;
+    const dy = (Math.random() - 0.5) * screenShake;
+    ctx.translate(dx, dy);
+  }
+
+  // ✅ FIX: clip con su propio save/restore anidado
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, screenW, screenH);
   ctx.clip();
-
-  if (screenShake > 0) {
-    const dx = (Math.random() - 0.5) * screenShake;
-    const dy = (Math.random() - 0.5) * screenShake;
-    ctx.translate(dx, dy);
-    if (updateEffects) { screenShake *= 0.82; if (screenShake < 0.3) screenShake = 0; }
-  }
 
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
   drawHuntTrail();
@@ -4260,7 +4463,6 @@ function draw(interpolation = 1, updateEffects = false) {
   const skin = getActiveSkin();
   const KUKULKAN_BODY = isGolden ? '#9c8a4a' : skin.body;
   const KUKULKAN_BORDER = isGolden ? '#d4c488' : skin.border;
-  const KUKULKAN_INNER = isGolden ? 'rgba(245, 235, 190, 0.4)' : skin.inner;
   const KUKULKAN_PLATE = isGolden ? '#c2b06a' : skin.plate;
 
   snake.forEach((seg, idx) => {
@@ -4318,7 +4520,16 @@ function draw(interpolation = 1, updateEffects = false) {
       ctx.globalAlpha = 1;
     }
   }
-  ctx.restore();
+
+  // ✅ FIX: cerrar clip y shake en el orden inverso al que se abrieron
+  ctx.restore(); // clip
+  ctx.restore(); // shake
+
+  // ✅ FIX: decrementar shake UNA vez por frame, fuera del save/restore
+  if (updateEffects && screenShake > 0.3) {
+    screenShake *= 0.82;
+    if (screenShake < 0.3) screenShake = 0;
+  }
 }
 
 // ========================================================
@@ -4364,9 +4575,9 @@ function startGame() {
   if (settingsModal) settingsModal.classList.add('hidden');
   if (gameOverlay) gameOverlay.classList.add('hidden');
   if (loreModal) loreModal.classList.add('hidden');
-  if (achievementsModal) achievementsModal.classList.add('hidden');
   if (customizeModal) customizeModal.classList.add('hidden');
   if (statisticsModal) statisticsModal.classList.add('hidden');
+  if (objectivesModal) objectivesModal.classList.add('hidden');
 
   stopWelcomeDemo();
   if (welcomeScreen) welcomeScreen.classList.add('hidden');
@@ -4377,7 +4588,6 @@ function startGame() {
   startGameLoop();
 }
 
-// ✅ FIX: pausar SIN mostrar overlay (para modales)
 function pauseForModal() {
   if (!isGameRunning || isPaused) return;
   isPaused = true;
@@ -4426,7 +4636,6 @@ function updatePauseButtonUI() {
 }
 
 function exitToMenu() {
-  // ✅ FIX: finalizar stats y resetear todo
   if (runStartedAt !== null) {
     try { finishRunStatistics(); } catch (e) { console.warn('[Kukulcán] finishRunStatistics:', e); }
   }
@@ -4439,12 +4648,16 @@ function exitToMenu() {
   if (gameOverlay) gameOverlay.classList.add('hidden');
   if (settingsModal) settingsModal.classList.add('hidden');
   if (tutorialModal) tutorialModal.classList.add('hidden');
+  if (objectivesModal) objectivesModal.classList.add('hidden');
+  if (statisticsModal) statisticsModal.classList.add('hidden');
+  if (customizeModal) customizeModal.classList.add('hidden');
+  if (loreModal) loreModal.classList.add('hidden');
+  if (introTutorialModal) introTutorialModal.classList.add('hidden');
   if (welcomeScreen) welcomeScreen.classList.remove('hidden');
   document.body.classList.add('welcome-open');
   document.body.classList.remove('gameover-open', 'tutorial-open');
   if (dtStartBtn) dtStartBtn.textContent = '▶ Iniciar';
 
-  // ✅ FIX: resetear el juego visualmente
   resetGame();
   gameTime = 0;
   applyGameModeRules();
@@ -4466,7 +4679,6 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.') {
   stopGameLoop();
   cancelCountdown();
   clearFireBreath();
-  // ✅ FIX: ocultar overlay de pausa
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
   isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
   BadgeManager.resetAll();
@@ -4534,7 +4746,6 @@ function showTutorialStep(step) {
 }
 
 function resumeIfWasRunning(wasRunning) {
-  // ✅ FIX: ocultar overlay de pausa SIEMPRE al reanudar
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
   if (!wasRunning) {
     updatePauseButtonUI();
@@ -4558,7 +4769,6 @@ function openTutorial() {
   if (!tutorialModal.classList.contains('hidden')) return;
   const wasRunning = isGameRunning;
   tutorialOpenedFromWelcome = !welcomeScreen.classList.contains('hidden');
-  // ✅ FIX: usar pauseForModal en vez de togglePause
   if (wasRunning && !isPaused) pauseForModal();
   if (!tutorialOpenedFromWelcome) document.body.appendChild(tutorialModal);
   welcomeStartBtn.classList.add('hidden');
@@ -4590,7 +4800,6 @@ function closeIntroTutorial() { introTutorialModal.classList.add('hidden'); }
 
 function openLore() {
   const wasRunning = isGameRunning;
-  // ✅ FIX: usar pauseForModal
   if (wasRunning && !isPaused) pauseForModal();
   loreModal.dataset.wasRunning = wasRunning ? '1' : '0';
   loreModal.classList.remove('hidden');
@@ -4604,27 +4813,9 @@ function closeLore() {
   resumeIfWasRunning(wasRunning);
 }
 
-function openAchievements() {
-  const wasRunning = isGameRunning;
-  // ✅ FIX: usar pauseForModal
-  if (wasRunning && !isPaused) pauseForModal();
-  settingsModal.classList.add('hidden');
-  renderAchievementsUI();
-  achievementsModal.dataset.wasRunning = wasRunning ? '1' : '0';
-  achievementsModal.classList.remove('hidden');
-}
-function closeAchievements() {
-  if (achievementsModal.classList.contains('hidden')) return;
-  achievementsModal.classList.add('hidden');
-  const wasRunning = achievementsModal.dataset.wasRunning === '1';
-  delete achievementsModal.dataset.wasRunning;
-  resumeIfWasRunning(wasRunning);
-}
-
 function openStatistics() {
   if (!statisticsModal.classList.contains('hidden')) return;
   const wasRunning = isGameRunning;
-  // ✅ FIX: usar pauseForModal
   if (wasRunning && !isPaused) pauseForModal();
   settingsModal.classList.add('hidden');
   updateStatisticsUI();
@@ -4640,7 +4831,6 @@ function closeStatistics() {
 }
 
 function openCustomize() {
-  // ✅ FIX: usar pauseForModal
   if (isGameRunning && !isPaused) pauseForModal();
   settingsModal.classList.add('hidden');
   beginCustomizeSession();
@@ -4670,7 +4860,6 @@ function closeCustomize(applyChanges) {
 }
 
 function openSettings() {
-  // ✅ FIX: usar pauseForModal
   if (isGameRunning && !isPaused) pauseForModal();
   settingsGameMode.value = gameModeSelect.value;
   settingsDifficulty.value = difficultySelect.value;
@@ -4762,7 +4951,7 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !introTutorialModal.classList.contains('hidden')) { closeIntroTutorial(); return; }
   if (e.key === 'Escape' && !statisticsModal.classList.contains('hidden')) { closeStatistics(); return; }
   if (e.key === 'Escape' && !loreModal.classList.contains('hidden')) { closeLore(); return; }
-  if (e.key === 'Escape' && !achievementsModal.classList.contains('hidden')) { closeAchievements(); return; }
+  if (e.key === 'Escape' && objectivesModal && !objectivesModal.classList.contains('hidden')) { closeObjectives(); return; }
   if (e.key === 'Escape' && !customizeModal.classList.contains('hidden')) { closeCustomize(false); return; }
   if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
   const isText = e.target instanceof Element && e.target.matches('select, input');
@@ -4813,8 +5002,24 @@ if (dtCustomizeBtn) dtCustomizeBtn.addEventListener('click', openCustomize);
 if (closeStatisticsBtn) closeStatisticsBtn.addEventListener('click', closeStatistics);
 if (statisticsModal) statisticsModal.addEventListener('click', e => { if (e.target === statisticsModal) closeStatistics(); });
 
-if (closeAchievementsBtn) closeAchievementsBtn.addEventListener('click', closeAchievements);
-if (achievementsModal) achievementsModal.addEventListener('click', e => { if (e.target === achievementsModal) closeAchievements(); });
+if (dtObjectivesBtn) dtObjectivesBtn.addEventListener('click', openObjectives);
+if (mbObjectivesBtn) mbObjectivesBtn.addEventListener('click', openObjectives);
+if (settingsObjectivesBtn) settingsObjectivesBtn.addEventListener('click', () => {
+  closeSettings(false);
+  openObjectives();
+});
+if (closeObjectivesBtn) closeObjectivesBtn.addEventListener('click', closeObjectives);
+if (objectivesModal) objectivesModal.addEventListener('click', e => {
+  if (e.target === objectivesModal) closeObjectives();
+});
+
+objectivesTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    objectivesTabs.forEach(t => t.classList.toggle('active', t === tab));
+    objectivesFilter = tab.dataset.filter || 'all';
+    renderObjectivesUI();
+  });
+});
 
 if (closeCustomizeBtn) closeCustomizeBtn.addEventListener('click', () => closeCustomize(false));
 if (customizeCancelBtn) customizeCancelBtn.addEventListener('click', () => closeCustomize(false));
@@ -4845,7 +5050,6 @@ if (settingsApplyBtn) settingsApplyBtn.addEventListener('click', () => closeSett
 if (settingsModal) settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeSettings(false); });
 if (settingsGameMode) settingsGameMode.addEventListener('change', updateSettingsDifficultyVisibility);
 if (settingsCustomizeBtn) settingsCustomizeBtn.addEventListener('click', () => { closeSettings(false); openCustomize(); });
-if (settingsAchievementsBtn) settingsAchievementsBtn.addEventListener('click', () => { closeSettings(false); openAchievements(); });
 if (settingsStatsBtn) settingsStatsBtn.addEventListener('click', () => { closeSettings(false); openStatistics(); });
 if (settingsTutorialBtn) settingsTutorialBtn.addEventListener('click', () => { closeSettings(false); openTutorial(); });
 if (settingsRestartBtn) settingsRestartBtn.addEventListener('click', () => { closeSettings(false); startGame(); });
@@ -4928,11 +5132,10 @@ if (gameModeSelect) gameModeSelect.addEventListener('change', () => {
 });
 
 // ========================================================
-// 29. VISIBILITY — Pausa robusta (v6)
+// 29. VISIBILITY — Pausa robusta
 // ========================================================
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    // ✅ FIX: pausar siempre al ocultar, incluso durante countdown
     if (isGameRunning && !isPaused) {
       if (pauseOverlay) pauseOverlay.classList.remove('hidden');
       isPaused = true;
@@ -4942,10 +5145,8 @@ document.addEventListener('visibilitychange', () => {
       updatePauseButtonUI();
       draw(renderInterpolation, false);
     }
-    // Detener el welcome demo también
     stopWelcomeDemo();
   } else {
-    // Al volver, redibujar el estado pausado para que no se vea glitch
     if (isGameRunning && isPaused) {
       draw(renderInterpolation, false);
     }
@@ -4955,7 +5156,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// ✅ FIX: usar pagehide y freeze además de blur para móviles
 window.addEventListener('blur', () => {
   if (isGameRunning && !isPaused) {
     if (pauseOverlay) pauseOverlay.classList.remove('hidden');
@@ -5281,7 +5481,6 @@ function welcomeDemoFrame(timestamp) {
     welcomeDemoLastFrame = timestamp;
   } else {
     let elapsed = welcomeDemoLastFrame === null ? 0 : timestamp - welcomeDemoLastFrame;
-    // ✅ FIX: si hubo un salto grande, resetear el acumulador
     if (elapsed > 500) {
       welcomeDemoAccumulator = 0;
       elapsed = 0;
