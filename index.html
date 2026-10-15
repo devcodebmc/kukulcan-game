@@ -90,11 +90,13 @@
     </div>
 
     <div class="toolbar-right">
+      <button id="dt-pause-btn" class="icon-btn" title="Pausar" aria-label="Pausar">⏸️</button>
       <button id="dt-settings-btn" class="icon-btn" title="Configuración" aria-label="Configuración">⚙️</button>
       <button id="dt-sound-btn" class="icon-btn" title="Sonido" aria-label="Sonido">🔊</button>
       <button id="dt-tutorial-btn" class="icon-btn" title="Cómo jugar" aria-label="Instrucciones">❓</button>
       <button id="dt-customize-btn" class="icon-btn" title="Personalizar" aria-label="Personalizar">🎨</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
+    </div>
     </div>
   </header>
 
@@ -114,6 +116,7 @@
       </div>
     </div>
     <div class="hud-actions">
+      <button id="mb-pause-btn" class="hud-action-btn" aria-label="Pausar">⏸️</button>
       <button id="mb-settings-btn" class="hud-action-btn" aria-label="Configuración">⚙️</button>
       <button id="mb-sound-btn" class="hud-btn" aria-label="Silenciar">🔊</button>
     </div>
@@ -124,14 +127,14 @@
     <div class="badges-priority-high" id="badges-priority-high">
       <div id="furia-badge" class="hud-badge furia-badge hidden">
         <span class="badge-icon">🔥</span>
-        <span class="badge-text-desktop">🔥 FURIA — incinera guardianes</span>
-        <span class="badge-text-mobile">🔥 FURIA</span>
+        <span class="badge-text-desktop">FURIA — incinera guardianes al tocarlos</span>
+        <span class="badge-text-mobile">Incineras guardianes</span>
         <span class="badge-compact"><span id="furia-timer">3</span>s</span>
       </div>
       <div id="air-badge" class="hud-badge air-badge hidden">
         <span class="badge-icon">💨</span>
-        <span class="badge-text-desktop">💨 Viento veloz</span>
-        <span class="badge-text-mobile">💨 Viento</span>
+        <span class="badge-text-desktop">Viento veloz — escapa más rápido</span>
+        <span class="badge-text-mobile">Velocidad ×1.5</span>
         <span class="badge-compact"><span id="air-timer">2</span>s</span>
       </div>
       <div id="immunity-badge" class="hud-badge immunity-badge hidden">
@@ -142,27 +145,28 @@
             <path d="M10 5 L13.5 10 L10 15 L6.5 10 Z" fill="none" stroke="#fff0b0" stroke-width="1.4"/>
           </svg>
         </span>
-        <span class="badge-text-desktop">💎 Escudo de jade</span>
-        <span class="badge-text-mobile">💎 Jade</span>
+        <span class="badge-text-desktop">Escudo de jade — inmune a guardianes</span>
+        <span class="badge-text-mobile">Inmune</span>
         <span class="badge-compact"><span id="immunity-timer">10</span>s</span>
       </div>
       <div id="respawn-badge" class="hud-badge respawn-badge hidden">
         <span class="badge-icon">🪶</span>
-        <span class="badge-text-desktop">Protección de plumas</span>
+        <span class="badge-text-desktop">Protección de plumas — inmune brevemente</span>
         <span class="badge-text-mobile">Protegido</span>
         <span class="badge-compact"><span id="respawn-timer">3</span>s</span>
       </div>
       <div id="freeze-badge" class="hud-badge freeze-badge hidden">
         <span class="badge-icon">❄️</span>
-        <span class="badge-text-desktop">Guardianes congelados</span>
-        <span class="badge-text-mobile">Congelados</span>
+        <span class="badge-text-desktop">Guardianes congelados — puedes destruirlos</span>
+        <span class="badge-text-mobile">Guardianes congelados</span>
         <span class="badge-compact"><span id="freeze-timer">3</span>s</span>
       </div>
     </div>
     <div class="badges-priority-medium" id="badges-priority-medium">
       <div id="rain-badge" class="hud-badge rain-badge hidden">
         <span class="badge-icon">🌧️</span>
-        <span class="badge-text-desktop">Lluvia sagrada · maíz +20</span>
+        <span class="badge-text-desktop">Lluvia sagrada — el maíz vale +20 puntos</span>
+        <span class="badge-text-mobile">Maíz ×2 puntos</span>
         <span class="badge-compact"><span id="rain-timer">8</span>s</span>
       </div>
       <div id="cosmic-order-badge" class="hud-badge cosmic-order-badge hidden">
@@ -173,48 +177,46 @@
       </div>
       <div id="cosmic-order-food-badge" class="hud-badge cosmic-order-badge hidden">
         <span class="badge-icon">🌀</span>
-        <span class="badge-text-desktop">Sello del orden disponible</span>
-        <span class="badge-text-mobile">Sello</span>
+        <span class="badge-text-desktop">¡Recoge el sello dorado! Elimina a todos los guardianes</span>
+        <span class="badge-text-mobile">Recoge el sello 🌀</span>
       </div>
       <div id="sacrifice-offering-badge" class="hud-badge sacrifice-offering-badge hidden">
         <span class="badge-icon">🫀</span>
-        <span class="badge-text-desktop">Sacrificio disponible</span>
-        <span class="badge-text-mobile">Sacrificio</span>
+        <span class="badge-text-desktop">Corazón de sacrificio — recupera una vida</span>
+        <span class="badge-text-mobile">Recupera vida</span>
       </div>
       <div id="skull-food-badge" class="hud-badge skull-food-badge hidden">
         <span class="badge-icon">☠️</span>
-        <span class="badge-text-desktop">Calavera maldita en el templo</span>
-        <span class="badge-text-mobile">Muerte</span>
+        <span class="badge-text-desktop">¡Calavera maldita! Evítala o pierdes una vida</span>
+        <span class="badge-text-mobile">¡Evita la calavera!</span>
       </div>
       <div id="threat-badge" class="hud-badge threat-badge hidden">
         <span class="badge-icon" id="threat-dot" aria-hidden="true"></span>
-        <span class="badge-text-desktop">Guardián al acecho</span>
-        <span class="badge-text-mobile">Guardián</span>
+        <span class="badge-text-desktop">Guardián al acecho — mantén distancia</span>
+        <span class="badge-text-mobile">¡Guardián cerca!</span>
       </div>
     </div>
     <div class="badges-priority-special" id="badges-priority-special">
       <div id="timer-badge" class="hud-badge timer-badge hidden">
         <span class="badge-icon">⏱️</span>
-        <span class="badge-text-desktop">Tiempo restante</span>
-        <span class="badge-text-mobile">Tiempo</span>
+        <span class="badge-text-desktop">Tiempo restante — el maíz suma +2s</span>
+        <span class="badge-text-mobile">Recoge maíz +2s</span>
         <span class="badge-compact"><span id="timer-value">60</span>s</span>
       </div>
       <div id="eclipse-badge" class="hud-badge eclipse-badge hidden">
-        <span class="badge-icon">🌑</span>
-        <span class="badge-text-desktop">¡Eclipse! Controles invertidos</span>
-        <span class="badge-text-mobile">🌑 Eclipse</span>
+        <span class="badge-text-desktop">¡Eclipse! Controles invertidos — no gires brusco</span>
+        <span class="badge-text-mobile">¡Controles invertidos!</span>
         <span class="badge-compact"><span id="eclipse-timer">5</span>s</span>
       </div>
       <div id="xibalba-badge" class="hud-badge xibalba-badge hidden">
-        <span class="badge-icon">💀</span>
-        <span class="badge-text-desktop">Prueba de Xibalbá</span>
-        <span class="badge-text-mobile">Prueba</span>
+        <span class="badge-text-desktop" id="xibalba-instruction">Prueba de Xibalbá — sobrevive</span>
+        <span class="badge-text-mobile" id="xibalba-instruction-mobile">Sobrevive</span>
         <span class="badge-compact"><span id="xibalba-timer">10</span>s</span>
       </div>
       <div id="darkness-badge" class="hud-badge darkness-badge hidden">
         <span class="badge-icon">🌑</span>
-        <span class="badge-text-desktop">Las tinieblas avanzan...</span>
-        <span class="badge-text-mobile">🌑 Tinieblas</span>
+        <span class="badge-text-desktop">Las tinieblas avanzan — corre hacia la luz</span>
+        <span class="badge-text-mobile">Tinieblas avanzan</span>
       </div>
     </div>
   </div>
@@ -239,7 +241,7 @@
     <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
   </div>
 
-  <!-- MODAL DE CONFIGURACIÓN -->
+  <!-- MODAL DE CONFIGURACIÓN (compacto, 2 columnas) -->
   <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="settings-card">
       <div class="settings-header">
@@ -247,52 +249,52 @@
         <button id="close-settings-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </div>
       <div class="settings-body">
-        <div class="settings-group">
-          <label for="settings-game-mode">🎮 Modo de Juego</label>
-          <select id="settings-game-mode" class="styled-select">
-            <option value="classic">⚔️ Clásico</option>
-            <option value="hunt">🎯 Cacería</option>
-            <option value="survival">🛡️ Supervivencia</option>
-            <option value="zen">🧘 Zen</option>
-            <option value="timed">⏱️ Contrarreloj</option>
-          </select>
-        </div>
-        <div class="settings-group" id="settings-difficulty-group">
-          <label for="settings-difficulty">⚡ Dificultad</label>
-          <select id="settings-difficulty" class="styled-select">
-            <option value="easy">Fácil</option>
-            <option value="medium" selected>Medio</option>
-            <option value="hard">Difícil</option>
-            <option value="extreme">Pesadilla</option>
-          </select>
-        </div>
-        <div class="settings-group">
-          <div class="toggle-row">
-            <label for="settings-sound-toggle">🔊 Sonido y música</label>
-            <input type="checkbox" id="settings-sound-toggle" class="styled-checkbox" checked>
+        <div class="settings-grid">
+          <div class="settings-group">
+            <label for="settings-game-mode">🎮 Modo</label>
+            <select id="settings-game-mode" class="styled-select">
+              <option value="classic">⚔️ Clásico</option>
+              <option value="hunt">🎯 Cacería</option>
+              <option value="survival">🛡️ Supervivencia</option>
+              <option value="zen">🧘 Zen</option>
+              <option value="timed">⏱️ Contrarreloj</option>
+            </select>
           </div>
-          <div class="toggle-row">
-            <label for="settings-dpad-toggle">🎮 Cruceta táctil</label>
-            <input type="checkbox" id="settings-dpad-toggle" class="styled-checkbox">
+          <div class="settings-group" id="settings-difficulty-group">
+            <label for="settings-difficulty">⚡ Dificultad</label>
+            <select id="settings-difficulty" class="styled-select">
+              <option value="easy">Fácil</option>
+              <option value="medium" selected>Medio</option>
+              <option value="hard">Difícil</option>
+              <option value="extreme">Pesadilla</option>
+            </select>
+          </div>
+          <div class="settings-group full-width">
+            <div class="toggle-row">
+              <label for="settings-sound-toggle">🔊 Sonido y música</label>
+              <input type="checkbox" id="settings-sound-toggle" class="styled-checkbox" checked>
+            </div>
+            <div class="toggle-row">
+              <label for="settings-dpad-toggle">🎮 Cruceta táctil</label>
+              <input type="checkbox" id="settings-dpad-toggle" class="styled-checkbox">
+            </div>
           </div>
         </div>
-        <div class="settings-group">
-          <button id="settings-customize-btn" class="btn btn-outline" style="width:100%;">🎨 Personalizar</button>
-          <button id="settings-achievements-btn" class="btn btn-outline" style="width:100%;">🏆 Logros</button>
-          <button id="settings-stats-btn" class="btn btn-outline" style="width:100%;">📊 Estadísticas</button>
-          <button id="settings-tutorial-btn" class="btn btn-outline" style="width:100%;">❓ Tutorial</button>
-        </div>
-        <div class="settings-group">
-          <button id="settings-restart-btn" class="btn btn-secondary" style="width:100%;">🔄 Reiniciar partida</button>
+        <div class="settings-actions-grid">
+          <button id="settings-customize-btn" class="btn btn-outline">🎨 Skins</button>
+          <button id="settings-achievements-btn" class="btn btn-outline">🏆 Logros</button>
+          <button id="settings-stats-btn" class="btn btn-outline">📊 Stats</button>
+          <button id="settings-tutorial-btn" class="btn btn-outline">❓ Tutorial</button>
+          <button id="settings-restart-btn" class="btn btn-secondary full-width">🔄 Reiniciar partida</button>
         </div>
       </div>
       <div class="settings-footer">
-        <button id="settings-apply-btn" class="btn btn-primary" style="width:100%;">✅ Aplicar y Cerrar</button>
+        <button id="settings-apply-btn" class="btn btn-primary">✅ Aplicar y Cerrar</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL TUTORIAL -->
+  <!-- MODAL TUTORIAL COMPLETO -->
   <div id="tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-step-title">
     <div class="tutorial-card">
       <div class="tutorial-header">
@@ -319,7 +321,7 @@
             <li><strong>Ahalpuh</strong><span>Rojo · El Putrefactor</span></li>
             <li><strong>Ixtab</strong><span>Violeta · La Vidente</span></li>
             <li><strong>Camazotz</strong><span>Naranja · El Murciélago</span></li>
-            <li><strong>Tezcatlipoca</strong><span>Jaguar de obsidiana · humo y garras</span></li>
+            <li><strong>Tezcatlipoca</strong><span>Jaguar de obsidiana</span></li>
           </ul>
           <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>. 🫀 El <strong>sacrificio</strong> en el templo recupera uno.</p>
         </div>
@@ -410,7 +412,7 @@
       </div>
       <div class="customize-coins">
         <span class="coins-icon">🌽</span>
-        <span class="coins-label">Monedas de Maíz:</span>
+        <span class="coins-label">Monedas:</span>
         <span id="customize-coins-value" class="coins-value">0</span>
       </div>
       <div class="customize-tabs">
@@ -472,30 +474,48 @@
     </section>
   </div>
 
-  <!-- MODAL INSTRUCCIONES RÁPIDAS -->
+  <!-- MODAL INSTRUCCIONES RÁPIDAS (compacto) -->
   <div id="intro-tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="intro-tutorial-title">
     <div class="tutorial-card intro-tutorial-card">
       <div class="tutorial-header">
         <img src="snk.png" alt="" class="tutorial-logo">
-        <h2 id="intro-tutorial-title">Instrucciones Rápidas</h2>
+        <h2 id="intro-tutorial-title">Cómo Jugar</h2>
         <button id="close-intro-tutorial-btn" class="close-btn tutorial-close-btn" aria-label="Cerrar">✕</button>
       </div>
       <div class="tutorial-content">
         <div class="tutorial-step active">
-          <div class="tutorial-icon-banner">🐍 🪶</div>
-          <p class="tutorial-lead"><strong>Controles:</strong> Desliza el dedo o usa <strong>Flechas / WASD</strong>. Pulsa <strong>Espacio / Shift</strong> o el botón 🔥 para la <strong>FURIA</strong> (incinera guardianes al tocarlos).</p>
+          <div class="tutorial-icon-banner">🐍</div>
+          <p class="tutorial-lead"><strong>Controles:</strong> Desliza o usa <strong>Flechas / WASD</strong>. Pulsa <strong>Espacio / Shift</strong> o el botón 🔥 para <strong>FURIA</strong>.</p>
         </div>
         <div class="tutorial-step active">
-          <div class="tutorial-icon-banner">💎 ❄️ 💨 🌀</div>
-          <p class="tutorial-lead"><strong>Ítems y Poderes:</strong> 💎 Jade te protege. ❄️ Hielo congela guardianes. 💨 Viento te da velocidad y puntos. 🌀 <strong>Sello del Orden Cósmico:</strong> recógelo y tras 1s elimina a todos los guardianes (+50 c/u). 🌽 El maíz te hace crecer.</p>
+          <div class="tutorial-icon-banner">🌽</div>
+          <p class="tutorial-lead"><strong>Ofrendas:</strong> Recoge maíz para crecer. 💎 Jade protege. ❄️ Hielo congela. 💨 Viento acelera. 🌀 Sello elimina a todos.</p>
         </div>
         <div class="tutorial-step active">
-          <div class="tutorial-icon-banner">⚔️ 🎯 🛡️ 🧘 ⏱️</div>
-          <p class="tutorial-lead"><strong>Modos:</strong> <strong>Clásico</strong> (eclipses), <strong>Cacería</strong> (rastro de humo), <strong>Supervivencia</strong> (oscuridad + pruebas de Xibalbá), <strong>Zen</strong> (sin enemigos) y <strong>Contrarreloj</strong> (60s + maíz).</p>
+          <div class="tutorial-icon-banner">🫀</div>
+          <p class="tutorial-lead"><strong>Vidas:</strong> Tienes <strong>3 sacrificios</strong>. Recoge el 🫀 del templo para recuperar uno. Cuidado con la ☠️.</p>
+        </div>
+        <div class="tutorial-step active">
+          <div class="tutorial-icon-banner">⚔️</div>
+          <p class="tutorial-lead"><strong>Modos:</strong> <strong>Clásico</strong> (eclipses), <strong>Cacería</strong> (rastro de humo), <strong>Supervivencia</strong> (oscuridad), <strong>Zen</strong> (sin enemigos), <strong>Contrarreloj</strong> (60s).</p>
         </div>
       </div>
       <div class="tutorial-footer">
         <button id="intro-tut-start-btn" class="btn btn-primary">🚀 ¡A Jugar!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY DE PAUSA -->
+  <div id="pause-overlay" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="pause-card">
+      <img src="snk.png" alt="" class="modal-gameover-logo">
+      <h2 id="pause-title">⏸️ Pausa</h2>
+      <p class="pause-hint">El juego está en pausa. Toca reanudar para continuar.</p>
+      <div class="pause-actions">
+        <button id="pause-resume-btn" class="btn btn-primary">▶ Reanudar</button>
+        <button id="pause-restart-btn" class="btn btn-secondary">🔄 Reiniciar</button>
+        <button id="pause-quit-btn" class="btn btn-outline">🏠 Salir al menú</button>
       </div>
     </div>
   </div>
