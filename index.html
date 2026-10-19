@@ -20,6 +20,7 @@
 <body>
   <canvas id="gameCanvas" aria-label="Tablero de juego"></canvas>
   <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive" aria-atomic="true"></div>
+  <div id="screen-reader-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <!-- PANTALLA DE BIENVENIDA -->
   <section id="welcome-screen" class="welcome-screen" aria-label="Instrucciones del juego">
@@ -28,9 +29,10 @@
         <canvas id="welcome-demo" class="welcome-demo" aria-label="Demostración del juego"></canvas>
         <div class="preview-legend" aria-label="Leyenda de iconos">
           <span class="preview-legend-item">🫀 Vidas</span>
-          <span class="preview-legend-item">💎 Tierra</span>
-          <span class="preview-legend-item">❄️ Agua</span>
-          <span class="preview-legend-item">💨 Aire</span>
+          <span class="preview-legend-item">🌽 Maíz</span>
+          <span class="preview-legend-item">💎 Jade</span>
+          <span class="preview-legend-item">❄️ Hielo</span>
+          <span class="preview-legend-item">💨 Viento</span>
           <span class="preview-legend-item">🌀 Sello</span>
         </div>
         <div id="welcome-demo-callout" class="preview-callout" role="status" aria-live="polite">Muévete por la cuadrícula y busca ofrendas</div>
@@ -45,6 +47,9 @@
               <option value="survival">🛡️ Supervivencia</option>
               <option value="zen">🧘 Zen</option>
               <option value="timed">⏱️ Contrarreloj</option>
+              <option value="flood">🌊 Diluvio</option>
+              <option value="campaign">📖 Travesía</option>
+              <option value="daily">📅 Desafío Diario</option>
             </select>
           </div>
           <div class="select-box" id="welcome-difficulty-box">
@@ -98,7 +103,6 @@
       <button id="dt-customize-btn" class="icon-btn" title="Personalizar" aria-label="Personalizar">🎨</button>
       <button id="dt-start-btn" class="btn btn-primary">▶ Iniciar</button>
     </div>
-    </div>
   </header>
 
   <!-- HUD MÓVIL -->
@@ -129,8 +133,8 @@
     <div class="badges-priority-high" id="badges-priority-high">
       <div id="furia-badge" class="hud-badge furia-badge hidden">
         <span class="badge-icon">🔥</span>
-        <span class="badge-text-desktop">FURIA — incinera guardianes al tocarlos</span>
-        <span class="badge-text-mobile">Incineras guardianes</span>
+        <span class="badge-text-desktop">FURIA DE XIUHCÓATL — incinera guardianes al tocarlos</span>
+        <span class="badge-text-mobile">Furia de Xiuhcóatl</span>
         <span class="badge-compact"><span id="furia-timer">3</span>s</span>
       </div>
       <div id="air-badge" class="hud-badge air-badge hidden">
@@ -162,6 +166,12 @@
         <span class="badge-text-desktop">Guardianes congelados — puedes destruirlos</span>
         <span class="badge-text-mobile">Guardianes congelados</span>
         <span class="badge-compact"><span id="freeze-timer">3</span>s</span>
+      </div>
+      <div id="cipactli-vulnerable-badge" class="hud-badge cipactli-vulnerable-badge hidden">
+        <span class="badge-icon">🐊</span>
+        <span class="badge-text-desktop">¡Cipactli vulnerable! Ataca ahora</span>
+        <span class="badge-text-mobile">¡Ataca a Cipactli!</span>
+        <span class="badge-compact"><span id="cipactli-vulnerable-timer">3</span>s</span>
       </div>
     </div>
     <div class="badges-priority-medium" id="badges-priority-medium">
@@ -220,6 +230,23 @@
         <span class="badge-text-desktop">Las tinieblas avanzan — corre hacia la luz</span>
         <span class="badge-text-mobile">Tinieblas avanzan</span>
       </div>
+      <div id="flood-badge" class="hud-badge flood-badge hidden">
+        <span class="badge-icon">🌊</span>
+        <span class="badge-text-desktop">Aguas: 0 — Cipactlis: 0/3</span>
+        <span class="badge-text-mobile">0/3</span>
+        <span class="badge-compact"><span id="flood-timer">0</span></span>
+      </div>
+      <div id="campaign-badge" class="hud-badge campaign-badge hidden">
+        <span class="badge-icon">📖</span>
+        <span class="badge-text-desktop" id="campaign-instruction">Travesía — capítulo actual</span>
+        <span class="badge-text-mobile" id="campaign-instruction-mobile">Capítulo</span>
+        <span class="badge-compact"><span id="campaign-progress">0/5</span></span>
+      </div>
+      <div id="daily-badge" class="hud-badge daily-badge hidden">
+        <span class="badge-icon">📅</span>
+        <span class="badge-text-desktop" id="daily-instruction">Desafío diario</span>
+        <span class="badge-text-mobile" id="daily-instruction-mobile">Diario</span>
+      </div>
     </div>
   </div>
 
@@ -243,7 +270,7 @@
     <button id="btn-down" class="pad-btn" aria-label="Abajo">▼</button>
   </div>
 
-  <!-- MODAL DE CONFIGURACIÓN (compacto, 2 columnas) -->
+  <!-- MODAL DE CONFIGURACIÓN -->
   <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="settings-card">
       <div class="settings-header">
@@ -260,6 +287,9 @@
               <option value="survival">🛡️ Supervivencia</option>
               <option value="zen">🧘 Zen</option>
               <option value="timed">⏱️ Contrarreloj</option>
+              <option value="flood">🌊 Diluvio</option>
+              <option value="campaign">📖 Travesía</option>
+              <option value="daily">📅 Desafío Diario</option>
             </select>
           </div>
           <div class="settings-group" id="settings-difficulty-group">
@@ -279,6 +309,14 @@
             <div class="toggle-row">
               <label for="settings-dpad-toggle">🎮 Cruceta táctil</label>
               <input type="checkbox" id="settings-dpad-toggle" class="styled-checkbox">
+            </div>
+            <div class="toggle-row">
+              <label for="settings-reduce-motion-toggle">🎬 Reducir movimiento</label>
+              <input type="checkbox" id="settings-reduce-motion-toggle" class="styled-checkbox">
+            </div>
+            <div class="toggle-row">
+              <label for="settings-high-contrast-toggle">🔲 Alto contraste</label>
+              <input type="checkbox" id="settings-high-contrast-toggle" class="styled-checkbox">
             </div>
           </div>
         </div>
@@ -318,29 +356,33 @@
           <p class="tutorial-tip">💨 <strong>Viento:</strong> impulso veloz y +15 puntos.</p>
         </div>
         <div id="step-3" class="tutorial-step">
-          <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 ⚡</div>
+          <div class="tutorial-icon-banner">🐍 🩸 🔮 🟠 ⚡ 🐊</div>
           <ul class="tutorial-guardian-list">
             <li><strong>Ahalpuh</strong><span>Rojo · El Putrefactor</span></li>
             <li><strong>Ixtab</strong><span>Violeta · La Vidente</span></li>
             <li><strong>Camazotz</strong><span>Naranja · El Murciélago</span></li>
+            <li><strong>Cipactli</strong><span>Verde · Cocodrilo Primordial</span></li>
             <li><strong>Tezcatlipoca</strong><span>Jaguar de obsidiana</span></li>
           </ul>
           <p class="tutorial-tip lives-tutorial-tip">🫀 Tienes <strong>3 sacrificios</strong>. 🫀 El <strong>sacrificio</strong> en el templo recupera uno.</p>
         </div>
         <div id="step-4" class="tutorial-step">
-          <div class="tutorial-icon-banner">🔥 🌀 ❄️</div>
-          <p class="tutorial-tip">🔥 <strong>FURIA:</strong> pulsa el botón (o <strong>Espacio / Shift</strong>). Kukulcán gana velocidad y <strong>destruye guardianes al tocarlos</strong>. ¡Se recarga más lento!</p>
+          <div class="tutorial-icon-banner">🔥 🌀 ❄️ 🐊</div>
+          <p class="tutorial-tip">🔥 <strong>FURIA DE XIUHCÓATL:</strong> pulsa el botón (o <strong>Espacio / Shift</strong>). Kukulcán gana velocidad y <strong>destruye guardianes al tocarlos</strong>.</p>
           <p class="tutorial-tip">🌀 <strong>Orden cósmico:</strong> recoge el sello en <strong>15s</strong>. Tras el aviso, elimina guardianes: <strong>+50 c/u</strong>.</p>
-          <p class="tutorial-tip">💨 Con <strong>Viento</strong>, esquiva con velocidad. ❄️ Con <strong>Hielo</strong>, congela y destruye sin escudo.</p>
+          <p class="tutorial-tip">🐊 <strong>Cipactli</strong> solo es vulnerable tras su <strong>Mordida Devoradora</strong>. ¡Esquívala y ataca!</p>
         </div>
         <div id="step-5" class="tutorial-step">
           <div class="tutorial-icon-banner">🎮</div>
           <p class="tutorial-lead"><strong>Modalidades de Juego:</strong></p>
-          <p class="tutorial-tip">⚔️ <strong>Clásico:</strong> La experiencia original. Cada 60s, un <strong>Eclipse</strong> invierte tus controles.</p>
+          <p class="tutorial-tip">⚔️ <strong>Clásico:</strong> Cada 60s, un <strong>Eclipse</strong> invierte tus controles.</p>
           <p class="tutorial-tip">🎯 <strong>Cacería:</strong> Los guardianes dejan un <strong>rastro de humo</strong> que te ralentiza.</p>
           <p class="tutorial-tip">🛡️ <strong>Supervivencia:</strong> Sin ítems. La <strong>oscuridad avanza</strong> y las <strong>pruebas de Xibalbá</strong> aparecen.</p>
-          <p class="tutorial-tip">🧘 <strong>Zen:</strong> Sin guardianes. Solo tú y las ofrendas.</p>
+          <p class="tutorial-tip">🧘 <strong>Zen:</strong> Recoge 25 maíces lo más rápido posible. Sin guardianes.</p>
           <p class="tutorial-tip">⏱️ <strong>Contrarreloj:</strong> 60 segundos. Cada maíz suma +2s.</p>
+          <p class="tutorial-tip">🌊 <strong>Diluvio:</strong> Cipactli emerge de las aguas. Oleadas inundan el tablero.</p>
+          <p class="tutorial-tip">📖 <strong>Travesía:</strong> Campaña de 5 capítulos. ¡Vence al jaguar de obsidiana!</p>
+          <p class="tutorial-tip">📅 <strong>Desafío Diario:</strong> Misma semilla para todos. Compite contra el mundo.</p>
         </div>
       </div>
       <div class="step-dots">
@@ -354,7 +396,7 @@
     </div>
   </div>
 
-  <!-- MODAL LORE -->
+  <!-- MODAL LORE CON CAPÍTULOS -->
   <div id="lore-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="lore-title">
     <div class="lore-card">
       <div class="lore-header">
@@ -362,7 +404,7 @@
         <h2 id="lore-title">El Descenso a Xibalbá</h2>
         <button id="close-lore-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </div>
-      <div class="lore-content">
+      <div class="lore-content" id="lore-content">
         <p class="lore-paragraph">
           <span class="lore-drop-cap">K</span>ukulcán, la Serpiente Emplumada, dios del viento y la sabiduría, contempló el mundo desde lo alto del Templo de Chichén Itzá. Los hombres habían olvidado las ofrendas. El maíz escaseaba, y el hambre se extendía por las tierras mayas.
         </p>
@@ -370,7 +412,7 @@
           Fue entonces cuando <strong>Hunahpú y Xbalanqué</strong>, los gemelos heroicos, le revelaron la verdad: los señores de <strong>Xibalbá</strong>, el inframundo, habían robado las semillas sagradas. Solo un dios podría descender a las nueve pruebas y recuperarlas.
         </p>
         <p class="lore-paragraph">
-          Kukulcán se enrolló sobre sí mismo y se lanzó hacia el abismo. En su descenso, los guardianes de la muerte lo acechan: <strong>Ahalpuh</strong>, el Putrefactor; <strong>Ixtab</strong>, la Vidente; <strong>Camazotz</strong>, el Murciélago. Y en lo más profundo, el propio <strong>Tezcatlipoca</strong>, el Jaguar de Obsidiana, espera entre las sombras.
+          Kukulcán se enrolló sobre sí mismo y se lanzó hacia el abismo. En su descenso, los guardianes de la muerte lo acechan: <strong>Ahalpuh</strong>, el Putrefactor; <strong>Ixtab</strong>, la Vidente; <strong>Camazotz</strong>, el Murciélago. Y en las aguas primordiales, <strong>Cipactli</strong>, el Cocodrilo Primordial, espera con sus fauces abiertas. En lo más profundo, el propio <strong>Tezcatlipoca</strong>, el Jaguar de Obsidiana, aguarda entre las sombras.
         </p>
         <p class="lore-paragraph">
           Solo el <strong>jade sagrado</strong> puede protegerte. Solo el <strong>maíz</strong> puede alimentarte. Solo la <strong>Furia de Xiuhcóatl</strong> puede incinerar a tus enemigos.
@@ -379,6 +421,7 @@
           🐍 <em>Guía a Kukulcán a través de las tinieblas. Recupera el maíz. Regresa al mundo de los vivos.</em> 🐍
         </p>
       </div>
+      <div class="lore-chapters" id="lore-chapters"></div>
       <div class="lore-footer">
         <button id="lore-start-btn" class="btn btn-primary">🚀 ¡Comenzar la Travesía!</button>
       </div>
@@ -406,6 +449,10 @@
       </div>
       <div id="customize-themes-panel" class="customize-panel">
         <div id="themes-grid" class="themes-grid"></div>
+        <div class="theme-live-preview" id="theme-live-preview">
+          <canvas id="theme-preview-canvas" class="theme-preview-canvas"></canvas>
+          <div class="theme-preview-label" id="theme-preview-label">Pasa el cursor sobre un tablero</div>
+        </div>
       </div>
       <div class="customize-footer">
         <button id="customize-cancel-btn" class="btn btn-outline">✕ Cancelar</button>
@@ -415,33 +462,31 @@
   </div>
 
   <!-- MODAL OBJETIVOS -->
-<div id="objectives-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="objectives-title">
-  <div class="objectives-card">
-    <div class="objectives-header">
-      <h2 id="objectives-title">🎯 Objetivos de la Travesía</h2>
-      <button id="close-objectives-btn" class="close-btn" aria-label="Cerrar">✕</button>
-    </div>
-
-    <div class="objectives-summary">
-      <div class="objectives-progress">
-        <span id="objectives-count">0 / 11</span>
-        <span class="objectives-label">completados</span>
+  <div id="objectives-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="objectives-title">
+    <div class="objectives-card">
+      <div class="objectives-header">
+        <h2 id="objectives-title">🎯 Objetivos de la Travesía</h2>
+        <button id="close-objectives-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </div>
-      <div class="objectives-bar">
-        <div id="objectives-fill" class="objectives-fill" style="width: 0%"></div>
+      <div class="objectives-summary">
+        <div class="objectives-progress">
+          <span id="objectives-count">0 / 20</span>
+          <span class="objectives-label">completados</span>
+        </div>
+        <div class="objectives-bar">
+          <div id="objectives-fill" class="objectives-fill" style="width: 0%"></div>
+        </div>
+        <div id="objectives-next" class="objectives-next"></div>
       </div>
-      <div id="objectives-next" class="objectives-next"></div>
+      <div class="objectives-tabs">
+        <button class="objectives-tab active" data-filter="all">Todos</button>
+        <button class="objectives-tab" data-filter="near">Cerca</button>
+        <button class="objectives-tab" data-filter="pending">Pendientes</button>
+        <button class="objectives-tab" data-filter="done">Cumplidos</button>
+      </div>
+      <div id="objectives-list" class="objectives-list"></div>
     </div>
-
-    <div class="objectives-tabs">
-      <button class="objectives-tab active" data-filter="all">Todos</button>
-      <button class="objectives-tab" data-filter="pending">Pendientes</button>
-      <button class="objectives-tab" data-filter="done">Cumplidos</button>
-    </div>
-
-    <div id="objectives-list" class="objectives-list"></div>
   </div>
-</div>
 
   <!-- MODAL GAME OVER -->
   <div id="game-overlay" class="modal-backdrop hidden">
@@ -450,7 +495,9 @@
       <h2 id="overlay-title">La travesía termina</h2>
       <p id="overlay-reason" class="death-reason">Has chocado con tu propio cuerpo</p>
       <div class="final-stats">
-        <p>Puntuación: <strong id="final-score">0</strong></p>
+        <p id="final-cause-line" class="final-cause-line"></p>
+        <p>Tiempo: <strong id="final-time">0 s</strong></p>
+        <p>Puntuación: <strong id="final-score">0</strong> <span id="record-badge" class="record-badge hidden">¡NUEVO RÉCORD!</span></p>
         <p>Longitud final: <strong id="final-length">3</strong></p>
         <p>🌽 Monedas ganadas: <strong id="final-coins">0</strong></p>
       </div>
@@ -466,7 +513,11 @@
         <button id="close-statistics-btn" class="close-btn" aria-label="Cerrar">✕</button>
       </header>
       <p class="statistics-description">Tus mejores registros guardados en este navegador.</p>
-      <div class="statistics-table-wrap">
+      <div class="statistics-tabs">
+        <button class="statistics-tab active" data-mode-stats="difficulty">Por dificultad</button>
+        <button class="statistics-tab" data-mode-stats="mode">Por modo</button>
+      </div>
+      <div class="statistics-table-wrap" id="statistics-difficulty-view">
         <table class="statistics-table">
           <thead>
             <tr>
@@ -481,11 +532,21 @@
           </tbody>
         </table>
       </div>
+      <div class="statistics-table-wrap hidden" id="statistics-mode-view">
+        <table class="statistics-table">
+          <thead>
+            <tr>
+              <th scope="col">Modo</th><th scope="col">Partidas</th><th scope="col">Mejor</th>
+            </tr>
+          </thead>
+          <tbody id="statistics-mode-tbody"></tbody>
+        </table>
+      </div>
       <p id="statistics-storage-status" class="statistics-storage-status" role="status"></p>
     </section>
   </div>
 
-  <!-- MODAL INSTRUCCIONES RÁPIDAS (compacto) -->
+  <!-- MODAL INSTRUCCIONES RÁPIDAS -->
   <div id="intro-tutorial-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="intro-tutorial-title">
     <div class="tutorial-card intro-tutorial-card">
       <div class="tutorial-header">
@@ -496,7 +557,7 @@
       <div class="tutorial-content">
         <div class="tutorial-step active">
           <div class="tutorial-icon-banner">🐍</div>
-          <p class="tutorial-lead"><strong>Controles:</strong> Desliza o usa <strong>Flechas / WASD</strong>. Pulsa <strong>Espacio / Shift</strong> o el botón 🔥 para <strong>FURIA</strong>.</p>
+          <p class="tutorial-lead"><strong>Controles:</strong> Desliza o usa <strong>Flechas / WASD</strong>. Pulsa <strong>Espacio / Shift</strong> o el botón 🔥 para <strong>FURIA DE XIUHCÓATL</strong>.</p>
         </div>
         <div class="tutorial-step active">
           <div class="tutorial-icon-banner">🌽</div>
@@ -508,7 +569,7 @@
         </div>
         <div class="tutorial-step active">
           <div class="tutorial-icon-banner">⚔️</div>
-          <p class="tutorial-lead"><strong>Modos:</strong> <strong>Clásico</strong> (eclipses), <strong>Cacería</strong> (rastro de humo), <strong>Supervivencia</strong> (oscuridad), <strong>Zen</strong> (sin enemigos), <strong>Contrarreloj</strong> (60s).</p>
+          <p class="tutorial-lead"><strong>Modos:</strong> <strong>Clásico</strong>, <strong>Cacería</strong>, <strong>Supervivencia</strong>, <strong>Zen</strong>, <strong>Contrarreloj</strong>, <strong>Diluvio</strong>, <strong>Travesía</strong>, <strong>Desafío Diario</strong>.</p>
         </div>
       </div>
       <div class="tutorial-footer">
@@ -527,6 +588,23 @@
         <button id="pause-resume-btn" class="btn btn-primary">▶ Reanudar</button>
         <button id="pause-restart-btn" class="btn btn-secondary">🔄 Reiniciar</button>
         <button id="pause-quit-btn" class="btn btn-outline">🏠 Salir al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CAMPAÑA (Victoria / Progreso) -->
+  <div id="campaign-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="campaign-title">
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h2 id="campaign-title">📖 Travesía de Kukulcán</h2>
+        <button id="close-campaign-btn" class="close-btn" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="campaign-body">
+        <div id="campaign-levels" class="campaign-levels"></div>
+        <div id="campaign-detail" class="campaign-detail hidden"></div>
+      </div>
+      <div class="campaign-footer">
+        <button id="campaign-play-btn" class="btn btn-primary">▶ Jugar capítulo</button>
       </div>
     </div>
   </div>
