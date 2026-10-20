@@ -80,11 +80,22 @@ h1, h2, h3 {
 
 .hidden { display: none !important; }
 
-.welcome-screen.hidden,
+/* FIX: los modales ocultos no interceptan eventos */
 .modal-backdrop.hidden {
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.welcome-screen.hidden {
   pointer-events: none;
   visibility: hidden;
 }
+
+/* Z-INDEX CORREGIDOS */
+#pause-overlay { z-index: 75; }
+#game-overlay { z-index: 80; }
 
 /* =========================================================
    ALTO CONTRASTE
@@ -95,13 +106,9 @@ body.high-contrast {
   --text-dim: #d4dcd8;
   --text-mute: #a0b0a8;
 }
-body.high-contrast .hud-badge {
-  border-width: 2px;
-}
+body.high-contrast .hud-badge { border-width: 2px; }
 body.high-contrast .stat-pill,
-body.high-contrast .lives-fixed-container {
-  border-width: 2px;
-}
+body.high-contrast .lives-fixed-container { border-width: 2px; }
 
 /* =========================================================
    CANVAS
@@ -176,9 +183,7 @@ body.high-contrast .lives-fixed-container {
 
 .toolbar-left,
 .toolbar-center,
-.toolbar-right {
-  pointer-events: auto;
-}
+.toolbar-right { pointer-events: auto; }
 
 .toolbar-left {
   flex-shrink: 0;
@@ -398,10 +403,7 @@ body.gameover-open .lives-fixed-container {
 @media (max-width: 1300px) {
   .brand-title { font-size: 0.68rem; }
   .stat-pill,
-  .lives-fixed-container {
-    padding: 3px 6px;
-    font-size: 0.6rem;
-  }
+  .lives-fixed-container { padding: 3px 6px; font-size: 0.6rem; }
   .stat-value { font-size: 0.72rem; }
   .toolbar-right .icon-btn { width: 28px; height: 28px; font-size: 0.8rem; }
   .toolbar-right .btn { padding: 4px 8px; font-size: 0.65rem; }
@@ -419,16 +421,9 @@ body.gameover-open .lives-fixed-container {
     row-gap: 6px;
   }
   .toolbar-left { flex-basis: auto; }
-  .toolbar-center {
-    flex-basis: 100%;
-    order: 3;
-    justify-content: center;
-  }
+  .toolbar-center { flex-basis: 100%; order: 3; justify-content: center; }
   .toolbar-right { flex-basis: auto; }
-  #dt-tutorial-btn,
-  #dt-sound-btn {
-    display: none !important;
-  }
+  #dt-tutorial-btn, #dt-sound-btn { display: none !important; }
 }
 
 /* =========================================================
@@ -470,11 +465,7 @@ body.gameover-open .lives-fixed-container {
 }
 .hud-btn:active { transform: scale(0.92); }
 
-.hud-actions {
-  display: flex;
-  gap: 6px;
-  pointer-events: auto;
-}
+.hud-actions { display: flex; gap: 6px; pointer-events: auto; }
 .hud-action-btn {
   background: rgba(15, 18, 24, 0.7);
   backdrop-filter: blur(8px);
@@ -536,11 +527,7 @@ body.gameover-open .lives-fixed-container {
 }
 
 @media (max-width: 400px) {
-  .hud-center-pill {
-    padding: 4px 6px;
-    gap: 4px;
-    font-size: 0.68rem;
-  }
+  .hud-center-pill { padding: 4px 6px; gap: 4px; font-size: 0.68rem; }
   .hud-center-pill strong { font-size: 0.78rem; }
   .hud-center-pill .lives-pips .life-pip { font-size: 0.75rem; }
   .hud-mini-logo { width: 12px; height: 12px; }
@@ -792,7 +779,6 @@ body.gameover-open .lives-fixed-container {
   50%      { transform: rotate(8deg) scale(1.15); }
 }
 
-/* Cipactli vulnerable badge (nuevo) */
 .cipactli-vulnerable-badge {
   background: rgba(120, 90, 20, 0.95);
   border: 1px solid rgba(255, 220, 120, 0.95);
@@ -833,7 +819,6 @@ body.gameover-open .lives-fixed-container {
   50%      { transform: translateY(-2px) scale(1.15); }
 }
 
-/* Campaña y Daily (nuevos) */
 .campaign-badge {
   background: rgba(60, 40, 90, 0.95);
   border: 1px solid rgba(180, 140, 255, 0.85);
@@ -1084,7 +1069,6 @@ body.gameover-open .lives-fixed-container {
   min-height: 40px;
 }
 
-/* Intro tutorial */
 .intro-tutorial-card { max-width: 520px; }
 .intro-tutorial-card .tutorial-content { gap: 8px; padding: 0; }
 .intro-tutorial-card .tutorial-step {
@@ -1307,7 +1291,6 @@ body.gameover-open .lives-fixed-container {
 }
 .lore-footer .btn { padding: 11px 24px; font-size: 0.85rem; min-height: 42px; }
 
-/* Capítulos del lore (nuevo) */
 .lore-chapters {
   display: flex;
   flex-wrap: wrap;
@@ -1526,7 +1509,6 @@ body.gameover-open .lives-fixed-container {
   min-height: 40px;
 }
 
-/* Preview de tema en vivo (nuevo) */
 .theme-live-preview {
   margin-top: 10px;
   padding: 8px;
@@ -1944,7 +1926,7 @@ body.gameover-open .lives-fixed-container {
 }
 
 /* =========================================================
-   TOAST DE OBJETIVO (compacto, arriba-derecha)
+   TOAST DE OBJETIVO
    ========================================================= */
 .achievement-toast-container {
   position: fixed;
@@ -2011,7 +1993,6 @@ body.gameover-open .lives-fixed-container {
   text-overflow: ellipsis;
 }
 
-/* Descripción: 1 sola línea, con ellipsis (desktop y móvil) */
 .achievement-toast-desc {
   font-size: 0.58rem;
   color: var(--text-dim);
@@ -2022,7 +2003,6 @@ body.gameover-open .lives-fixed-container {
   margin-top: 1px;
 }
 
-/* Desktop: un pelín más ancho para respirar */
 @media (min-width: 769px) {
   .achievement-toast-container {
     max-width: min(340px, 82vw);
@@ -2040,7 +2020,6 @@ body.gameover-open .lives-fixed-container {
   .achievement-toast-desc { font-size: 0.62rem; }
 }
 
-/* Móvil: compacto, ancho corto, arriba-derecha (NO abajo) */
 @media (max-width: 768px) {
   .achievement-toast-container {
     top: calc(max(8px, env(safe-area-inset-top)) + 52px);
@@ -2487,7 +2466,7 @@ body.gameover-open .lives-fixed-container {
 }
 
 /* =========================================================
-   CAMPAÑA (nuevo)
+   CAMPAÑA
    ========================================================= */
 .campaign-card {
   background: linear-gradient(180deg, rgba(26, 22, 18, 0.98), rgba(20, 18, 15, 0.98));

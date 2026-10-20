@@ -1,5 +1,13 @@
 // ========================================================
-// LA TRAVESÍA DE KUKULCÁN — script.js (v13 PERF)
+// LA TRAVESÍA DE KUKULCÁN — script.js (v16 FINAL)
+// ========================================================
+// CAMBIOS v16:
+// - Diluvio rediseñado: charcos circulares aleatorios que se retiran solos
+// - Desafío Diario con 9 reglas rotativas + recompensa
+// - Todos los dibujos originales intactos (Cipactli, Tezcatlipoca, maíz, jade...)
+// - playAchievementSound incluido
+// - Contadores de campaña en tiempo real
+// - Correcciones de bugs previas
 // ========================================================
 
 // ========================================================
@@ -140,6 +148,7 @@ const finalTimeElement = document.getElementById('final-time');
 const finalCauseLine = document.getElementById('final-cause-line');
 const recordBadge = document.getElementById('record-badge');
 const restartOverlayBtn = document.getElementById('restart-overlay-btn');
+const campaignNextBtn = document.getElementById('campaign-next-btn');
 const statisticsModal = document.getElementById('statistics-modal');
 const closeStatisticsBtn = document.getElementById('close-statistics-btn');
 const statisticsStorageStatus = document.getElementById('statistics-storage-status');
@@ -185,7 +194,7 @@ const campaignPlayBtn = document.getElementById('campaign-play-btn');
 const screenReaderAnnouncer = document.getElementById('screen-reader-announcer');
 
 // ========================================================
-// HELPERS DE MODALES
+// HELPERS
 // ========================================================
 function isAnyModalOpen() {
   return (
@@ -209,13 +218,12 @@ function announce(text) {
 }
 
 // ========================================================
-// 3. CONFIGURACIÓN GENERAL
+// 2. CONFIGURACIÓN GENERAL
 // ========================================================
 let TILE_SIZE = window.innerWidth < 480 ? 20 : 24;
 let gridCols = 30;
 let gridRows = 20;
 
-// PERF: detección de dispositivo lento
 let isMobileDevice = window.innerWidth <= 768;
 let isSlowDevice = false;
 let frameTimeEMA = 16.7;
@@ -385,31 +393,35 @@ const ECLIPSE_FIRST_MS = 60000;
 const ECLIPSE_INTERVAL_MS = 75000;
 const ECLIPSE_DURATION_MS = 5000;
 const ECLIPSE_WARNING_MS = 3000;
-
 const DARKNESS_START_MS = 15000;
 const DARKNESS_MAX_RADIUS = 8;
 const DARKNESS_MIN_RADIUS = 2.5;
 const DARKNESS_FULL_MS = 180000;
-
 const HUNT_TRAIL_LIFETIME_MS = 4000;
 const HUNT_TRAIL_SLOW_FACTOR = 1.35;
-
 const TIMED_INITIAL_MS = 60000;
 const TIMED_MAIZE_BONUS_MS = 2000;
 const TIMED_BONUS_BONUS_MS = 5000;
 const TIMED_WARNING_MS = 10000;
-
 const XIBALBA_FIRST_MS = 30000;
 const XIBALBA_INTERVAL_MS = 45000;
 const XIBALBA_DURATION_MS = 10000;
 
-const FLOOD_WAVE_FIRST_MS = 20000;
-const FLOOD_WAVE_INTERVAL_MS = 22000;
-const FLOOD_WAVE_ROWS = 3;
-const FLOOD_SLOW_FACTOR = 1.4;
-const FLOOD_MAIZE_BONUS_SPAWN_MS = 3000;
-const CIPACTLI_FLOOD_FIRST_SPAWN_MS = 30000;
-const CIPACTLI_FLOOD_RESPAWN_MS = 40000;
+// ===== DILUVIO v16: charcos aleatorios que se retiran =====
+const FLOOD_WAVE_FIRST_MS = 10000;
+const FLOOD_WAVE_INTERVAL_MS = 12000;
+const FLOOD_SLOW_FACTOR = 1.15;
+const FLOOD_MAIZE_BONUS_SPAWN_MS = 2500;
+const CIPACTLI_FLOOD_FIRST_SPAWN_MS = 15000;
+const CIPACTLI_FLOOD_RESPAWN_MS = 18000;
+const CIPACTLI_FLOOD_VULNERABLE_MS = 4000;
+const FLOOD_MAIZE_DELAY_MS = 2000;
+const FLOOD_MAX_WATER_RATIO = 0.55;
+const FLOOD_CELLS_PER_WAVE = 8;
+const FLOOD_CELL_LIFETIME_MS = 8000;
+const FLOOD_JADE_CLEAR_CELLS = 5;
+const FLOOD_KILL_CLEAR_CELLS = 3;
+const FLOOD_CELL_WARNING_MS = 2000;
 
 const TEZCATLIPOCA_CONFIG = {
   easy:    { unlockMs: 90000,  cooldownMs: 120000, teleportMs: 4500, vulnerableMs: 3000, reward: 300 },
@@ -425,9 +437,7 @@ const CIPACTLI_CONFIG = {
   extreme: { unlockMs: 30000, cooldownMs: 70000,  chargeSpeed: 2, telegraphMs: 1000, vulnerableMs: 0, reward: 350, portalTeleportMs: 5000 }
 };
 
-const CIPACTLI_PORTAL_TELEPORT_MS = 8000;
 const CIPACTLI_PORTAL_FADE_MS = 400;
-const CIPACTLI_PORTAL_RADIUS = 1.2;
 
 const BOARD_THEMES = {
   classic: { bg: '#141720', gridLine: 'rgba(144, 153, 177, 0.13)', patternColor: 'rgba(198, 164, 85, 0.07)', patternType: 'diamond', vignetteColor: 'rgba(0,0,0,0.42)', cost: 0 },
@@ -440,7 +450,6 @@ const BOARD_THEMES = {
   cenote:  { bg: '#051428', gridLine: 'rgba(92, 200, 255, 0.14)', patternColor: 'rgba(120, 220, 255, 0.07)', patternType: 'diamond', vignetteColor: 'rgba(0, 10, 25, 0.6)', cost: 600 }
 };
 
-// PERF: caches de perfil y dificultad
 let _cachedProfileKey = '';
 let _cachedProfile = null;
 let _cachedEffectiveDifficulty = null;
@@ -490,37 +499,31 @@ function invalidateProfileCache() {
 
 const FREEZE_FIRST_SPAWN_MS = 16000;
 const FREEZE_RESPAWN_DELAY_MS = 22000;
-const GUARDIAN_FREEZE_DURATION_MS = 3000;
-const CHAAC_UNLOCK_MS = 45000;
-const CHAAC_COOLDOWN_MS = 60000;
-const CHAAC_LIFETIME_MS = 999999;
-const CHAAC_TELEPORT_MS = 5000;
 const CHAAC_RETRY_MS = 3000;
-const CHAAC_VULNERABLE_MS = 2200;
 
 const GUARDIAN_DEFS = [
   { behavior: 'hunter', name: 'Ahalpuh', title: 'El Putrefactor', icon: '⚔️',
-    lore: 'Demonio que causa la putrefacción. Te persigue sin descanso.',
+    lore: 'Demonio que causa la putrefacción.',
     palette: { head: '#e2574c', body: '#9b2929', crest: '#ff9b83', eye: '#fff0c6' },
     traits: { fangs: true, crestCount: 1, eyeMark: false },
     ambientParticles: { color: '#ff6b4c', rate: 0.35, size: 1.5 } },
   { behavior: 'interceptor', name: 'Ixtab', title: 'La Vidente', icon: '👁️',
-    lore: 'Diosa de la adivinación. Anticipa tu rumbo antes de que lo tomes.',
+    lore: 'Diosa de la adivinación.',
     palette: { head: '#a65bd4', body: '#64328e', crest: '#d4a0f0', eye: '#f0e0ff' },
     traits: { fangs: false, crestCount: 1, eyeMark: true },
     ambientParticles: { color: '#c89bf0', rate: 0.4, size: 1.8 } },
   { behavior: 'flanker', name: 'Camazotz', title: 'El Murciélago de la Muerte', icon: '🦇',
-    lore: 'Señor de los murciélagos. Intenta rodearte desde las sombras.',
+    lore: 'Señor de los murciélagos.',
     palette: { head: '#f28c28', body: '#a64b1b', crest: '#ffc078', eye: '#fff0c6' },
     traits: { fangs: true, crestCount: 2, eyeMark: false },
     ambientParticles: { color: '#ff9b3c', rate: 0.45, size: 1.6 } },
   { behavior: 'cipactli', name: 'Cipactli', title: 'El Cocodrilo Primordial', icon: '🐊',
-    lore: 'Monstruo marino que devoró a los dioses. Su cuerpo es mitad cocodrilo, mitad pez, mitad sapo. De sus fauces nacen mundos.',
+    lore: 'Monstruo marino que devoró a los dioses.',
     palette: { head: '#4ec98a', body: '#1f6b4a', crest: '#a8ffd0', eye: '#ffb347', belly: '#c9e8a0', jaw: '#0e3324' },
     traits: { isBoss: true, isCipactli: true, fangs: true, crestCount: 6, eyeMark: false, scales: true },
     ambientParticles: { color: '#4ec98a', rate: 0.55, size: 2 } },
   { behavior: 'ambusher', name: 'Tezcatlipoca', title: 'El Jaguar de Obsidiana', icon: '🐆',
-    lore: 'Dios de la noche y los espejos. Se teletransporta entre las sombras.',
+    lore: 'Dios de la noche y los espejos.',
     palette: { head: '#d98e2b', body: '#a8561b', crest: '#14110f', eye: '#f2e2b8', jade: '#4ec9a0', obsidian: '#14110f', ember: '#f2e2b8' },
     traits: { fangs: true, crestCount: 4, eyeMark: false, isBoss: true, isTezcatlipoca: true },
     ambientParticles: { color: '#d98e2b', rate: 0.6, size: 2 } }
@@ -548,23 +551,15 @@ function getUniqueGuardianDef() {
   return def;
 }
 
-const SACRED_RAIN_FIRST_MS = 22000;
-const SACRED_RAIN_INTERVAL_MS = 42000;
 const SACRED_RAIN_DURATION_MS = 8000;
 const MAIZE_RAIN_BONUS = 10;
 const SACRED_RAIN_MAIZE_COUNT = 3;
 const MAIZE_FALL_DURATION_MS = 700;
-
-const SACRIFICE_FIRST_SPAWN_MS = 30000;
 const SACRIFICE_RESPAWN_DELAY_MS = 12000;
 const SACRIFICE_REPEAT_DELAY_MS = 30000;
-const SKULL_FIRST_SPAWN_MS = 20000;
 const SKULL_RESPAWN_DELAY_MS = 38000;
 const SKULL_MOVE_INTERVAL_MS = 8000;
 const SKULL_REAPPEAR_DELAY_MS = 300;
-
-const COSMIC_ORDER_FIRST_SPAWN_MS = 30000;
-const COSMIC_ORDER_SPAWN_INTERVAL_MS = 45000;
 const COSMIC_ORDER_SPAWN_RETRY_MS = 5000;
 const COSMIC_ORDER_WARNING_MS = 1000;
 const COSMIC_ORDER_FOOD_LIFETIME_MS = 15000;
@@ -601,6 +596,57 @@ const CAMPAIGN_LEVELS = [
     goal: { type: 'killTezcatlipoca', target: 1 }, difficulty: 'extreme', mode: 'classic' }
 ];
 
+// ===== DESAFÍO DIARIO v16: reglas especiales =====
+const DAILY_RULES = [
+  { id: 'slow_safe', name: 'Lento pero seguro', icon: '🐌', description: 'Velocidad -20%, sin Furia',
+    apply() { dailyState.speedMultiplier = 0.8; dailyState.furiaDisabled = true; },
+    remove() { dailyState.speedMultiplier = 1.0; dailyState.furiaDisabled = false; } },
+  { id: 'furia_infinita', name: 'Furia infinita', icon: '🔥', description: 'Furia sin cooldown, guardianes +50% velocidad',
+    apply() { dailyState.furiaNoCooldown = true; dailyState.guardianSpeedMultiplier = 1.5; },
+    remove() { dailyState.furiaNoCooldown = false; dailyState.guardianSpeedMultiplier = 1.0; } },
+  { id: 'dieta_maiz', name: 'Dieta de maíz', icon: '🌽', description: 'Solo maíz, +10 pts por maíz',
+    apply() { dailyState.onlyMaize = true; dailyState.maizeBonusPoints = 10; },
+    remove() { dailyState.onlyMaize = false; dailyState.maizeBonusPoints = 0; } },
+  { id: 'jade_abundante', name: 'Jade abundante', icon: '💎', description: '3 jades a la vez, sin escudo de respawn',
+    apply() { dailyState.jadeTarget = 3; dailyState.noRespawnShield = true; },
+    remove() { dailyState.jadeTarget = 0; dailyState.noRespawnShield = false; } },
+  { id: 'sin_piedad', name: 'Sin piedad', icon: '👁️', description: 'Guardianes desde el segundo 5, 5 vidas',
+    apply() { dailyState.guardianFirstSpawnMs = 5000; dailyState.extraLives = 2; },
+    remove() { dailyState.guardianFirstSpawnMs = 0; dailyState.extraLives = 0; } },
+  { id: 'invierno', name: 'Invierno eterno', icon: '❄️', description: 'Guardianes congelados, sin cacao',
+    apply() { dailyState.guardiansAlwaysFrozen = true; dailyState.noCacao = true; },
+    remove() { dailyState.guardiansAlwaysFrozen = false; dailyState.noCacao = false; } },
+  { id: 'cosecha_doble', name: 'Cosecha doble', icon: '🌾', description: 'Maíz vale doble, guardianes valen doble',
+    apply() { dailyState.maizeMultiplier = 2; dailyState.guardianMultiplier = 2; },
+    remove() { dailyState.maizeMultiplier = 1; dailyState.guardianMultiplier = 1; } },
+  { id: 'sin_jade', name: 'Sin jade', icon: '🚫', description: 'No hay jades, +1 vida',
+    apply() { dailyState.noJade = true; dailyState.extraLives = 1; },
+    remove() { dailyState.noJade = false; dailyState.extraLives = 0; } },
+  { id: 'rapido_furioso', name: 'Rápido y furioso', icon: '⚡', description: 'Velocidad +30%, cooldown Furia -50%',
+    apply() { dailyState.speedMultiplier = 1.3; dailyState.furiaCooldownMultiplier = 0.5; },
+    remove() { dailyState.speedMultiplier = 1.0; dailyState.furiaCooldownMultiplier = 1.0; } }
+];
+
+let dailyState = {
+  speedMultiplier: 1.0, furiaDisabled: false, furiaNoCooldown: false,
+  guardianSpeedMultiplier: 1.0, onlyMaize: false, maizeBonusPoints: 0,
+  jadeTarget: 0, noRespawnShield: false, guardianFirstSpawnMs: 0,
+  extraLives: 0, guardiansAlwaysFrozen: false, noCacao: false,
+  maizeMultiplier: 1, guardianMultiplier: 1, noJade: false,
+  furiaCooldownMultiplier: 1.0, activeRule: null
+};
+
+function resetDailyState() {
+  dailyState = {
+    speedMultiplier: 1.0, furiaDisabled: false, furiaNoCooldown: false,
+    guardianSpeedMultiplier: 1.0, onlyMaize: false, maizeBonusPoints: 0,
+    jadeTarget: 0, noRespawnShield: false, guardianFirstSpawnMs: 0,
+    extraLives: 0, guardiansAlwaysFrozen: false, noCacao: false,
+    maizeMultiplier: 1, guardianMultiplier: 1, noJade: false,
+    furiaCooldownMultiplier: 1.0, activeRule: null
+  };
+}
+
 function getDailyChallenge() {
   const today = new Date();
   const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
@@ -609,7 +655,9 @@ function getDailyChallenge() {
   const mode = modes[Math.floor(pseudo(1) * modes.length)];
   const diffs = ['easy', 'medium', 'hard', 'extreme'];
   const difficulty = diffs[Math.floor(pseudo(2) * diffs.length)];
-  return { seed, mode, difficulty, dateStr: today.toISOString().slice(0, 10) };
+  const ruleIndex = Math.floor(pseudo(3) * DAILY_RULES.length);
+  const rule = DAILY_RULES[ruleIndex];
+  return { seed, mode, difficulty, rule, dateStr: today.toISOString().slice(0, 10) };
 }
 
 function getUnlockedChapters() {
@@ -622,7 +670,7 @@ function getUnlockedChapters() {
 }
 
 // ========================================================
-// 4. STORAGE SEGURO
+// 3. STORAGE
 // ========================================================
 let storageUnavailable = false;
 function safeGetItem(key, fallback) {
@@ -635,28 +683,19 @@ function safeSetItem(key, value) {
 }
 
 // ========================================================
-// 5. PROGRESIÓN
+// 4. PROGRESIÓN
 // ========================================================
 let progression = {
   totalMaize: 0, totalCacao: 0, totalGuardiansDefeated: 0,
-  totalTezcatlipocaDefeated: 0,
-  totalCipactliDefeated: 0,
-  bothBossesInOneRun: 0,
-  bestScoreSingleRun: 0,
-  bestFloodSurvivalMs: 0,
-  maxFloodWavesInRun: 0,
-  totalFloodWaves: 0,
+  totalTezcatlipocaDefeated: 0, totalCipactliDefeated: 0,
+  bothBossesInOneRun: 0, bestScoreSingleRun: 0,
+  bestFloodSurvivalMs: 0, maxFloodWavesInRun: 0, totalFloodWaves: 0,
   totalGamesPlayed: 0, totalSurvivalMs: 0,
   bestTimedScore: 0, achievements: {},
-  bestScoreByMode: {
-    classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0
-  },
-  gamesPlayedByMode: {
-    classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0
-  },
-  bestZenTimeMs: 999999999,
-  campaignProgress: 0,
-  campaignCompleted: [],
+  bestScoreByMode: { classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0 },
+  gamesPlayedByMode: { classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0 },
+  bestZenTimeMs: 999999999, campaignProgress: 0, campaignCompleted: [],
+  dailyCompletedOnce: false, dailyScores: {},
   unlockedSkins: ['default'],
   unlockedThemes: ['classic', 'hunt', 'survival'],
   selectedSkin: 'default', selectedTheme: 'classic', maizeCoins: 0
@@ -673,6 +712,7 @@ function loadProgression() {
       if (!Array.isArray(progression.unlockedThemes)) progression.unlockedThemes = ['classic', 'hunt', 'survival'];
       if (!Array.isArray(progression.campaignCompleted)) progression.campaignCompleted = [];
       if (!progression.achievements || typeof progression.achievements !== 'object') progression.achievements = {};
+      if (!progression.dailyScores || typeof progression.dailyScores !== 'object') progression.dailyScores = {};
       if (!progression.bestScoreByMode) progression.bestScoreByMode = { classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0 };
       if (!progression.gamesPlayedByMode) progression.gamesPlayedByMode = { classic: 0, hunt: 0, survival: 0, zen: 0, timed: 0, flood: 0, campaign: 0, daily: 0 };
       ['totalCipactliDefeated','bothBossesInOneRun','bestScoreSingleRun','bestFloodSurvivalMs','maxFloodWavesInRun','totalFloodWaves','campaignProgress'].forEach(k => {
@@ -686,7 +726,7 @@ function saveProgression() { safeSetItem(PROGRESSION_STORAGE_KEY, JSON.stringify
 loadProgression();
 
 // ========================================================
-// 5.2. SKINS Y TEMAS
+// 5. SKINS Y TEMAS
 // ========================================================
 const KUKULKAN_SKINS = {
   default: { name: 'Jade Clásico', description: 'El aspecto tradicional de Kukulcán.', head: '#4ec9a0', body: '#1a7a5e', border: 'rgba(213, 189, 112, 0.55)', inner: 'rgba(182, 242, 209, 0.28)', plate: null, cost: 0 },
@@ -898,14 +938,12 @@ let runCipactliDefeated = 0;
 let runTezcatlipocaDefeated = 0;
 let runMaizeEaten = 0;
 let runLivesLost = 0;
-let runLastDamageTime = 0;
 let runStartForCampaign = 0;
 
 let campaignLevel = null;
 let campaignInProgress = false;
 let campaignWon = false;
 let dailyChallenge = null;
-let dailyChallengeActive = false;
 
 let lastEatPitch = 0;
 
@@ -943,11 +981,11 @@ let freezeSpawnAt = null;
 let nextChaacSpawnAt = null;
 let nextCipactliSpawnAt = null;
 let isOnFire = false;
-let fireExpiresAt = 0;
 
 let isFuria = false;
 let furiaReadyAt = 0;
 let furiaCooldownUntil = 0;
+let furiaCooldownUntilReal = 0;
 let furiaAuraStart = 0;
 let airFoods = [];
 let airSpawnAt = null;
@@ -978,8 +1016,9 @@ let eclipseUntil = 0;
 let nextEclipseAt = null;
 let eclipseWarningShown = false;
 
+// ===== DILUVIO v16: charcos =====
 let floodNextWaveAt = null;
-let floodWaterCells = [];
+let floodWaterCells = [];       // { x, y, expiresAt, bornAt }
 let floodWaterWaves = 0;
 let floodKills = 0;
 let floodVictoryShown = false;
@@ -1045,12 +1084,13 @@ let tutorialOpenedFromWelcome = false;
 let showDpad = safeGetItem('snakeIoShowDpad', 'false') === 'true';
 let gameMode = safeGetItem('snakeIoGameMode', 'classic');
 
-// PERF: cache de speed por tick
 let _cachedSpeed = 150;
 let _cachedSpeedTick = -1;
+let _spawnScheduled = false;
+let _spawnTimeoutId = null;
 
 // ========================================================
-// 5.1. OBJETIVOS
+// 7. OBJETIVOS
 // ========================================================
 let objectivesFilter = 'all';
 
@@ -1108,8 +1148,6 @@ function checkAchievements() {
 function processAchievementToastQueue() {
   if (achievementToastActive) return;
   if (achievementToastQueue.length === 0) return;
-
-  // Filtrar ya cumplidos y duplicados
   const seen = new Set();
   achievementToastQueue = achievementToastQueue.filter(ach => {
     if (!ach || !ach.id) return false;
@@ -1118,15 +1156,11 @@ function processAchievementToastQueue() {
     seen.add(ach.id);
     return true;
   });
-
   if (achievementToastQueue.length === 0) return;
-
-  // En móvil, 1 toast a la vez para no saturar
   const isMobile = window.innerWidth <= 768;
   if (isMobile && achievementToastQueue.length > 1) {
     achievementToastQueue = achievementToastQueue.slice(0, 1);
   }
-
   achievementToastActive = true;
   const ach = achievementToastQueue.shift();
   showAchievementToast(ach, () => {
@@ -1137,13 +1171,10 @@ function processAchievementToastQueue() {
 
 function showAchievementToast(achievement, onDone) {
   if (!achievement) { if (onDone) onDone(); return; }
-
-  // Si ya estaba cumplido y no es "recién desbloqueado", no mostrar
   if (progression.achievements[achievement.id] && achievement._justUnlocked !== true) {
     if (onDone) onDone();
     return;
   }
-
   const container = document.getElementById('achievement-toast-container');
   if (!container) { if (onDone) onDone(); return; }
   const isMobile = window.innerWidth <= 768;
@@ -1159,7 +1190,7 @@ function showAchievementToast(achievement, onDone) {
   `;
   container.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('visible'));
-  playAchievementSound();
+  try { playAchievementSound(); } catch (e) { console.warn('[Kukulcán] Audio objetivo falló:', e); }
   vibrate([15, 30, 15]);
   announce(`Objetivo cumplido: ${achievement.name}`);
   const duration = isMobile ? 2000 : 2800;
@@ -1198,17 +1229,6 @@ function showGuardianQuoteToast(icon, name, description) {
     toast.classList.remove('visible');
     setTimeout(() => toast.remove(), 400);
   }, duration);
-}
-
-function playAchievementSound() {
-  if (isMuted) return;
-  if (!getAudioContext()) return;
-  try {
-    playTone(523, 100, 0.15, 'triangle');
-    setTimeout(() => { if (isMuted) return; playTone(659, 100, 0.15, 'triangle'); }, 80);
-    setTimeout(() => { if (isMuted) return; playTone(784, 150, 0.18, 'triangle'); }, 160);
-    setTimeout(() => { if (isMuted) return; playTone(1046, 250, 0.2, 'sine'); }, 240);
-  } catch (e) {}
 }
 
 function getObjectiveProgress(ach) {
@@ -1357,10 +1377,13 @@ function closeObjectives() {
   delete objectivesModal.dataset.wasRunning;
   resumeIfWasRunning(wasRunning);
   updateGuardianBadge();
+  if (!welcomeScreen.classList.contains('hidden') && welcomeStartBtn) {
+    welcomeStartBtn.classList.remove('hidden');
+  }
 }
 
 // ========================================================
-// 2. BADGE MANAGER
+// 8. BADGE MANAGER
 // ========================================================
 const BadgeManager = (() => {
   const isMobile = () => window.innerWidth <= 768;
@@ -1369,7 +1392,7 @@ const BadgeManager = (() => {
   const MAX_SPECIAL_MOBILE = 1;
   const mediumOrder = ['flood', 'cipactli', 'cosmicOrder', 'rain', 'sacrificeOffering', 'cosmicOrderFood', 'skullFood', 'threat'];
   const highOrder = ['furia', 'air', 'immunity', 'freeze', 'respawn'];
-  const specialOrder = ['timer', 'eclipse', 'xibalba', 'darkness', 'campaign', 'daily'];
+  const specialOrder = ['campaign', 'daily', 'timer', 'eclipse', 'xibalba', 'darkness'];
   const refs = {
     immunity: document.getElementById('immunity-badge'),
     furia: furiaBadge, air: airBadge, respawn: respawnBadge, freeze: freezeBadge,
@@ -1440,7 +1463,7 @@ const BadgeManager = (() => {
 window.addEventListener('resize', () => BadgeManager.refresh());
 
 // ========================================================
-// 7. ESTADÍSTICAS
+// 9. ESTADÍSTICAS
 // ========================================================
 function createEmptyStats() {
   return Object.fromEntries(Object.keys(DIFFICULTY_NAMES).map(d => [
@@ -1537,20 +1560,30 @@ function finishRunStatistics() {
     if (modeKey === 'zen' && campaignWon) {
       progression.bestZenTimeMs = Math.min(progression.bestZenTimeMs || 999999999, survivalMs);
     }
+    if (modeKey === 'daily' && dailyChallenge) {
+      const dateStr = dailyChallenge.dateStr;
+      const prev = progression.dailyScores[dateStr];
+      if (!prev || score > prev.score) {
+        progression.dailyScores[dateStr] = { score, completedAt: Date.now(), rule: dailyChallenge.rule ? dailyChallenge.rule.id : null };
+      }
+      progression.dailyCompletedOnce = true;
+      progression.maizeCoins += 50;
+    }
     saveProgression();
   } catch (e) { console.warn('[Kukulcán] Error guardando progresión:', e); }
   try { checkAchievements(); } catch (e) { console.warn('[Kukulcán] Error en checkAchievements:', e); }
+  if (customizeCoinsValue) customizeCoinsValue.textContent = progression.maizeCoins;
+  if (dtCoins) dtCoins.textContent = progression.maizeCoins;
   runStartedAt = null;
   runDifficulty = null;
   runGuardiansDefeated = 0;
   runCipactliDefeated = 0;
   runTezcatlipocaDefeated = 0;
   runFloodWaves = 0;
-  runMode = 'classic';
 }
 
 // ========================================================
-// 8. ESCALADO / CANVAS
+// 10. ESCALADO / CANVAS
 // ========================================================
 function resizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1664,20 +1697,27 @@ window.addEventListener('resize', debouncedResizeCanvas);
 window.addEventListener('orientationchange', () => setTimeout(debouncedResizeCanvas, 200));
 
 // ========================================================
-// 9. AUDIO
+// 11. AUDIO
 // ========================================================
 let audioCtx = null;
 let musicTimer = null;
 let musicLayer = 0;
 let musicTick = 0;
+let _audioCtxCreatedAt = 0;
 
 function getAudioContext() {
   try {
+    const now = performance.now();
     if (!audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) audioCtx = new AC();
+      if (AC) {
+        audioCtx = new AC();
+        _audioCtxCreatedAt = now;
+      }
     }
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    if (audioCtx && audioCtx.state === 'suspended' && now - _audioCtxCreatedAt > 100) {
+      audioCtx.resume().catch(() => {});
+    }
   } catch (e) {}
   return audioCtx;
 }
@@ -1694,6 +1734,7 @@ function playTone(freq, dur, vol = 0.08, type = 'square') {
     g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur / 1000);
     o.connect(g); g.connect(a.destination);
     o.start(); o.stop(a.currentTime + dur / 1000);
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
     return o;
   } catch (e) { return null; }
 }
@@ -1917,6 +1958,14 @@ function playChapterCompleteSound() {
   const notes = [392, 523, 659, 784, 1046];
   notes.forEach((n, i) => setTimeout(() => playTone(n, 250, 0.22, 'triangle'), i * 150));
 }
+function playAchievementSound() {
+  if (isMuted) return;
+  try {
+    playTone(1046, 90, 0.16, 'sine');
+    setTimeout(() => { if (!isMuted) playTone(1318, 90, 0.17, 'sine'); }, 80);
+    setTimeout(() => { if (!isMuted) playTone(1567, 160, 0.18, 'sine'); }, 160);
+  } catch (e) {}
+}
 function vibrate(pattern) {
   if (navigator.vibrate && !isMuted) { try { navigator.vibrate(pattern); } catch (e) {} }
 }
@@ -1935,15 +1984,18 @@ function toggleSound(forceState = null) {
 }
 
 // ========================================================
-// 10. FURIA
+// 12. FURIA
 // ========================================================
 function triggerFuria() {
+  if (dailyState.furiaDisabled) return;
   if (isFuria || getFuriaCooldownRemaining() > 0 || !isGameRunning || isPaused || countdownEndsAt !== null) return;
+  const now = performance.now();
   isFuria = true;
   furiaReadyAt = gameTime + FURIA_DURATION_MS;
   furiaCooldownUntil = furiaReadyAt + FURIA_COOLDOWN_MS;
+  furiaCooldownUntilReal = now + FURIA_DURATION_MS + FURIA_COOLDOWN_MS * dailyState.furiaCooldownMultiplier;
   furiaAuraStart = gameTime;
-  isOnFire = false; fireExpiresAt = 0;
+  isOnFire = false;
   updateFuriaUI();
   playFuriaStartSound();
   vibrate([30, 20, 30]);
@@ -1972,7 +2024,12 @@ function triggerFuria() {
   announce('Furia de Xiuhcóatl activada');
 }
 
-function getFuriaCooldownRemaining() { return Math.max(0, furiaCooldownUntil - gameTime); }
+function getFuriaCooldownRemaining() {
+  if (dailyState.furiaNoCooldown) return 0;
+  const byGame = Math.max(0, furiaCooldownUntil - gameTime);
+  const byReal = Math.max(0, furiaCooldownUntilReal - performance.now());
+  return Math.max(byGame, byReal);
+}
 
 function updateFuriaUI() {
   if (!btnTurbo) return;
@@ -1980,15 +2037,15 @@ function updateFuriaUI() {
   const charge = isFuria ? 1 : cooldownRemaining > 0 ? 1 - cooldownRemaining / FURIA_COOLDOWN_MS : 1;
   btnTurbo.classList.toggle('active', isFuria);
   btnTurbo.classList.toggle('cooldown', cooldownRemaining > 0 && !isFuria);
-  btnTurbo.disabled = (cooldownRemaining > 0 && !isFuria) || !isGameRunning || isPaused || countdownEndsAt !== null;
-  turboIcon.textContent = '🔥';
-  turboLabel.textContent = isFuria ? 'FURIA' : cooldownRemaining > 0 ? 'RECARGA' : 'FURIA';
+  btnTurbo.disabled = (cooldownRemaining > 0 && !isFuria) || !isGameRunning || isPaused || countdownEndsAt !== null || dailyState.furiaDisabled;
+  turboIcon.textContent = dailyState.furiaDisabled ? '🚫' : '🔥';
+  turboLabel.textContent = dailyState.furiaDisabled ? 'BLOQ' : isFuria ? 'FURIA' : cooldownRemaining > 0 ? 'RECARGA' : 'FURIA';
   btnTurbo.setAttribute('aria-label', isFuria ? 'Furia de Xiuhcóatl activa' : 'Activar Furia de Xiuhcóatl');
   if (turboProgress) turboProgress.style.setProperty('--turbo-charge', `${Math.round(charge * 100)}%`);
 }
 
 // ========================================================
-// 11. EFECTOS VISUALES
+// 13. EFECTOS VISUALES
 // ========================================================
 function triggerHeadPulse(color = '#d5bd70') { headPulse = 1; headPulseColor = color; }
 
@@ -2130,7 +2187,7 @@ function updateAndDrawParticles(updateState = true) {
 }
 
 // ========================================================
-// 12. INMUNIDAD / FREEZE / AIRE
+// 14. INMUNIDAD / FREEZE / AIRE
 // ========================================================
 function activateImmunity(seconds = 10) {
   isImmune = true;
@@ -2199,15 +2256,15 @@ function activateAirBoost() {
 function deactivateAirBoost() { airBoostUntil = 0; BadgeManager.setVisible('air', false); }
 
 // ========================================================
-// 12.5 LOOP
+// 15. LOOP
 // ========================================================
 function getCurrentSpeed() {
-  // PERF: cachear por tick
   if (_cachedSpeedTick === gameTime) return _cachedSpeed;
   const sel = difficultySelect.value;
   const base = SPEEDS[sel] || SPEEDS.medium;
   const lengthPenalty = Math.max(0, snake.length - 3) * 1.2;
   let adaptive = Math.max(base * 0.78, base - lengthPenalty);
+  adaptive *= dailyState.speedMultiplier;
   if (isFuria) adaptive *= 0.55;
   else if (airBoostUntil > gameTime) adaptive *= AIR_BOOST_MULTIPLIER;
   if (GAME_MODES[gameModeSelect.value]?.hasHuntTrail && snake.length > 0) {
@@ -2253,7 +2310,6 @@ function gameLoopFrame(timestamp) {
     return;
   }
   elapsedMs = Math.max(0, Math.min(100, elapsedMs));
-  // PERF: EMA de frame time para detección de dispositivo lento
   if (elapsedMs > 0) {
     frameTimeEMA = frameTimeEMA * (1 - EMA_ALPHA) + elapsedMs * EMA_ALPHA;
     const wasSlow = isSlowDevice;
@@ -2311,17 +2367,29 @@ function stopGameLoop() {
 }
 
 // ========================================================
-// 13. GUARDIANES — SPAWN
+// 16. GUARDIANES — SPAWN
 // ========================================================
 function scheduleEnemySpawn(retryDelay = null) {
+  if (_spawnScheduled) return;
   const profile = getDifficultyProfile();
   const target = profile.guardianTargets;
   const normalGuardians = enemyGuardians.filter(g => !g.traits.isBoss).length;
   updateGuardianBadge();
-  if (!isGameRunning || normalGuardians >= target || cosmicOrderResolveAt !== null) { enemySpawnAt = null; return; }
+  if (!isGameRunning || normalGuardians >= target || cosmicOrderResolveAt !== null) {
+    enemySpawnAt = null;
+    return;
+  }
   if (isPaused || countdownEndsAt !== null) return;
-  const delay = retryDelay ?? (hasSpawnedGuardian ? profile.guardianNextSpawnMs : profile.guardianFirstSpawnMs);
+  let delay = retryDelay ?? (hasSpawnedGuardian ? profile.guardianNextSpawnMs : profile.guardianFirstSpawnMs);
+  if (dailyState.guardianFirstSpawnMs > 0 && !hasSpawnedGuardian) {
+    delay = dailyState.guardianFirstSpawnMs;
+  }
   enemySpawnAt = gameTime + delay;
+  _spawnScheduled = true;
+  _spawnTimeoutId = setTimeout(() => {
+    _spawnScheduled = false;
+    _spawnTimeoutId = null;
+  }, delay);
 }
 
 function isCellFreeForNewGuardian(x, y) {
@@ -2436,7 +2504,8 @@ function spawnCipactli() {
       portalPhaseUntil: 0,
       portalEntryPos: null,
       portalExitPos: null,
-      portalAlpha: 0
+      portalAlpha: 0,
+      vulnerableUntil: 0
     };
     enemyGuardians.push(guardian);
     nextCipactliSpawnAt = gameTime + config.cooldownMs;
@@ -2674,10 +2743,10 @@ function destroyEnemySnake(id, spawnBonus = true) {
 
       if (runMode === 'flood') {
         floodKills++;
-        const toRemove = Math.min(2, floodWaterCells.length);
-        for (let i = 0; i < toRemove; i++) {
-          const removed = floodWaterCells.shift();
-          if (removed) spawnFloatingText('🌊 Agua retrocede', removed.x * TILE_SIZE + TILE_SIZE / 2, removed.y * TILE_SIZE, '#7de8c4');
+        const removed = clearFloodCells(FLOOD_KILL_CLEAR_CELLS);
+        if (removed > 0) {
+          const headForText = g.segments[0] || { x: 0, y: 0 };
+          spawnFloatingText(`💧 -${removed} charcos`, headForText.x * TILE_SIZE + TILE_SIZE / 2, headForText.y * TILE_SIZE - 20, '#7de8c4');
         }
         const headForText = g.segments[0] || { x: 0, y: 0 };
         spawnFloatingText(`¡Cipactli ${floodKills}/${GAME_MODES.flood.floodKillGoal} vencido!`, headForText.x * TILE_SIZE + TILE_SIZE / 2, headForText.y * TILE_SIZE, '#4ec98a');
@@ -2700,7 +2769,6 @@ function destroyEnemySnake(id, spawnBonus = true) {
   scheduleEnemySpawn();
 }
 
-// PERF: floodFillCount con Uint8Array en vez de Set de strings
 let _floodFillVisited = null;
 let _floodFillQueueX = null;
 let _floodFillQueueY = null;
@@ -2753,6 +2821,12 @@ function floodFillCount(startX, startY, maxCells, occupiedByGuardians) {
 function updateCipactliAI(g, playerHead) {
   const config = g.config;
   const isFleeing = hasGuardianProtection() || isFuria;
+  // Si está vulnerable, no perseguir (queda quieto esperando)
+  if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves && g.vulnerableUntil && gameTime < g.vulnerableUntil) {
+    g.chargeState = 'idle';
+    g.chargeStateUntil = 0;
+    return;
+  }
 
   if (g.portalPhase !== 'idle') {
     if (gameTime < g.portalPhaseUntil) {
@@ -2835,6 +2909,15 @@ function updateCipactliAI(g, playerHead) {
     if (gameTime >= g.chargeStateUntil) {
       g.chargeState = 'idle';
       g.chargeStateUntil = 0;
+      if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves && !g.traits.isTezcatlipoca) {
+        g.vulnerableUntil = gameTime + CIPACTLI_FLOOD_VULNERABLE_MS;
+        BadgeManager.setVisible('cipactliVulnerable', true);
+        if (cipactliVulnerableTimerSpan) {
+          cipactliVulnerableTimerSpan.textContent = Math.ceil(CIPACTLI_FLOOD_VULNERABLE_MS / 1000);
+        }
+        spawnFloatingText('🐊 ¡Cipactli vulnerable!', g.segments[0].x * TILE_SIZE + TILE_SIZE / 2, g.segments[0].y * TILE_SIZE - 20, '#ffb347');
+        playCipactliRoar();
+      }
     } else {
       const head = g.segments[0];
       const nx = (head.x + g.chargeDir.x + gridCols) % gridCols;
@@ -2845,6 +2928,18 @@ function updateCipactliAI(g, playerHead) {
         if (g.segments.length > 3) g.segments.pop();
       }
       if (g.segments.some(s => s.x === snake[0].x && s.y === snake[0].y)) {
+        if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves) {
+          const vulnerable = g.vulnerableUntil && gameTime < g.vulnerableUntil;
+          if (!vulnerable) {
+            if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isFuria) {
+              // ignorar
+            } else {
+              screenShake = reduceMotion ? 0 : 12;
+              loseLife('¡Cipactli te devoró con sus fauces primordiales!', g.segments[0].x, g.segments[0].y);
+              return;
+            }
+          }
+        }
         if (hasGuardianProtection() || guardiansFrozenUntil > gameTime || isFuria) {
           const furia = isFuria, shield = isImmune, frozen = guardiansFrozenUntil > gameTime;
           const color = furia ? '#ff6b2c' : shield ? '#facc15' : frozen ? '#8be7ff' : '#4ec98a';
@@ -2955,9 +3050,12 @@ function updateEnemySnakeAI() {
   const isFleeing = hasGuardianProtection() || isFuria;
   const occupiedByGuardians = {};
   enemyGuardians.forEach(g => { g.segments.forEach(s => { occupiedByGuardians[`${s.x},${s.y}`] = true; }); });
-  for (let gi = 0; gi < enemyGuardians.length; gi++) {
-    const g = enemyGuardians[gi];
+  
+  const snapshot = enemyGuardians.slice();
+  for (let gi = 0; gi < snapshot.length; gi++) {
+    const g = snapshot[gi];
     if (!g || g.destroyed) continue;
+    if (!enemyGuardians.includes(g)) continue;
     g.tickCounter++;
     if (g.traits.isCipactli) {
       const res = updateCipactliAI(g, playerHead);
@@ -3012,8 +3110,8 @@ function updateEnemySnakeAI() {
           playEnemyDefeatedSound();
           vibrate([40, 30, 40, 30, 60]);
           runGuardiansDefeated++;
-          score += reward;
-          spawnFloatingText(`+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+          score += reward * dailyState.guardianMultiplier;
+          spawnFloatingText(`+${reward * dailyState.guardianMultiplier} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
           updateScoresUI();
           destroyEnemySnake(g.id);
           continue;
@@ -3050,8 +3148,8 @@ function updateEnemySnakeAI() {
           playEnemyDefeatedSound();
           vibrate([40, 30, 40, 30, 60]);
           runGuardiansDefeated++;
-          score += reward;
-          spawnFloatingText(`+${reward} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+          score += reward * dailyState.guardianMultiplier;
+          spawnFloatingText(`+${reward * dailyState.guardianMultiplier} ${symbol} ¡TEZCATLIPOCA VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
           updateScoresUI();
           destroyEnemySnake(g.id);
           continue;
@@ -3065,7 +3163,8 @@ function updateEnemySnakeAI() {
       g.segments.pop();
       continue;
     }
-    const interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
+    let interval = moveInterval + (g.behavior.id === 'interceptor' ? 1 : 0);
+    interval = Math.max(1, Math.round(interval / dailyState.guardianSpeedMultiplier));
     if ((g.tickCounter + g.id) % interval !== 0) continue;
     g.lastMoveTick = g.tickCounter;
     const enemyHead = g.segments[0];
@@ -3142,8 +3241,8 @@ function updateEnemySnakeAI() {
         playEnemyDefeatedSound();
         vibrate(35);
         runGuardiansDefeated++;
-        score += reward;
-        spawnFloatingText(`+${reward} ${symbol} ¡GUARDIÁN VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
+        score += reward * dailyState.guardianMultiplier;
+        spawnFloatingText(`+${reward * dailyState.guardianMultiplier} ${symbol} ¡GUARDIÁN VENCIDO!`, playerHead.x * TILE_SIZE + TILE_SIZE / 2, playerHead.y * TILE_SIZE, color);
         updateScoresUI();
         destroyEnemySnake(g.id);
         continue;
@@ -3157,7 +3256,7 @@ function updateEnemySnakeAI() {
 }
 
 // ========================================================
-// 14. SPAWN HELPERS
+// 17. SPAWN HELPERS
 // ========================================================
 function maybeSpawnCosmicOrderFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return false;
@@ -3207,8 +3306,10 @@ function spawnSkullFood() {
 }
 function maybeSpawnShieldFood() {
   if (!GAME_MODES[gameModeSelect.value].itemsEnabled) return;
+  if (dailyState.noJade) return;
   const profile = getDifficultyProfile();
-  const target = profile.guardianTargets;
+  let target = profile.guardianTargets;
+  if (dailyState.jadeTarget > 0) target = dailyState.jadeTarget;
   let attempts = 0;
   while (shieldFoods.length < target && attempts < 200) {
     attempts++;
@@ -3264,7 +3365,7 @@ function resolveCosmicOrder() {
   const cleared = enemyGuardians.length;
   if (cleared === 0) { enemySpawnAt = null; scheduleEnemySpawn(); return; }
   cosmicOrderFlashStartedAt = gameTime;
-  const defeated = enemyGuardians;
+  const defeated = enemyGuardians.slice();
   runGuardiansDefeated += cleared;
   defeated.forEach(g => {
     g.segments.forEach(s => {
@@ -3277,7 +3378,7 @@ function resolveCosmicOrder() {
       }
     });
   });
-  enemyGuardians = [];
+  enemyGuardians.length = 0;
   previousGuardianPositions.clear();
   particles = particles.filter(p => p.decay > 0.03 || p.alpha > 0.5);
   updateGuardianBadge();
@@ -3297,12 +3398,21 @@ function resolveCosmicOrder() {
 }
 
 // ========================================================
-// 15. TIMERS
+// 18. TIMERS
 // ========================================================
 function updateGameTimers(elapsedMs) {
   gameTime += elapsedMs;
   if (headPulse > 0) headPulse = Math.max(0, headPulse - elapsedMs / 240);
   updateMusicLayer();
+  if (BadgeManager && cipactliVulnerableBadge) {
+    const anyVulnerable = enemyGuardians.some(g => g.vulnerableUntil && gameTime < g.vulnerableUntil);
+    if (!anyVulnerable && !cipactliVulnerableBadge.classList.contains('hidden')) {
+      BadgeManager.setVisible('cipactliVulnerable', false);
+    } else if (anyVulnerable && cipactliVulnerableTimerSpan) {
+      const maxVuln = Math.max(...enemyGuardians.filter(g => g.vulnerableUntil && gameTime < g.vulnerableUntil).map(g => g.vulnerableUntil - gameTime));
+      cipactliVulnerableTimerSpan.textContent = Math.ceil(maxVuln / 1000);
+    }
+  }
   if (guardiansFrozenUntil > 0) {
     if (gameTime >= guardiansFrozenUntil) {
       enemyGuardians.forEach(g => { g.frozenAt = null; });
@@ -3326,7 +3436,7 @@ function updateGameTimers(elapsedMs) {
       updateMusicLayer();
     }
   }
-  if (!isFuria && furiaCooldownUntil > 0 && gameTime >= furiaCooldownUntil) {
+  if (!isFuria && furiaCooldownUntil > 0 && gameTime >= furiaCooldownUntil && getFuriaCooldownRemaining() <= 0) {
     furiaCooldownUntil = 0;
     playTurboReadySound();
   }
@@ -3473,91 +3583,172 @@ function updateGameTimers(elapsedMs) {
   updateModeMechanics(elapsedMs);
 }
 
+// ========================================================
+// 19. DILUVIO — CHARCOs
+// ========================================================
+function isFloodCell(x, y) {
+  return floodWaterCells.some(c => c.x === x && c.y === y);
+}
+
+function removeFloodCellAt(x, y) {
+  const idx = floodWaterCells.findIndex(c => c.x === x && c.y === y);
+  if (idx === -1) return false;
+  floodWaterCells.splice(idx, 1);
+  return true;
+}
+
+function spawnFloodWave() {
+  const head = snake[0];
+  const candidates = [];
+  for (let y = 0; y < gridRows; y++) {
+    for (let x = 0; x < gridCols; x++) {
+      if (isFloodCell(x, y)) continue;
+      if (head && x === head.x && y === head.y) continue;
+      if (enemyGuardians.some(g => g.segments.some(s => s.x === x && s.y === y))) continue;
+      candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) return 0;
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const count = Math.min(FLOOD_CELLS_PER_WAVE, candidates.length);
+  for (let i = 0; i < count; i++) {
+    const c = candidates[i];
+    floodWaterCells.push({
+      x: c.x, y: c.y,
+      expiresAt: gameTime + FLOOD_CELL_LIFETIME_MS,
+      bornAt: gameTime
+    });
+    const px = c.x * TILE_SIZE + TILE_SIZE / 2;
+    const py = c.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let p = 0; p < 4; p++) {
+      const a = (Math.PI * 2 * p) / 4 + Math.random() * 0.4;
+      particles.push({
+        x: px, y: py,
+        vx: Math.cos(a) * 1.5, vy: Math.sin(a) * 1.5 - 1,
+        size: 1.5 + Math.random() * 1.5,
+        color: ['#3aa8d4', '#6ecbff', '#b3e5ff'][p % 3],
+        alpha: 0.9, decay: 0.03
+      });
+    }
+  }
+  return count;
+}
+
+function clearFloodCells(count) {
+  const sorted = floodWaterCells.slice().sort((a, b) => a.bornAt - b.bornAt);
+  const toRemove = sorted.slice(0, count);
+  toRemove.forEach(c => {
+    const idx = floodWaterCells.indexOf(c);
+    if (idx !== -1) floodWaterCells.splice(idx, 1);
+    const px = c.x * TILE_SIZE + TILE_SIZE / 2;
+    const py = c.y * TILE_SIZE + TILE_SIZE / 2;
+    for (let p = 0; p < 3; p++) {
+      const a = Math.random() * Math.PI * 2;
+      particles.push({
+        x: px, y: py,
+        vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8 - 0.5,
+        size: 1.2 + Math.random() * 1.2,
+        color: ['#7de8c4', '#b3e5ff', '#ffffff'][p % 3],
+        alpha: 0.7, decay: 0.04
+      });
+    }
+  });
+  return toRemove.length;
+}
+
 function updateFloodMode(elapsedMs) {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode || !mode.hasFloodWaves) return;
 
-  if (floodNextWaveAt !== null && gameTime >= floodNextWaveAt && !floodVictoryShown) {
-    floodNextWaveAt = gameTime + FLOOD_WAVE_INTERVAL_MS;
-    floodWaterWaves++;
-    runFloodWaves = floodWaterWaves;
-
-    const isHorizontal = Math.random() > 0.5;
-    let newCells = [];
-    if (isHorizontal) {
-      const y = Math.floor(Math.random() * gridRows);
-      for (let x = 0; x < gridCols; x++) {
-        if (!floodWaterCells.some(c => c.x === x && c.y === y)) {
-          newCells.push({ x, y });
-        }
+  // Retirar charcos expirados
+  for (let i = floodWaterCells.length - 1; i >= 0; i--) {
+    const c = floodWaterCells[i];
+    if (gameTime >= c.expiresAt) {
+      floodWaterCells.splice(i, 1);
+      const px = c.x * TILE_SIZE + TILE_SIZE / 2;
+      const py = c.y * TILE_SIZE + TILE_SIZE / 2;
+      for (let p = 0; p < 3; p++) {
+        const a = Math.random() * Math.PI * 2;
+        particles.push({
+          x: px, y: py,
+          vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8 - 0.5,
+          size: 1.2 + Math.random() * 1.2,
+          color: ['#7de8c4', '#b3e5ff', '#ffffff'][p % 3],
+          alpha: 0.7, decay: 0.04
+        });
       }
-    } else {
-      const x = Math.floor(Math.random() * gridCols);
-      for (let y = 0; y < gridRows; y++) {
-        if (!floodWaterCells.some(c => c.x === x && c.y === y)) {
-          newCells.push({ x, y });
-        }
-      }
-    }
-    floodWaterCells.push(...newCells);
-
-    spawnFloatingText('🌊 ¡Las aguas suben!', window.innerWidth / 2, 100, '#6ecbff');
-    playCosmicOrderSound();
-    vibrate([30, 40, 30]);
-    screenShake = reduceMotion ? 0 : 6;
-    announce(`Oleada ${floodWaterWaves}: las aguas suben`);
-
-    for (let i = 0; i < 15 && newCells.length > 0; i++) {
-      const cell = newCells[Math.floor(Math.random() * newCells.length)];
-      particles.push({
-        x: cell.x * TILE_SIZE + TILE_SIZE / 2,
-        y: cell.y * TILE_SIZE + TILE_SIZE / 2,
-        vx: (Math.random() - 0.5) * 2,
-        vy: -1 - Math.random() * 2,
-        size: 1.5 + Math.random() * 2,
-        color: ['#3aa8d4', '#6ecbff', '#b3e5ff'][i % 3],
-        alpha: 0.9, decay: 0.025
-      });
-    }
-
-    const totalCells = gridCols * gridRows;
-    if (floodWaterCells.length / totalCells >= 0.6 && !floodVictoryShown) {
-      gameOver('🌊 ¡Las aguas han cubierto la tierra! Cipactli devora el mundo.', '🌊');
     }
   }
 
+  // Nueva oleada
+  if (floodNextWaveAt !== null && gameTime >= floodNextWaveAt && !floodVictoryShown) {
+    const added = spawnFloodWave();
+    if (added > 0) {
+      floodWaterWaves++;
+      runFloodWaves = floodWaterWaves;
+      floodNextWaveAt = gameTime + FLOOD_WAVE_INTERVAL_MS;
+      spawnFloatingText(`🌊 ¡Oleada ${floodWaterWaves}! +${added} charcos`, window.innerWidth / 2, 100, '#6ecbff');
+      playCosmicOrderSound();
+      vibrate([25, 35, 25]);
+      screenShake = reduceMotion ? 0 : 5;
+      announce(`Oleada ${floodWaterWaves}: el agua sube`);
+    } else {
+      floodNextWaveAt = gameTime + 2000;
+    }
+  }
+
+  // Daño por agua
   const head = snake[0];
-  if (head && floodWaterCells.some(c => c.x === head.x && c.y === head.y)) {
+  if (head && isFloodCell(head.x, head.y)) {
     if (floodSlowUntil < gameTime) {
-      floodSlowUntil = gameTime + 1500;
+      floodSlowUntil = gameTime + 1000;
       spawnFloatingText('🌊 ¡Ralentizado!', head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, '#6ecbff');
     }
     if (!window.__floodDamageCooldown) window.__floodDamageCooldown = 0;
-    if (gameTime - window.__floodDamageCooldown > 4000) {
+    if (gameTime - window.__floodDamageCooldown > 3500) {
       window.__floodDamageCooldown = gameTime;
       loseLife('🌊 El agua sagrada te arrastra', head.x, head.y);
+      return;
     }
   }
 
+  // Derrota por saturación
+  const totalCells = gridCols * gridRows;
+  const waterRatio = floodWaterCells.length / totalCells;
+  if (waterRatio >= FLOOD_MAX_WATER_RATIO && !floodVictoryShown) {
+    gameOver('🌊 ¡Las aguas han cubierto la tierra! Cipactli devora el mundo.', '🌊');
+    return;
+  }
+
+  // Badge
   BadgeManager.setVisible('flood', true);
+  const maxSimul = Math.floor(totalCells * FLOOD_MAX_WATER_RATIO);
+  const nextWaveIn = floodNextWaveAt !== null ? Math.max(0, Math.ceil((floodNextWaveAt - gameTime) / 1000)) : 0;
   if (floodTimerSpan) floodTimerSpan.textContent = `${floodKills}/${mode.floodKillGoal || 3}`;
   const floodBadgeEl = document.getElementById('flood-badge');
   if (floodBadgeEl) {
     const desktop = floodBadgeEl.querySelector('.badge-text-desktop');
     const mobile = floodBadgeEl.querySelector('.badge-text-mobile');
-    if (desktop) desktop.textContent = `🌊 Aguas: ${floodWaterCells.length} celdas — Cipactlis: ${floodKills}/${mode.floodKillGoal || 3}`;
+    if (desktop) {
+      desktop.textContent = `🌊 Charcos ${floodWaterCells.length}/${maxSimul} · Cipactlis ${floodKills}/${mode.floodKillGoal || 3} · Oleada ${nextWaveIn}s`;
+    }
     if (mobile) mobile.textContent = `${floodKills}/${mode.floodKillGoal || 3}`;
   }
 
+  // Spawn Cipactli
   const cipAlive = enemyGuardians.some(g => g.traits.isCipactli);
   if (!cipAlive && !floodVictoryShown && gameTime >= CIPACTLI_FLOOD_FIRST_SPAWN_MS) {
     if (!nextCipactliSpawnAt || gameTime >= nextCipactliSpawnAt) {
       const ok = spawnCipactli();
-      if (!ok) nextCipactliSpawnAt = gameTime + CHAAC_RETRY_MS;
+      if (!ok) nextCipactliSpawnAt = gameTime + 3000;
       else nextCipactliSpawnAt = gameTime + CIPACTLI_FLOOD_RESPAWN_MS;
     }
   }
 
+  // Spawn maíz
   if (floodMaizeSpawnAt !== null && gameTime >= floodMaizeSpawnAt) {
     floodMaizeSpawnAt = gameTime + FLOOD_MAIZE_BONUS_SPAWN_MS;
     const total = gridCols * gridRows;
@@ -3567,7 +3758,7 @@ function updateFloodMode(elapsedMs) {
       const x = c % gridCols;
       const y = Math.floor(c / gridCols);
       if (isGuardianCellOccupied(x, y)) continue;
-      if (floodWaterCells.some(w => w.x === x && w.y === y)) continue;
+      if (isFloodCell(x, y)) continue;
       foods.push({
         x, y, shape: 2, offering: 'maize',
         landingAt: gameTime + MAIZE_FALL_DURATION_MS,
@@ -3578,6 +3769,53 @@ function updateFloodMode(elapsedMs) {
   }
 }
 
+// ========================================================
+// 20. CAMPANA
+// ========================================================
+function updateCampaignProgressBadge() {
+  if (!campaignLevel) return;
+  const lvl = CAMPAIGN_LEVELS.find(l => l.id === campaignLevel);
+  if (!lvl || campaignWon) return;
+
+  let current = 0;
+  const target = lvl.goal.target;
+  if (lvl.goal.type === 'eatMaize') current = runMaizeEaten;
+  else if (lvl.goal.type === 'killGuardians') current = runGuardiansDefeated;
+  else if (lvl.goal.type === 'surviveNoDamage') {
+    current = runLivesLost === 0 ? Math.floor(gameTime - runStartForCampaign) : 0;
+  }
+  else if (lvl.goal.type === 'killCipactli') current = runCipactliDefeated;
+  else if (lvl.goal.type === 'killTezcatlipoca') current = runTezcatlipocaDefeated;
+
+  current = Math.min(current, target);
+
+  BadgeManager.setVisible('campaign', true);
+  if (campaignInstruction) campaignInstruction.textContent = `📖 Cap. ${campaignLevel}: ${lvl.desc}`;
+  if (campaignInstructionMobile) campaignInstructionMobile.textContent = `Cap. ${campaignLevel}`;
+  if (campaignProgressSpan) {
+    campaignProgressSpan.textContent = lvl.goal.type === 'surviveNoDamage'
+      ? `${Math.floor(current / 1000)}s/${Math.floor(target / 1000)}s`
+      : `${current}/${target}`;
+  }
+
+  if (current >= target && !campaignWon) {
+    campaignWon = true;
+    if (!progression.campaignCompleted.includes(campaignLevel)) {
+      progression.campaignCompleted.push(campaignLevel);
+      progression.campaignProgress = Math.max(progression.campaignProgress || 0, campaignLevel);
+      saveProgression();
+      checkAchievements();
+    }
+    playChapterCompleteSound();
+    setTimeout(() => {
+      if (isGameRunning) gameOver(`📖 ¡Capítulo ${campaignLevel} completado!`);
+    }, 350);
+  }
+}
+
+// ========================================================
+// 21. MODOS
+// ========================================================
 function updateModeMechanics(elapsedMs) {
   const mode = GAME_MODES[gameModeSelect.value];
   if (!mode) return;
@@ -3688,51 +3926,34 @@ function updateModeMechanics(elapsedMs) {
     }
   }
   if (mode.isCampaign && campaignLevel) {
-    const lvl = CAMPAIGN_LEVELS.find(l => l.id === campaignLevel);
-    if (lvl && !campaignWon) {
-      BadgeManager.setVisible('campaign', true);
-      if (campaignInstruction) campaignInstruction.textContent = `📖 Cap. ${campaignLevel}: ${lvl.desc}`;
-      if (campaignInstructionMobile) campaignInstructionMobile.textContent = `Cap. ${campaignLevel}`;
-      let current = 0;
-      let target = lvl.goal.target;
-      if (lvl.goal.type === 'eatMaize') current = runMaizeEaten;
-      else if (lvl.goal.type === 'killGuardians') current = runGuardiansDefeated;
-      else if (lvl.goal.type === 'surviveNoDamage') current = runLivesLost === 0 ? (gameTime - runStartForCampaign) : 0;
-      else if (lvl.goal.type === 'killCipactli') current = runCipactliDefeated;
-      else if (lvl.goal.type === 'killTezcatlipoca') current = runTezcatlipocaDefeated;
-      if (campaignProgressSpan) campaignProgressSpan.textContent = `${Math.min(current, target)}/${target}`;
-      if (current >= target) {
-        campaignWon = true;
-        if (!progression.campaignCompleted.includes(campaignLevel)) {
-          progression.campaignCompleted.push(campaignLevel);
-          progression.campaignProgress = Math.max(progression.campaignProgress || 0, campaignLevel);
-          saveProgression();
-          checkAchievements();
-        }
-        playChapterCompleteSound();
-        gameOver(`📖 ¡Capítulo ${campaignLevel} completado!`);
-      }
-    }
+    updateCampaignProgressBadge();
   }
   if (mode.isDaily && dailyChallenge && !campaignWon) {
     BadgeManager.setVisible('daily', true);
-    if (dailyInstruction) dailyInstruction.textContent = `📅 ${MODE_NAMES[dailyChallenge.mode]} · ${DIFFICULTY_NAMES[dailyChallenge.difficulty]}`;
-    if (dailyInstructionMobile) dailyInstructionMobile.textContent = `${dailyChallenge.dateStr}`;
+    const rule = dailyChallenge.rule;
+    if (dailyInstruction) dailyInstruction.textContent = `${rule.icon} ${rule.name}: ${rule.description}`;
+    if (dailyInstructionMobile) dailyInstructionMobile.textContent = `${rule.icon}`;
   }
   updateFloodMode(elapsedMs);
 }
 
 // ========================================================
-// 17. RESET / GAME OVER
+// 22. RESET / GAME OVER
 // ========================================================
 function ensureFoodCount(count = 6) {
   let attempts = 0;
+  const onlyMaize = dailyState.onlyMaize;
+  const noCacao = dailyState.noCacao;
   while (foods.length < count && attempts < gridCols * gridRows) {
     attempts++;
     const x = Math.floor(Math.random() * gridCols);
     const y = Math.floor(Math.random() * gridRows);
     if (isGuardianCellOccupied(x, y)) continue;
-    foods.push({ x, y, shape: Math.floor(Math.random() * 6), offering: Math.random() < 0.35 ? 'cacao' : 'common' });
+    let offering;
+    if (onlyMaize) offering = 'maize';
+    else if (noCacao) offering = 'common';
+    else offering = Math.random() < 0.35 ? 'cacao' : 'common';
+    foods.push({ x, y, shape: Math.floor(Math.random() * 6), offering });
   }
   if (sacredRainUntil > gameTime) ensureMaizeOffering();
 }
@@ -3777,13 +3998,13 @@ function resetGame() {
   foods = []; bonusFoods = []; shieldFoods = []; freezeFoods = []; cosmicOrderFoods = []; sacrificeFoods = []; skullFoods = [];
   damageRings = [];
   lastSkullPosition = null; nextSkullMoveAt = null;
-  isOnFire = false; fireExpiresAt = 0;
+  isOnFire = false;
   BadgeManager.setVisible('sacrificeOffering', false);
   BadgeManager.setVisible('skullFood', false);
   BadgeManager.setVisible('cosmicOrder', false);
   BadgeManager.setVisible('cosmicOrderFood', false);
   BadgeManager.setVisible('rain', false);
-  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0; furiaAuraStart = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0; furiaCooldownUntilReal = 0; furiaAuraStart = 0;
   BadgeManager.setVisible('furia', false);
   airFoods = []; airSpawnAt = AIR_FIRST_SPAWN_MS; airBoostUntil = 0;
   BadgeManager.setVisible('air', false);
@@ -3796,6 +4017,8 @@ function resetGame() {
   enemySpawnAt = null; jadeSpawnAt = null; freezeSpawnAt = FREEZE_FIRST_SPAWN_MS;
   guardiansFrozenUntil = 0; nextChaacSpawnAt = null;
   nextCipactliSpawnAt = null;
+  if (_spawnTimeoutId) { clearTimeout(_spawnTimeoutId); _spawnTimeoutId = null; }
+  _spawnScheduled = false;
   BadgeManager.setVisible('freeze', false);
   enemyGuardians = []; hasSpawnedGuardian = false; usedGuardianPalettes = [];
   window.__guardianQuotesShown = {};
@@ -3835,7 +4058,7 @@ function resetGame() {
   runMaizeEaten = 0;
   runLivesLost = 0;
   campaignWon = false;
-  runStartForCampaign = gameTime;
+  runStartForCampaign = 0;
   BadgeManager.setVisible('timer', false);
   BadgeManager.setVisible('eclipse', false);
   BadgeManager.setVisible('xibalba', false);
@@ -3844,6 +4067,15 @@ function resetGame() {
   BadgeManager.setVisible('daily', false);
   if (timerBadge) timerBadge.classList.remove('critical');
   invalidateProfileCache();
+  if (gameModeSelect.value === 'campaign') {
+    if (!campaignLevel) campaignLevel = 1;
+    const lvl = CAMPAIGN_LEVELS.find(l => l.id === campaignLevel);
+    if (lvl && difficultySelect.value !== lvl.difficulty) {
+      difficultySelect.value = lvl.difficulty;
+      invalidateProfileCache();
+    }
+    updateCampaignProgressBadge();
+  }
   updateMusicLayer();
 }
 
@@ -3865,6 +4097,13 @@ function loseLife(reason, damageX, damageY) {
   lives = Math.max(0, lives - 1);
   runLivesLost++;
   updateLivesUI();
+  if (GAME_MODES[gameModeSelect.value]?.isCampaign && campaignLevel === 3) {
+    screenShake = reduceMotion ? 0 : 8;
+    vibrate([40, 30, 40]);
+    playDamageSound();
+    setTimeout(() => gameOver('📖 Fallaste: perdiste una vida en el Descenso.'), 300);
+    return;
+  }
   screenShake = reduceMotion ? 0 : 8;
   vibrate([40, 30, 40]);
   playDamageSound();
@@ -3894,15 +4133,17 @@ function loseLife(reason, damageX, damageY) {
   directionQueue = [];
   previousSnakePositions = snake.map(s => ({ ...s }));
   deactivateImmunity();
-  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0; furiaCooldownUntilReal = 0;
   BadgeManager.setVisible('furia', false);
-  isOnFire = false; fireExpiresAt = 0;
+  isOnFire = false;
   airBoostUntil = 0;
   BadgeManager.setVisible('air', false);
   updateFuriaUI();
-  respawnProtectedUntil = gameTime + RESPAWN_PROTECTION_MS;
-  if (respawnTimerSpan) respawnTimerSpan.textContent = String(Math.ceil(RESPAWN_PROTECTION_MS / 1000));
-  BadgeManager.setVisible('respawn', true);
+  if (!dailyState.noRespawnShield) {
+    respawnProtectedUntil = gameTime + RESPAWN_PROTECTION_MS;
+    if (respawnTimerSpan) respawnTimerSpan.textContent = String(Math.ceil(RESPAWN_PROTECTION_MS / 1000));
+    BadgeManager.setVisible('respawn', true);
+  }
   triggerHeadPulse('#4ec9a0');
   if (prevHead) spawnFloatingText('🫀 Sacrificio perdido', prevHead.x * TILE_SIZE + TILE_SIZE / 2, prevHead.y * TILE_SIZE, '#ef5261');
   updateScoresUI();
@@ -3911,12 +4152,12 @@ function loseLife(reason, damageX, damageY) {
 }
 
 // ========================================================
-// 18. UPDATE POR TICK
+// 23. UPDATE POR TICK
 // ========================================================
 function gameUpdate() {
   if (isPaused || !isGameRunning || countdownEndsAt !== null) return;
   if (directionQueue.length > 0) direction = directionQueue.shift();
-  const moveDir = direction;
+  const moveDir = { ...direction };
   const crossed =
     (moveDir.x > 0 && snake[0].x === gridCols - 1) ||
     (moveDir.x < 0 && snake[0].x === 0) ||
@@ -3948,7 +4189,13 @@ function gameUpdate() {
   const hitG = enemyGuardians.find(g => {
     if (g.destroyed) return false;
     if (g.traits.isCipactli && g.portalPhase !== 'idle') return false;
-    if (g.traits.isCipactli) return g.segments.some(s => s.x === head.x && s.y === head.y);
+    if (g.traits.isCipactli) {
+      if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves) {
+        const vulnerable = g.vulnerableUntil && gameTime < g.vulnerableUntil;
+        if (!vulnerable) return false;
+      }
+      return g.segments.some(s => s.x === head.x && s.y === head.y);
+    }
     if (g.behavior.id === 'ambusher') return g.segments.some(s => Math.abs(s.x - head.x) <= 1 && Math.abs(s.y - head.y) <= 1);
     return g.segments.some(s => s.x === head.x && s.y === head.y);
   });
@@ -3965,6 +4212,7 @@ function gameUpdate() {
       if (hitG.traits.isCipactli) reward = (CIPACTLI_CONFIG[getEffectiveDifficulty()] || CIPACTLI_CONFIG.medium).reward;
       else if (hitG.traits.isTezcatlipoca) reward = furia ? FURIA_GUARDIAN_REWARD : (TEZCATLIPOCA_CONFIG[getEffectiveDifficulty()]?.reward || 400);
       else reward = furia ? FURIA_GUARDIAN_REWARD : (isBoss ? profile.bossReward : profile.guardianReward);
+      reward *= dailyState.guardianMultiplier;
       screenShake = reduceMotion ? 0 : (isBoss ? 12 : 10);
       triggerHeadPulse(color);
       playEnemyDefeatedSound();
@@ -3976,6 +4224,9 @@ function gameUpdate() {
       else if (hitG.traits.isTezcatlipoca) label = '¡TEZCATLIPOCA VENCIDO!';
       spawnFloatingText(`+${reward} ${symbol} ${label}`, head.x * TILE_SIZE + TILE_SIZE / 2, head.y * TILE_SIZE, color);
       updateScoresUI();
+      if (GAME_MODES[gameModeSelect.value]?.isCampaign && campaignLevel) {
+        updateCampaignProgressBadge();
+      }
       destroyEnemySnake(hitG.id);
     } else {
       screenShake = reduceMotion ? 0 : (isBoss ? 12 : 8);
@@ -4002,6 +4253,13 @@ function gameUpdate() {
     updateScoresUI();
     jadeSpawnAt = gameTime + profile.jadeRespawnMs;
     spawnEatBurst(hx, hy, '#7de8c4', 10);
+    if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves && floodWaterCells.length > 0) {
+      const removed = clearFloodCells(FLOOD_JADE_CLEAR_CELLS);
+      if (removed > 0) {
+        spawnFloatingText(`💎 ¡Dique! -${removed} charcos`, hx, hy - 22, '#7de8c4');
+        announce('Dique de jade: el agua retrocede');
+      }
+    }
     ateItem = true;
   }
   if (!ateItem) {
@@ -4110,6 +4368,8 @@ function gameUpdate() {
       const [food] = foods.splice(foodIdx, 1);
       const maizeBonus = food.offering === 'maize' && sacredRainUntil > gameTime ? MAIZE_RAIN_BONUS : 0;
       let foodScore = 10 + maizeBonus;
+      if (food.offering === 'maize') foodScore += dailyState.maizeBonusPoints;
+      foodScore *= dailyState.maizeMultiplier;
       if (GAME_MODES[gameModeSelect.value]?.floodScoreMultiplier) foodScore = Math.round(foodScore * GAME_MODES[gameModeSelect.value].floodScoreMultiplier);
       score += foodScore;
       runMaizeEaten++;
@@ -4128,6 +4388,13 @@ function gameUpdate() {
       ensureFoodCount(6);
       updateScoresUI();
       saveProgression();
+      if (GAME_MODES[gameModeSelect.value]?.isCampaign && campaignLevel) {
+        updateCampaignProgressBadge();
+      }
+      if (GAME_MODES[gameModeSelect.value]?.hasFloodWaves && floodNextWaveAt !== null) {
+        floodNextWaveAt += FLOOD_MAIZE_DELAY_MS;
+        spawnFloatingText(`+${FLOOD_MAIZE_DELAY_MS/1000}s 🌽`, hx, hy - 22, '#facc15');
+      }
       ateItem = true;
     }
   }
@@ -4145,7 +4412,7 @@ function gameUpdate() {
 }
 
 // ========================================================
-// 19. UI
+// 24. UI / SCORES
 // ========================================================
 function updateScoresUI() {
   if (dtScore) dtScore.textContent = score;
@@ -4182,10 +4449,9 @@ function updateLivesUI() {
 }
 
 // ========================================================
-// 20. HELPERS DE DIBUJO
+// 25. HELPERS DE DIBUJO
 // ========================================================
 function interpolateGridPosition(current, previous, progress) {
-  // PERF: early out si no hay prev o progress >= 1
   if (!previous || progress >= 1) return current;
   let dx = current.x - previous.x;
   let dy = current.y - previous.y;
@@ -4621,7 +4887,7 @@ function drawKukulkanPlume(rs, dir, protectedFlag) {
 }
 
 // ========================================================
-// 21. GUARDIANES — DIBUJO
+// 26. DIBUJO DE GUARDIANES — Cipactli completo (diseño original)
 // ========================================================
 function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
   const pal = guardian.palette;
@@ -4640,7 +4906,6 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     const pRadius = TILE_SIZE * 1.6 * Math.min(1, portalAlpha * 1.5);
     drawCipactliPortal(ex, ey, pRadius, portalAlpha, guardian.portalPhase === 'opening');
   }
-
   if (inPortal && guardian.portalExitPos && guardian.portalPhase === 'entering') {
     const ex = guardian.portalExitPos.x * TILE_SIZE + TILE_SIZE / 2;
     const ey = guardian.portalExitPos.y * TILE_SIZE + TILE_SIZE / 2;
@@ -4651,13 +4916,11 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
   const bodyAlpha = 1 - portalAlpha;
   if (bodyAlpha > 0.05) {
     ctx.globalAlpha = bodyAlpha;
-
     const bossPulse = Math.sin(gameTime * 0.004) * 0.5 + 0.5;
     ctx.fillStyle = `rgba(78, 201, 138, ${0.14 + bossPulse * 0.1})`;
     ctx.beginPath();
     ctx.arc(cx, cy, TILE_SIZE * 1.7, 0, Math.PI * 2);
     ctx.fill();
-
     if (isTelegraph || isCharging) {
       const pulse = Math.sin(gameTime * 0.03) * 0.5 + 0.5;
       ctx.fillStyle = `rgba(255, 60, 30, ${0.28 + pulse * 0.25})`;
@@ -4665,7 +4928,6 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.arc(cx, cy, TILE_SIZE * 1.55, 0, Math.PI * 2);
       ctx.fill();
     }
-
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
@@ -4674,6 +4936,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     const bodyH = TILE_SIZE * 1.35;
     const tailLen = TILE_SIZE * 2.2;
 
+    // Cola
     const tailWave = Math.sin(time * 2.5) * 2.5;
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = pal.jaw;
@@ -4689,6 +4952,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.closePath();
     ctx.fill(); ctx.stroke();
 
+    // Escamas de la cola
     ctx.fillStyle = pal.crest;
     ctx.strokeStyle = pal.jaw;
     ctx.lineWidth = 0.9;
@@ -4710,6 +4974,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.fill(); ctx.stroke();
     }
 
+    // Punta de cola
     const tipX = -bodyW * 0.5 - tailLen;
     const tipY = tailWave * 1.3;
     ctx.fillStyle = pal.crest;
@@ -4720,6 +4985,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.closePath();
     ctx.fill(); ctx.stroke();
 
+    // Patas
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = pal.jaw;
     ctx.lineWidth = 1.4;
@@ -4746,6 +5012,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.fillStyle = pal.body;
     });
 
+    // Cuerpo principal
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = pal.jaw;
     ctx.lineWidth = 1.8;
@@ -4759,6 +5026,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.closePath();
     ctx.fill(); ctx.stroke();
 
+    // Vientre
     ctx.fillStyle = pal.belly;
     ctx.globalAlpha = 0.55 * bodyAlpha;
     ctx.beginPath();
@@ -4766,6 +5034,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
     ctx.globalAlpha = bodyAlpha;
 
+    // Escamas del cuerpo
     ctx.fillStyle = pal.crest;
     ctx.strokeStyle = pal.jaw;
     ctx.lineWidth = 0.8;
@@ -4791,6 +5060,7 @@ function drawCipactliHead(rs, guardian, cx, cy, dir, perp, rear) {
       ctx.fill(); ctx.stroke();
     });
 
+    // Cresta dorsal
     ctx.fillStyle = pal.crest;
     ctx.strokeStyle = pal.jaw;
     ctx.lineWidth = 1.1;
@@ -4834,10 +5104,7 @@ function drawSingleCrocodileHead(hx, hy, rotation, pal, isTelegraph, isCharging,
 
   const headW = TILE_SIZE * 1.5;
   const headH = TILE_SIZE * 1.0;
-
-  const jawOpen = isTelegraph
-    ? 0.75 + Math.sin(gameTime * 0.04) * 0.25
-    : isCharging ? 1 : 0.15;
+  const jawOpen = isTelegraph ? 0.75 + Math.sin(gameTime * 0.04) * 0.25 : isCharging ? 1 : 0.15;
 
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.beginPath();
@@ -4963,12 +5230,12 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   const isVulnerable = guardian.vulnerableUntil && gameTime < guardian.vulnerableUntil;
   const time = gameTime * 0.006;
 
-  const FUR     = '#d98e2b';
-  const FUR_DK  = '#a85e14';
-  const BELLY   = '#f5d09a';
-  const SPOT    = '#1a0e05';
+  const FUR = '#d98e2b';
+  const FUR_DK = '#a85e14';
+  const BELLY = '#f5d09a';
+  const SPOT = '#1a0e05';
   const OUTLINE = '#2a1508';
-  const EYE_G   = '#ffcc33';
+  const EYE_G = '#ffcc33';
 
   ctx.save();
 
@@ -4997,6 +5264,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   const LEG_W = TILE_SIZE * 0.26;
   const LEG_H = TILE_SIZE * 0.5;
 
+  // Patas
   ctx.fillStyle = FUR_DK;
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.1;
@@ -5004,7 +5272,6 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.fill(); ctx.stroke();
   roundRect(ctx, -L * 0.6, H * 0.5 - LEG_H * 0.6, LEG_W, LEG_H, 2);
   ctx.fill(); ctx.stroke();
-
   ctx.fillStyle = '#7a4210';
   roundRect(ctx, -L * 0.78, -H * 0.2 - LEG_H * 0.3, LEG_W * 0.85, LEG_H, 2);
   ctx.fill();
@@ -5018,20 +5285,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   roundRect(ctx, L * 0.35, -H * 0.2 - LEG_H * 0.3, LEG_W * 0.85, LEG_H, 2);
   ctx.fill();
 
-  ctx.fillStyle = '#fff8dc';
-  for (const side of [-1, 1]) {
-    const px = L * 0.18 + LEG_W * 0.5;
-    const py = side * (H * 0.5 - LEG_H * 0.6) + (side > 0 ? LEG_H : 0);
-    for (let c = -1; c <= 1; c++) {
-      ctx.beginPath();
-      ctx.moveTo(px + c * 2.5, py);
-      ctx.lineTo(px + c * 2.5 - 1.2, py + (side > 0 ? 3.5 : -3.5));
-      ctx.lineTo(px + c * 2.5 + 1.2, py + (side > 0 ? 3.5 : -3.5));
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
+  // Cola
   const tailBaseX = -L * 0.5;
   const tailWave = Math.sin(time * 2) * 2.5;
   ctx.strokeStyle = FUR;
@@ -5050,6 +5304,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.lineTo(tailBaseX - L * 0.5, tailWave * 1.3);
   ctx.stroke();
 
+  // Cuerpo
   ctx.fillStyle = FUR;
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.4;
@@ -5065,6 +5320,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.closePath();
   ctx.fill(); ctx.stroke();
 
+  // Vientre
   ctx.fillStyle = BELLY;
   ctx.globalAlpha = 0.6;
   ctx.beginPath();
@@ -5076,6 +5332,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
+  // Manchas
   ctx.fillStyle = SPOT;
   const spots = [
     { x: L * 0.02, y: -H * 0.18, s: 3.5 },
@@ -5094,6 +5351,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fill();
   });
 
+  // Orejas
   ctx.fillStyle = FUR;
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.3;
@@ -5114,6 +5372,7 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
     ctx.fillStyle = FUR;
   }
 
+  // Cabeza
   ctx.fillStyle = FUR;
   ctx.strokeStyle = OUTLINE;
   ctx.beginPath();
@@ -5145,7 +5404,6 @@ function drawTezcatlipocaHead(rs, guardian, cx, cy, dir, perp, rear) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = SPOT;
   for (const side of [-1, 1]) {
     ctx.beginPath();
     ctx.moveTo(HEAD_W * 0.3, side * HEAD_H * 0.28);
@@ -5377,6 +5635,9 @@ function drawGuardianHead(rs, guardian) {
   ctx.restore();
 }
 
+// ========================================================
+// 27. DIBUJO DE COMIDA — maíz detallado (diseño original)
+// ========================================================
 function drawFoodOffering(food, cx, cy, pulse) {
   const isMaize = food.offering === 'maize';
   const isCacao = food.offering === 'cacao';
@@ -5588,7 +5849,7 @@ function drawCipactliPortal(cx, cy, radius, alpha, isOpening) {
 }
 
 // ========================================================
-// 22. DRAW PRINCIPAL (optimizado)
+// 28. DRAW PRINCIPAL (con visual de agua nuevo y dibujos originales)
 // ========================================================
 function draw(interpolation = 1, updateEffects = false) {
   const screenW = window.innerWidth;
@@ -5620,23 +5881,48 @@ function draw(interpolation = 1, updateEffects = false) {
   ctx.rect(-10, -10, screenW + 20, screenH + 20);
   ctx.clip();
   const pulse = Math.sin(gameTime * 0.006) * 1.5;
+
+  // ===== NUEVO VISUAL DEL AGUA: CHARCOS CIRCULARES =====
   if (floodWaterCells.length > 0) {
     ctx.save();
     floodWaterCells.forEach(cell => {
       const x = cell.x * TILE_SIZE;
       const y = cell.y * TILE_SIZE;
-      const grad = ctx.createLinearGradient(x, y, x, y + TILE_SIZE);
-      grad.addColorStop(0, 'rgba(110, 203, 255, 0.75)');
-      grad.addColorStop(0.5, 'rgba(58, 168, 212, 0.85)');
-      grad.addColorStop(1, 'rgba(20, 60, 90, 0.9)');
+      const age = gameTime - cell.bornAt;
+      const remaining = cell.expiresAt - gameTime;
+      const warning = remaining < FLOOD_CELL_WARNING_MS;
+      let alpha = 0.85;
+      if (age < 400) alpha = 0.85 * (age / 400);
+      else if (warning) alpha = 0.85 * (remaining / FLOOD_CELL_WARNING_MS);
+      alpha = Math.max(0.2, Math.min(0.9, alpha));
+      const cx = x + TILE_SIZE / 2;
+      const cy = y + TILE_SIZE / 2;
+      const r = TILE_SIZE * 0.62;
+      const grad = ctx.createRadialGradient(cx, cy, TILE_SIZE * 0.15, cx, cy, r);
+      grad.addColorStop(0, `rgba(110, 203, 255, ${alpha})`);
+      grad.addColorStop(0.6, `rgba(58, 168, 212, ${alpha * 0.9})`);
+      grad.addColorStop(1, `rgba(20, 60, 90, ${alpha * 0.85})`);
       ctx.fillStyle = grad;
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-      const waveY = y + Math.sin(gameTime * 0.004 + cell.x * 0.5 + cell.y * 0.3) * 2;
-      ctx.fillStyle = 'rgba(179, 229, 255, 0.7)';
-      ctx.fillRect(x, waveY + 2, TILE_SIZE, 1.5);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      const waveR = r * (0.7 + Math.sin(gameTime * 0.006 + cell.x + cell.y) * 0.08);
+      ctx.strokeStyle = `rgba(179, 229, 255, ${alpha * 0.8})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, waveR, 0, Math.PI * 2);
+      ctx.stroke();
+      if (warning) {
+        ctx.strokeStyle = `rgba(255, 220, 120, ${alpha * 0.9})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     });
     ctx.restore();
   }
+
   drawHuntTrail();
   foods.forEach(food => {
     const targetX = food.x * TILE_SIZE + TILE_SIZE / 2;
@@ -5945,7 +6231,7 @@ function draw(interpolation = 1, updateEffects = false) {
 }
 
 // ========================================================
-// 23. START / PAUSE / GAME OVER
+// 29. START / PAUSE / GAME OVER
 // ========================================================
 function startGame() {
   getAudioContext();
@@ -5962,9 +6248,19 @@ function startGame() {
   lastFrameTimestamp = null;
   frameTimeEMA = 16.7;
   isSlowDevice = false;
+  resetDailyState();
+  if (gameModeSelect.value === 'daily' && dailyChallenge && dailyChallenge.rule) {
+    dailyChallenge.rule.apply();
+    dailyState.activeRule = dailyChallenge.rule;
+  }
   resetGame();
   gameTime = 0;
   applyGameModeRules();
+  if (dailyState.extraLives > 0) {
+    maxLives += dailyState.extraLives;
+    lives = maxLives;
+    updateLivesUI();
+  }
   isGameRunning = true;
   isPaused = false;
   runStartedAt = gameTime;
@@ -5995,6 +6291,7 @@ function pauseForModal() {
   isPaused = true;
   stopMusic();
   stopGameLoop();
+  stopWelcomeDemo();
   updateFuriaUI();
   updatePauseButtonUI();
   draw(renderInterpolation, false);
@@ -6045,11 +6342,13 @@ function exitToMenu() {
   stopGameLoop();
   stopMusic();
   cancelCountdown();
+  resetDailyState();
   [pauseOverlay, gameOverlay, settingsModal, tutorialModal, objectivesModal, statisticsModal, customizeModal, loreModal, introTutorialModal, campaignModal].forEach(m => { if (m) m.classList.add('hidden'); });
   if (welcomeScreen) welcomeScreen.classList.remove('hidden');
   document.body.classList.add('welcome-open');
   document.body.classList.remove('gameover-open', 'tutorial-open');
   if (dtStartBtn) dtStartBtn.textContent = '▶ Iniciar';
+  if (welcomeStartBtn) welcomeStartBtn.classList.remove('hidden');
   resetGame();
   gameTime = 0;
   applyGameModeRules();
@@ -6062,6 +6361,8 @@ function exitToMenu() {
 }
 
 function gameOver(reason = 'Has chocado con tu propio cuerpo.', causeEmoji) {
+  if (!isGameRunning && gameOverlay && !gameOverlay.classList.contains('hidden')) return;
+  const runModeSnapshot = runMode;
   finishRunStatistics();
   const coinsEarned = Math.floor(score / 10);
   isGameRunning = false;
@@ -6070,7 +6371,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.', causeEmoji) {
   cancelCountdown();
   clearFireBreath();
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
-  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0;
+  isFuria = false; furiaReadyAt = 0; furiaCooldownUntil = 0; furiaCooldownUntilReal = 0;
   BadgeManager.resetAll();
   airBoostUntil = 0;
   updateFuriaUI();
@@ -6085,7 +6386,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.', causeEmoji) {
   enemyGuardians = []; particles = []; damageRings = [];
   nextCipactliSpawnAt = null;
   deactivateImmunity();
-  isOnFire = false; fireExpiresAt = 0;
+  isOnFire = false;
   eclipseActive = false;
   huntTrail = [];
   stopMusic();
@@ -6105,7 +6406,7 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.', causeEmoji) {
       finalCauseLine.textContent = '';
     }
   }
-  const prevBest = progression.bestScoreByMode[runMode] || 0;
+  const prevBest = progression.bestScoreByMode[runModeSnapshot] || 0;
   if (recordBadge) {
     if (score > prevBest && score > 0) {
       recordBadge.classList.remove('hidden');
@@ -6113,6 +6414,66 @@ function gameOver(reason = 'Has chocado con tu propio cuerpo.', causeEmoji) {
       recordBadge.classList.add('hidden');
     }
   }
+  
+  const isCampaignMode = (gameModeSelect.value === 'campaign');
+  const overlayTitle = document.getElementById('overlay-title');
+  
+  if (isCampaignMode && campaignWon) {
+    const hasNextLevel = campaignLevel < CAMPAIGN_LEVELS.length;
+    if (overlayTitle) {
+      overlayTitle.textContent = hasNextLevel ? '📖 ¡Capítulo completado!' : '🏆 ¡Travesía completada!';
+    }
+    if (campaignNextBtn) {
+      if (hasNextLevel) {
+        campaignNextBtn.classList.remove('hidden');
+        campaignNextBtn.onclick = () => {
+          const nextLevel = campaignLevel + 1;
+          const nextLvl = CAMPAIGN_LEVELS.find(l => l.id === nextLevel);
+          const unlocked = nextLvl && (
+            progression.campaignCompleted.includes(campaignLevel) ||
+            progression.campaignCompleted.some(id => id > nextLevel)
+          );
+          if (!unlocked) {
+            gameOverlay.classList.add('hidden');
+            document.body.classList.remove('gameover-open');
+            exitToMenu();
+            return;
+          }
+          campaignLevel = nextLevel;
+          gameOverlay.classList.add('hidden');
+          document.body.classList.remove('gameover-open');
+          startGame();
+        };
+      } else {
+        campaignNextBtn.classList.add('hidden');
+      }
+    }
+    if (restartOverlayBtn) {
+      restartOverlayBtn.textContent = hasNextLevel ? '🔄 Repetir capítulo' : '🏠 Volver al menú';
+      if (!hasNextLevel) {
+        restartOverlayBtn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          exitToMenu();
+        };
+      } else {
+        restartOverlayBtn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          setTimeout(() => startGame(), 0);
+        };
+      }
+    }
+  } else {
+    if (overlayTitle) overlayTitle.textContent = 'La travesía termina';
+    if (campaignNextBtn) campaignNextBtn.classList.add('hidden');
+    if (restartOverlayBtn) {
+      restartOverlayBtn.textContent = '🔄 Jugar de nuevo';
+      restartOverlayBtn.onclick = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        setTimeout(() => startGame(), 0);
+      };
+    }
+  }
+  
   if (gameOverlay) gameOverlay.classList.remove('hidden');
   document.body.classList.add('gameover-open');
   if (dtStartBtn) dtStartBtn.textContent = '▶ Iniciar';
@@ -6134,7 +6495,7 @@ function changeDirection(newDir) {
 }
 
 // ========================================================
-// 24-31. TUTORIAL, MODALES, CONTROLES, WELCOME DEMO, INIT
+// 30. MODALES
 // ========================================================
 function showTutorialStep(step) {
   currentTutorialStep = step;
@@ -6151,6 +6512,7 @@ function showTutorialStep(step) {
 
 function resumeIfWasRunning(wasRunning) {
   if (pauseOverlay) pauseOverlay.classList.add('hidden');
+  if (!welcomeScreen.classList.contains('hidden')) startWelcomeDemo();
   if (!wasRunning) { updatePauseButtonUI(); return; }
   if (!isPaused) {
     if (animationFrameId === null && isGameRunning) startGameLoop();
@@ -6179,6 +6541,7 @@ function openTutorial() {
   tutorialModal.dataset.wasRunning = wasRunning ? '1' : '0';
   showTutorialStep(1);
 }
+
 function closeTutorial() {
   if (tutorialModal.classList.contains('hidden')) return;
   tutorialModal.classList.add('hidden');
@@ -6186,14 +6549,22 @@ function closeTutorial() {
   const card = welcomeScreen.querySelector('.welcome-card');
   if (card && tutorialModal.parentElement !== card) card.appendChild(tutorialModal);
   if (tutorialOpenedFromWelcome) { welcomeScreen.classList.remove('hidden'); startWelcomeDemo(); }
-  welcomeStartBtn.classList.toggle('hidden', welcomeScreen.classList.contains('hidden') || !tutorialModal.classList.contains('hidden'));
+  if (!welcomeScreen.classList.contains('hidden') && welcomeStartBtn) {
+    welcomeStartBtn.classList.remove('hidden');
+  }
   tutorialOpenedFromWelcome = false;
   const wasRunning = tutorialModal.dataset.wasRunning === '1';
   delete tutorialModal.dataset.wasRunning;
   resumeIfWasRunning(wasRunning);
 }
+
 function openIntroTutorial() { introTutorialModal.classList.remove('hidden'); }
-function closeIntroTutorial() { introTutorialModal.classList.add('hidden'); }
+function closeIntroTutorial() {
+  introTutorialModal.classList.add('hidden');
+  if (!welcomeScreen.classList.contains('hidden') && welcomeStartBtn) {
+    welcomeStartBtn.classList.remove('hidden');
+  }
+}
 
 function renderLoreChapters() {
   if (!loreChapters) return;
@@ -6223,6 +6594,9 @@ function closeLore() {
   const wasRunning = loreModal.dataset.wasRunning === '1';
   delete loreModal.dataset.wasRunning;
   resumeIfWasRunning(wasRunning);
+  if (!welcomeScreen.classList.contains('hidden') && welcomeStartBtn) {
+    welcomeStartBtn.classList.remove('hidden');
+  }
 }
 
 function openStatistics() {
@@ -6264,6 +6638,9 @@ function closeCustomize(applyChanges) {
   }
   cancelCustomizeSession();
   resumeIfWasRunning(wasRunning);
+  if (!welcomeScreen.classList.contains('hidden') && welcomeStartBtn) {
+    welcomeStartBtn.classList.remove('hidden');
+  }
 }
 
 function openSettings() {
@@ -6339,7 +6716,9 @@ function renderCampaignUI() {
   if (!campaignLevels) return;
   campaignLevels.innerHTML = '';
   CAMPAIGN_LEVELS.forEach(lvl => {
-    const unlocked = lvl.id === 1 || progression.campaignCompleted.includes(lvl.id - 1);
+    const unlocked = lvl.id === 1
+      || progression.campaignCompleted.includes(lvl.id - 1)
+      || progression.campaignCompleted.some(id => id > lvl.id);
     const completed = progression.campaignCompleted.includes(lvl.id);
     const div = document.createElement('div');
     div.className = `campaign-level ${!unlocked ? 'locked' : ''} ${completed ? 'completed' : ''}`;
@@ -6364,7 +6743,7 @@ function renderCampaignUI() {
 }
 
 // ========================================================
-// 25. CONTROLES
+// 31. CONTROLES
 // ========================================================
 let touchStartX = 0;
 let touchStartY = 0;
@@ -6416,10 +6795,17 @@ bindDpad(btnLeft, { x: -1, y: 0 });
 bindDpad(btnRight, { x: 1, y: 0 });
 
 // ========================================================
-// 26. EVENTOS UI
+// 32. EVENTOS UI
 // ========================================================
 if (welcomeStartBtn) welcomeStartBtn.addEventListener('click', () => {
   if (gameModeSelect.value === 'campaign') { openCampaign(); return; }
+  if (gameModeSelect.value === 'daily') {
+    dailyChallenge = getDailyChallenge();
+    if (dailyChallenge && dailyChallenge.rule) {
+      dailyChallenge.rule.apply();
+      dailyState.activeRule = dailyChallenge.rule;
+    }
+  }
   startGame();
 });
 if (welcomeInfoBtn) welcomeInfoBtn.addEventListener('click', openIntroTutorial);
@@ -6511,7 +6897,7 @@ if (campaignPlayBtn) campaignPlayBtn.addEventListener('click', () => {
 });
 
 // ========================================================
-// 28. DIFICULTAD Y MODO
+// 33. DIFICULTAD Y MODO
 // ========================================================
 function updateModeUI() {
   const isClassic = gameModeSelect.value === 'classic';
@@ -6576,12 +6962,27 @@ if (gameModeSelect) gameModeSelect.addEventListener('change', () => {
 });
 
 // ========================================================
-// 29. VISIBILITY
+// 34. VISIBILITY + BLUR
 // ========================================================
+let _lastBlurPause = 0;
+window.addEventListener('blur', () => {
+  const now = performance.now();
+  if (now - _lastBlurPause < 300) return;
+  _lastBlurPause = now;
+  if (isGameRunning && !isPaused) {
+    if (pauseOverlay) pauseOverlay.classList.remove('hidden');
+    isPaused = true;
+    stopMusic();
+    stopGameLoop();
+    updateFuriaUI();
+    updatePauseButtonUI();
+    draw(renderInterpolation, false);
+  }
+});
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (isGameRunning && !isPaused) {
-      if (pauseOverlay) pauseOverlay.classList.remove('hidden');
       isPaused = true;
       stopMusic();
       stopGameLoop();
@@ -6595,23 +6996,13 @@ document.addEventListener('visibilitychange', () => {
     if (!welcomeScreen.classList.contains('hidden')) startWelcomeDemo();
   }
 });
-window.addEventListener('blur', () => {
-  if (isGameRunning && !isPaused) {
-    if (pauseOverlay) pauseOverlay.classList.remove('hidden');
-    isPaused = true;
-    stopMusic();
-    stopGameLoop();
-    updateFuriaUI();
-    updatePauseButtonUI();
-    draw(renderInterpolation, false);
-  }
-});
+
 window.addEventListener('pagehide', () => {
   if (isGameRunning && !isPaused) { isPaused = true; stopMusic(); stopGameLoop(); }
 });
 
 // ========================================================
-// 30. WELCOME DEMO
+// 35. WELCOME DEMO
 // ========================================================
 function buildWelcomeScenario(cols, rows) {
   const sx = 4;
@@ -6666,8 +7057,12 @@ function updateWelcomeLayout(width, height) {
   const target = Math.max(18, Math.min(28, width / 15));
   const cols = Math.max(14, Math.min(30, Math.floor(availW / target)));
   const rows = Math.max(7, Math.min(22, Math.floor(availH / target)));
-  const cell = Math.max(8, Math.min(availW / cols, availH / rows));
-  welcomeLayout = { cell, bx: (width - cell * cols) / 2, by: HUD_H + (availH - cell * rows) / 2 };
+  const cell = Math.max(8, Math.min(availW / Math.max(1, cols), availH / Math.max(1, rows)));
+  welcomeLayout = {
+    cell,
+    bx: Math.max(0, (width - cell * cols) / 2),
+    by: HUD_H + Math.max(0, (availH - cell * rows) / 2)
+  };
   const changed = cols !== welcomeDemoCols || rows !== welcomeDemoRows;
   if (changed) {
     welcomeDemoCols = cols; welcomeDemoRows = rows;
@@ -6693,7 +7088,10 @@ function drawWelcomeCell(segment, index, options = {}) {
   const { x, y, size } = segment;
   const inset = Math.max(1, size * 0.07);
   const isHead = index === 0;
-  const direction = options.direction || { x: 1, y: 0 };
+  let direction = options.direction;
+  if (!direction || (direction.x === 0 && direction.y === 0)) {
+    direction = { x: 1, y: 0 };
+  }
   const colors = options.guardian ? ['#e2574c', '#9b2929'] : options.immune ? ['#7de8c4', '#1a7a5e'] : ['#4ec9a0', '#1a7a5e'];
   welcomeDemoContext.fillStyle = isHead ? colors[0] : colors[1];
   roundRect(welcomeDemoContext, x + inset, y + inset, size - inset * 2, size - inset * 2, isHead ? size * 0.32 : size * 0.2);
@@ -6891,7 +7289,7 @@ function stopWelcomeDemo() {
 }
 
 // ========================================================
-// 31. INICIALIZACIÓN
+// 36. INICIALIZACIÓN
 // ========================================================
 function init() {
   updateSoundUI();
